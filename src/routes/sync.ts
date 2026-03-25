@@ -14,6 +14,7 @@ export function syncRoutes(db: Database.Database): Router {
 
   // Full sync — pulls everything from Odoo
   router.post('/full', async (_req, res) => {
+    _req.socket.setTimeout(300000); // 5 minutes
     try {
       const result = await runFullSync(db, {
         dateFrom: _req.body.date_from,
@@ -40,6 +41,7 @@ export function syncRoutes(db: Database.Database): Router {
 
   // Sync only journal entries
   router.post('/journal', async (req, res) => {
+    req.socket.setTimeout(300000); // 5 minutes
     try {
       const result = await runJournalSync(db, {
         dateFrom: req.body.date_from,
