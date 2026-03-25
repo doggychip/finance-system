@@ -108,7 +108,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(rows.reverse());
   });
 
-  // Cash & bank account balances
+  // Cash & bank account balances — categorized
   router.get('/cash-balances', (_req, res) => {
     const rows = db.prepare(`
       SELECT
@@ -120,14 +120,23 @@ export function dashboardRoutes(db: Database.Database): Router {
       LEFT JOIN line_items li ON li.account_id = a.id
         AND li.journal_entry_id IN (SELECT id FROM journal_entries WHERE status = 'posted')
       WHERE a.is_active = 1
-        AND (a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')
+        AND (a.odoo_type IN ('asset_cash', 'asset_current', 'asset_receivable')
+             OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')
       GROUP BY a.id
       HAVING balance != 0
       ORDER BY balance DESC
-    `).all();
+    `).all() as any[];
 
-    const totalCash = (rows as any[]).reduce((sum, r) => sum + r.balance, 0);
-    res.json({ accounts: rows, total: totalCash });
+    const overdrawn = rows.filter(r => r.balance < 0);
+    const receivable = rows.filter(r => r.balance > 0 && r.odoo_type === 'asset_receivable');
+    const cash = rows.filter(r => r.balance > 0 && r.odoo_type !== 'asset_receivable');
+
+    res.json({
+      cash: { accounts: cash, total: cash.reduce((s, r) => s + r.balance, 0) },
+      receivable: { accounts: receivable, total: receivable.reduce((s, r) => s + r.balance, 0) },
+      overdrawn: { accounts: overdrawn, total: overdrawn.reduce((s, r) => s + r.balance, 0) },
+      grand_total: rows.reduce((s, r) => s + r.balance, 0),
+    });
   });
 
   // Cash balances over time — supports daily, weekly, monthly periods

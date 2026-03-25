@@ -49,6 +49,8 @@
     .stat-card .value { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
 
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
@@ -79,6 +81,24 @@
     .bar-row .bar-track { flex: 1; height: 28px; background: var(--surface2); border-radius: 6px; overflow: hidden; }
     .bar-row .bar-fill { height: 100%; border-radius: 6px; transition: width 0.6s ease; }
     .bar-row .bar-amount { font-size: 14px; font-weight: 600; width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Category boxes */
+    .category-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .category-box .box-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .category-box .box-header h3 { font-size: 14px; font-weight: 600; }
+    .category-box .box-header .box-total { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .category-box .box-header .box-count { font-size: 12px; color: var(--text-dim); }
+    .category-box.cash-box .box-header { border-left: 3px solid var(--green); }
+    .category-box.receivable-box .box-header { border-left: 3px solid var(--blue); }
+    .category-box.overdrawn-box .box-header { border-left: 3px solid var(--red); }
+    .category-box .box-list { max-height: 400px; overflow-y: auto; }
+    .category-box .box-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .category-box .box-item:last-child { border-bottom: none; }
+    .category-box .box-item:hover { background: var(--surface2); }
+    .category-box .box-item .item-name { flex: 1; }
+    .category-box .box-item .item-code { color: var(--text-dim); width: 80px; font-size: 12px; }
+    .category-box .box-item .item-balance { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
+    .box-empty { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
 
     .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
@@ -152,16 +172,31 @@
       <div class="chart-container" style="height:400px"><canvas id="accountHistoryChart"></canvas></div>
     </div>
 
-    <!-- Bar breakdown -->
-    <div class="card fullwidth">
-      <h2>Cash Accounts Breakdown</h2>
-      <div id="accountBars"><div class="loading">Loading...</div></div>
-    </div>
+    <!-- Three category boxes -->
+    <div class="grid-3">
+      <div class="category-box cash-box">
+        <div class="box-header">
+          <div><h3>Cash & Bank</h3><div class="box-count" id="cashCount">--</div></div>
+          <div class="box-total text-green" id="cashTotal">--</div>
+        </div>
+        <div class="box-list" id="cashList"><div class="box-empty">Loading...</div></div>
+      </div>
 
-    <!-- Account list -->
-    <div class="card fullwidth">
-      <h2>All Cash & Bank Accounts</h2>
-      <div id="accountList"><div class="loading">Loading...</div></div>
+      <div class="category-box receivable-box">
+        <div class="box-header">
+          <div><h3>Receivables</h3><div class="box-count" id="receivableCount">--</div></div>
+          <div class="box-total" style="color:var(--blue)" id="receivableTotal">--</div>
+        </div>
+        <div class="box-list" id="receivableList"><div class="box-empty">Loading...</div></div>
+      </div>
+
+      <div class="category-box overdrawn-box">
+        <div class="box-header">
+          <div><h3>Overdrawn</h3><div class="box-count" id="overdrawnCount">--</div></div>
+          <div class="box-total text-red" id="overdrawnTotal">--</div>
+        </div>
+        <div class="box-list" id="overdrawnList"><div class="box-empty">Loading...</div></div>
+      </div>
     </div>
   </div>
 
@@ -207,27 +242,50 @@
 
     async function loadCashBalances() {
       const data = await fetchJSON('/api/dashboard/cash-balances');
-      const accounts = data.accounts || [];
-      const total = data.total || 0;
+      const cashAccs = data.cash?.accounts || [];
+      const recvAccs = data.receivable?.accounts || [];
+      const overAccs = data.overdrawn?.accounts || [];
+      const allAccs = [...cashAccs, ...recvAccs, ...overAccs];
+      const grandTotal = data.grand_total || 0;
 
       const heroEl = document.getElementById('heroTotal');
-      heroEl.textContent = fmt(total);
-      heroEl.className = 'total ' + (total >= 0 ? 'positive' : 'negative');
-      document.getElementById('heroSub').textContent = `Across ${accounts.length} cash & bank account${accounts.length !== 1 ? 's' : ''}`;
+      heroEl.textContent = fmt(grandTotal);
+      heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
+      document.getElementById('heroSub').textContent = `Across ${allAccs.length} account${allAccs.length !== 1 ? 's' : ''}`;
 
-      const positive = accounts.filter(a => a.balance > 0);
-      const negative = accounts.filter(a => a.balance < 0);
-      document.getElementById('statCount').textContent = fmtNum(accounts.length);
-      document.getElementById('statPositive').textContent = fmtNum(positive.length);
-      document.getElementById('statNegative').textContent = fmtNum(negative.length);
-      if (accounts.length > 0) {
-        const largest = accounts.reduce((a, b) => Math.abs(a.balance) > Math.abs(b.balance) ? a : b);
+      document.getElementById('statCount').textContent = fmtNum(cashAccs.length);
+      document.getElementById('statPositive').textContent = fmtNum(cashAccs.length + recvAccs.length);
+      document.getElementById('statNegative').textContent = fmtNum(overAccs.length);
+      if (allAccs.length > 0) {
+        const largest = allAccs.reduce((a, b) => Math.abs(a.balance) > Math.abs(b.balance) ? a : b);
         document.getElementById('statLargest').textContent = largest.name.slice(0, 25);
       }
 
-      renderDistribution(accounts);
-      renderBars(accounts);
-      renderAccountList(accounts);
+      renderDistribution(cashAccs);
+      renderCategoryBox('cash', cashAccs, data.cash?.total || 0, 'var(--green)');
+      renderCategoryBox('receivable', recvAccs, data.receivable?.total || 0, 'var(--blue)');
+      renderCategoryBox('overdrawn', overAccs, data.overdrawn?.total || 0, 'var(--red)');
+    }
+
+    function renderCategoryBox(type, accounts, total, color) {
+      document.getElementById(type + 'Total').textContent = fmt(total);
+      document.getElementById(type + 'Count').textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
+
+      const listEl = document.getElementById(type + 'List');
+      if (accounts.length === 0) {
+        listEl.innerHTML = '<div class="box-empty">None</div>';
+        return;
+      }
+
+      const sorted = [...accounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+      listEl.innerHTML = sorted.map(a => {
+        const balColor = a.balance >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<div class="box-item">
+          <div class="item-code">${a.code}</div>
+          <div class="item-name">${a.name.length > 35 ? a.name.slice(0, 35) + '...' : a.name}</div>
+          <div class="item-balance" style="color:${balColor}">${fmt(a.balance)}</div>
+        </div>`;
+      }).join('');
     }
 
     function renderDistribution(accounts) {
@@ -376,40 +434,6 @@
       });
     }
 
-    function renderBars(accounts) {
-      const el = document.getElementById('accountBars');
-      const sorted = [...accounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 20);
-      if (!sorted.length) { el.innerHTML = '<div class="empty-state"><p>No cash accounts found.</p></div>'; return; }
-      const maxAbs = Math.max(...sorted.map(a => Math.abs(a.balance)));
-      el.innerHTML = sorted.map(a => {
-        const pct = maxAbs > 0 ? (Math.abs(a.balance) / maxAbs * 100) : 0;
-        const color = a.balance >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)';
-        return `<div class="bar-row">
-          <div class="bar-label">${a.code} ${a.name.slice(0, 30)}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.max(pct, 2)}%;background:${color}"></div></div>
-          <div class="bar-amount" style="color:${a.balance >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(a.balance)}</div>
-        </div>`;
-      }).join('');
-    }
-
-    function renderAccountList(accounts) {
-      const el = document.getElementById('accountList');
-      if (!accounts.length) { el.innerHTML = '<div class="empty-state"><p>No cash or bank accounts found.</p></div>'; return; }
-      const sorted = [...accounts].sort((a, b) => b.balance - a.balance);
-      el.innerHTML = '<ul class="account-list">' + sorted.map(a => {
-        const cls = a.balance > 0 ? 'positive' : a.balance < 0 ? 'negative' : 'zero';
-        return `<li class="account-item">
-          <div class="info">
-            <div class="name">${a.name} <span class="type-badge">${odooTypeLabel(a.odoo_type)}</span></div>
-            <div class="code">${a.code}</div>
-          </div>
-          <div class="balance-col">
-            <div class="balance ${cls}">${fmt(a.balance)}</div>
-            <div class="debit-credit">Dr: ${fmt(a.total_debits)} / Cr: ${fmt(a.total_credits)}</div>
-          </div>
-        </li>`;
-      }).join('') + '</ul>';
-    }
 
     async function loadAll() {
       await Promise.all([loadCashBalances(), loadTimeCharts()]);
