@@ -1,4 +1,4 @@
-import { createClient } from 'xmlrpc';
+import { createClient, createSecureClient } from 'xmlrpc';
 
 export interface OdooConfig {
   url: string;       // e.g. https://mycompany.odoo.com
@@ -11,9 +11,16 @@ interface XmlRpcClient {
   methodCall(method: string, params: unknown[], callback: (err: Error | null, result: unknown) => void): void;
 }
 
+const RPC_TIMEOUT_MS = 30000; // 30 seconds
+
 function rpcCall(client: XmlRpcClient, method: string, params: unknown[]): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`XML-RPC call "${method}" timed out after ${RPC_TIMEOUT_MS / 1000}s`));
+    }, RPC_TIMEOUT_MS);
+
     client.methodCall(method, params, (err, result) => {
+      clearTimeout(timer);
       if (err) reject(err);
       else resolve(result);
     });
@@ -32,19 +39,23 @@ export class OdooClient {
     const urlObj = new URL(config.url);
     const isSecure = urlObj.protocol === 'https:';
     const port = urlObj.port ? parseInt(urlObj.port) : (isSecure ? 443 : 80);
-    const createFn = isSecure ? require('xmlrpc').createSecureClient : createClient;
+    const createFn = isSecure ? createSecureClient : createClient;
+
+    const clientOptions = {
+      host: urlObj.hostname,
+      port,
+      rejectUnauthorized: true,
+    };
 
     this.commonClient = createFn({
-      host: urlObj.hostname,
-      port,
+      ...clientOptions,
       path: '/xmlrpc/2/common',
-    });
+    }) as unknown as XmlRpcClient;
 
     this.objectClient = createFn({
-      host: urlObj.hostname,
-      port,
+      ...clientOptions,
       path: '/xmlrpc/2/object',
-    });
+    }) as unknown as XmlRpcClient;
   }
 
   async authenticate(): Promise<number> {
@@ -56,7 +67,7 @@ export class OdooClient {
     ]) as number;
 
     if (!uid || uid === 0) {
-      throw new Error('Odoo authentication failed. Check your credentials.');
+      throw new Error('Odoo authentication failed. Check your credentials (db, username, password/API key).');
     }
 
     this.uid = uid;

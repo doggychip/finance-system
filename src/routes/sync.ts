@@ -94,8 +94,12 @@ export function syncRoutes(db: Database.Database): Router {
     try {
       const { createOdooClient } = await import('../odoo/client');
       const odoo = createOdooClient();
+      console.log('[sync/test] Fetching Odoo version...');
       const version = await odoo.version();
+      console.log('[sync/test] Odoo version:', version.server_version);
+      console.log('[sync/test] Authenticating...');
       const uid = await odoo.authenticate();
+      console.log('[sync/test] Authenticated, UID:', uid);
       res.json({
         status: 'connected',
         odoo_version: version.server_version,
@@ -103,6 +107,7 @@ export function syncRoutes(db: Database.Database): Router {
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[sync/test] Error:', message);
       res.status(500).json({ status: 'error', error: message });
     }
   });
