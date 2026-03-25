@@ -20,7 +20,7 @@ app.get('/health', (_req, res) => {
 app.use(express.json());
 
 // Serve dashboard
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 const db = initDb();
 
