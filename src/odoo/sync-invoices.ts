@@ -107,7 +107,7 @@ export async function syncInvoices(
     paymentDomain,
     [
       'id', 'name', 'partner_id', 'amount', 'date',
-      'payment_type', 'state', 'ref', 'currency_id', 'move_id',
+      'payment_type', 'state', 'currency_id', 'move_id',
     ],
     { order: 'date desc', limit: options.limit }
   );
@@ -139,7 +139,7 @@ export async function syncInvoices(
         const date = pmt.date as string;
         const paymentType = pmt.payment_type as string;
         const state = pmt.state as string;
-        const ref = (pmt.ref as string | false) || '';
+        const ref = (pmt.name as string | false) || '';
         const currencyRef = pmt.currency_id as [number, string] | false;
         const currency = currencyRef ? currencyRef[1] : 'USD';
 
