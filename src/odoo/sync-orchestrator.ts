@@ -26,9 +26,6 @@ export async function runFullSync(
   const odoo = createOdooClient();
   await odoo.authenticate();
 
-  // Default limit for journal entries to avoid timeouts
-  const journalLimit = options.limit || 200;
-
   // 1. Sync accounts first (other syncs depend on account mapping)
   const accountResult = await syncAccounts(odoo, db);
   logSync(
@@ -38,8 +35,8 @@ export async function runFullSync(
     accountResult.errors.join('; ') || undefined
   );
 
-  // 2. Sync journal entries (depends on accounts) — limited to avoid timeouts
-  const journalResult = await syncJournalEntries(odoo, db, { ...options, limit: journalLimit });
+  // 2. Sync journal entries (depends on accounts) — batched to avoid timeouts
+  const journalResult = await syncJournalEntries(odoo, db, options);
   logSync(
     db, 'journal_entries',
     journalResult.errors.length > 0 ? 'error' : 'success',

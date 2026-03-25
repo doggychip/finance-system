@@ -117,7 +117,8 @@ describe('syncJournalEntries', () => {
   });
 
   it('should sync journal entries with line items', async () => {
-    // Mock account.move search_read
+    // Mock searchCount then account.move search_read
+    (odoo.searchCount as ReturnType<typeof vi.fn>).mockResolvedValueOnce(1);
     (odoo.searchRead as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([
         { id: 100, name: 'INV/2025/001', date: '2025-01-15', ref: 'Sale', state: 'posted', move_type: 'entry', amount_total: 500 },
@@ -145,6 +146,7 @@ describe('syncJournalEntries', () => {
   });
 
   it('should map Odoo states correctly', async () => {
+    (odoo.searchCount as ReturnType<typeof vi.fn>).mockResolvedValueOnce(1);
     (odoo.searchRead as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([
         { id: 200, name: 'DRAFT/001', date: '2025-02-01', ref: '', state: 'draft', move_type: 'entry', amount_total: 100 },
