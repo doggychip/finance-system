@@ -45,7 +45,7 @@ export async function syncAccounts(odoo: OdooClient, db: Database.Database): Pro
   const odooAccounts = await odoo.searchRead(
     'account.account',
     [],
-    ['id', 'name', 'code', 'account_type', 'deprecated', 'company_id'],
+    ['id', 'name', 'code', 'account_type', 'deprecated'],
     { order: 'code asc' }
   );
 
