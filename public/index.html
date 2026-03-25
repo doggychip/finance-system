@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232734;
+      --border: #2e3344;
+      --text: #e4e6ef;
+      --text-dim: #8b8fa3;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .header .sync-status {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .header .sync-status .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .header .actions { display: flex; gap: 8px; }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); }
+    .btn.primary:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+    .card .chart-container {
+      position: relative;
+      height: 280px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      font-weight: 500;
+      color: var(--text-dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    .text-right { text-align: right; }
+    .text-green { color: var(--green); }
+    .text-red { color: var(--red); }
+    .text-dim { color: var(--text-dim); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge.posted { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge.draft { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .badge.void { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    .balance-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .balance-bar .type-label {
+      font-size: 13px;
+      width: 80px;
+      text-transform: capitalize;
+    }
+    .balance-bar .bar-track {
+      flex: 1;
+      height: 24px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .balance-bar .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .balance-bar .amount {
+      font-size: 13px;
+      width: 120px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: var(--text-dim);
+    }
+
+    .fullwidth { margin-bottom: 24px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Finance Dashboard</h1>
+    <div class="sync-status" id="syncStatus">
+      <span class="dot"></span> Loading...
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="refreshData()">Refresh</button>
+      <button class="btn primary" onclick="triggerSync()" id="syncBtn">Sync from Odoo</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="label">Accounts</div><div class="value" id="statAccounts">--</div></div>
+      <div class="stat-card"><div class="label">Journal Entries</div><div class="value" id="statEntries">--</div><div class="sub" id="statEntriesSub"></div></div>
+      <div class="stat-card"><div class="label">Total Assets</div><div class="value" id="statAssets">--</div></div>
+      <div class="stat-card"><div class="label">Total Liabilities</div><div class="value" id="statLiabilities">--</div></div>
+      <div class="stat-card"><div class="label">Net Income</div><div class="value" id="statNetIncome">--</div></div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Account Balances by Type</h2>
+        <div class="chart-container"><canvas id="balanceChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Revenue vs Expenses (Monthly)</h2>
+        <div class="chart-container"><canvas id="revenueExpenseChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Monthly Volume -->
+    <div class="card fullwidth">
+      <h2>Monthly Transaction Volume</h2>
+      <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+    </div>
+
+    <!-- Tables row -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Top Accounts by Balance</h2>
+        <div id="topAccountsTable"><div class="loading">Loading...</div></div>
+      </div>
+      <div class="card">
+        <h2>Recent Journal Entries</h2>
+        <div id="recentEntriesTable"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Balance breakdown -->
+    <div class="card fullwidth">
+      <h2>Balance by Account Type</h2>
+      <div id="balanceBars"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Sync log -->
+    <div class="card fullwidth">
+      <h2>Sync History</h2>
+      <div id="syncLogTable"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let charts = {};
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '--';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
+    function fmtNum(n) {
+      if (n == null) return '--';
+      return new Intl.NumberFormat('en-US').format(n);
+    }
+    function fmtDate(d) {
+      if (!d) return '--';
+      return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    const chartColors = {
+      asset: '#3b82f6',
+      liability: '#ef4444',
+      equity: '#8b5cf6',
+      revenue: '#22c55e',
+      expense: '#f97316',
+    };
+
+    async function fetchJSON(url) {
+      const res = await fetch(API + url);
+      return res.json();
+    }
+
+    async function loadStats() {
+      const [stats, balances] = await Promise.all([
+        fetchJSON('/api/dashboard/stats'),
+        fetchJSON('/api/dashboard/balances'),
+      ]);
+
+      document.getElementById('statAccounts').textContent = fmtNum(stats.accounts);
+      document.getElementById('statEntries').textContent = fmtNum(stats.journal_entries);
+      document.getElementById('statEntriesSub').textContent = `${fmtNum(stats.posted_entries)} posted`;
+
+      const byType = {};
+      for (const row of balances) byType[row.account_type] = row;
+
+      const assets = byType.asset?.net_balance || 0;
+      const liabilities = Math.abs(byType.liability?.net_balance || 0);
+      const revenue = Math.abs(byType.revenue?.net_balance || 0);
+      const expenses = byType.expense?.net_balance || 0;
+
+      document.getElementById('statAssets').textContent = fmt(assets);
+      document.getElementById('statLiabilities').textContent = fmt(liabilities);
+
+      const netIncome = revenue - expenses;
+      const el = document.getElementById('statNetIncome');
+      el.textContent = fmt(netIncome);
+      el.className = 'value ' + (netIncome >= 0 ? 'text-green' : 'text-red');
+
+      if (stats.last_sync) {
+        document.getElementById('syncStatus').innerHTML =
+          `<span class="dot"></span> Last sync: ${fmtDate(stats.last_sync.started_at)} (${stats.last_sync.records_synced} records)`;
+      }
+    }
+
+    async function loadBalanceChart() {
+      const data = await fetchJSON('/api/dashboard/balances');
+      const ctx = document.getElementById('balanceChart').getContext('2d');
+
+      if (charts.balance) charts.balance.destroy();
+      charts.balance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: data.map(r => r.account_type.charAt(0).toUpperCase() + r.account_type.slice(1)),
+          datasets: [{
+            data: data.map(r => Math.abs(r.net_balance)),
+            backgroundColor: data.map(r => chartColors[r.account_type] || '#6366f1'),
+            borderWidth: 0,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#8b8fa3', padding: 16, font: { size: 12 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${fmt(ctx.parsed)}`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadRevenueExpenseChart() {
+      const data = await fetchJSON('/api/dashboard/revenue-vs-expenses');
+      const ctx = document.getElementById('revenueExpenseChart').getContext('2d');
+
+      if (charts.revExp) charts.revExp.destroy();
+      charts.revExp = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(r => r.month),
+          datasets: [
+            {
+              label: 'Revenue',
+              data: data.map(r => r.revenue),
+              backgroundColor: 'rgba(34, 197, 94, 0.7)',
+              borderRadius: 4,
+            },
+            {
+              label: 'Expenses',
+              data: data.map(r => r.expenses),
+              backgroundColor: 'rgba(249, 115, 22, 0.7)',
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3' } },
+            y: {
+              grid: { color: '#2e3344' },
+              ticks: { color: '#8b8fa3', callback: v => fmt(v) }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#8b8fa3' } },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+          }
+        }
+      });
+    }
+
+    async function loadMonthlyChart() {
+      const data = await fetchJSON('/api/dashboard/monthly-totals');
+      const ctx = document.getElementById('monthlyChart').getContext('2d');
+
+      if (charts.monthly) charts.monthly.destroy();
+      charts.monthly = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(r => r.month),
+          datasets: [
+            {
+              label: 'Total Debits',
+              data: data.map(r => r.total_debits),
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59,130,246,0.1)',
+              fill: true,
+              tension: 0.3,
+            },
+            {
+              label: 'Total Credits',
+              data: data.map(r => r.total_credits),
+              borderColor: '#8b5cf6',
+              backgroundColor: 'rgba(139,92,246,0.1)',
+              fill: true,
+              tension: 0.3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3' } },
+            y: {
+              grid: { color: '#2e3344' },
+              ticks: { color: '#8b8fa3', callback: v => fmt(v) }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#8b8fa3' } },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+          }
+        }
+      });
+    }
+
+    async function loadTopAccounts() {
+      const data = await fetchJSON('/api/dashboard/top-accounts?limit=15');
+      const el = document.getElementById('topAccountsTable');
+
+      if (data.length === 0) {
+        el.innerHTML = '<div class="loading">No data yet</div>';
+        return;
+      }
+
+      el.innerHTML = `<table>
+        <thead><tr><th>Code</th><th>Account</th><th>Type</th><th class="text-right">Balance</th></tr></thead>
+        <tbody>${data.map(r => `<tr>
+          <td class="text-dim">${r.code}</td>
+          <td>${r.name.length > 30 ? r.name.slice(0, 30) + '...' : r.name}</td>
+          <td><span style="color:${chartColors[r.type]}">${r.type}</span></td>
+          <td class="text-right ${r.balance >= 0 ? '' : 'text-red'}">${fmt(r.balance)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    async function loadRecentEntries() {
+      const data = await fetchJSON('/api/dashboard/recent-entries?limit=15');
+      const el = document.getElementById('recentEntriesTable');
+
+      if (data.length === 0) {
+        el.innerHTML = '<div class="loading">No entries yet</div>';
+        return;
+      }
+
+      el.innerHTML = `<table>
+        <thead><tr><th>Date</th><th>Description</th><th>Status</th><th class="text-right">Amount</th></tr></thead>
+        <tbody>${data.map(r => `<tr>
+          <td class="text-dim">${r.date}</td>
+          <td>${r.description.length > 30 ? r.description.slice(0, 30) + '...' : r.description}</td>
+          <td><span class="badge ${r.status}">${r.status}</span></td>
+          <td class="text-right">${fmt(r.total_amount)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    async function loadBalanceBars() {
+      const data = await fetchJSON('/api/dashboard/balances');
+      const el = document.getElementById('balanceBars');
+
+      if (data.length === 0) {
+        el.innerHTML = '<div class="loading">No data yet</div>';
+        return;
+      }
+
+      const maxVal = Math.max(...data.map(r => Math.abs(r.net_balance)));
+
+      el.innerHTML = data.map(r => {
+        const pct = maxVal > 0 ? (Math.abs(r.net_balance) / maxVal * 100) : 0;
+        return `<div class="balance-bar">
+          <div class="type-label">${r.account_type}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%;background:${chartColors[r.account_type]}"></div>
+          </div>
+          <div class="amount">${fmt(Math.abs(r.net_balance))}</div>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadSyncLog() {
+      const data = await fetchJSON('/api/dashboard/sync-history');
+      const el = document.getElementById('syncLogTable');
+
+      if (data.length === 0) {
+        el.innerHTML = '<div class="loading">No sync history yet</div>';
+        return;
+      }
+
+      el.innerHTML = `<table>
+        <thead><tr><th>Time</th><th>Type</th><th>Status</th><th class="text-right">Records</th><th>Error</th></tr></thead>
+        <tbody>${data.map(r => `<tr>
+          <td class="text-dim">${fmtDate(r.started_at)}</td>
+          <td>${r.entity_type}</td>
+          <td><span class="badge ${r.status === 'success' ? 'posted' : 'void'}">${r.status}</span></td>
+          <td class="text-right">${fmtNum(r.records_synced)}</td>
+          <td class="text-dim">${r.error_message ? r.error_message.slice(0, 50) + '...' : '--'}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    async function refreshData() {
+      await Promise.all([
+        loadStats(),
+        loadBalanceChart(),
+        loadRevenueExpenseChart(),
+        loadMonthlyChart(),
+        loadTopAccounts(),
+        loadRecentEntries(),
+        loadBalanceBars(),
+        loadSyncLog(),
+      ]);
+    }
+
+    async function triggerSync() {
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      try {
+        await fetch(API + '/api/sync/full', { method: 'POST' });
+        await refreshData();
+      } catch (e) {
+        console.error('Sync failed:', e);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Sync from Odoo';
+    }
+
+    // Initial load
+    refreshData();
+    // Auto-refresh every 5 minutes
+    setInterval(refreshData, 5 * 60 * 1000);
+  </script>
+</body>
+</html>
