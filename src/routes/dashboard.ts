@@ -108,6 +108,56 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(rows.reverse());
   });
 
+  // Cash & bank account balances
+  router.get('/cash-balances', (_req, res) => {
+    const rows = db.prepare(`
+      SELECT
+        a.id, a.name, a.code, a.odoo_type,
+        COALESCE(SUM(li.debit), 0) as total_debits,
+        COALESCE(SUM(li.credit), 0) as total_credits,
+        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM accounts a
+      LEFT JOIN line_items li ON li.account_id = a.id
+        AND li.journal_entry_id IN (SELECT id FROM journal_entries WHERE status = 'posted')
+      WHERE a.is_active = 1
+        AND (a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')
+      GROUP BY a.id
+      HAVING balance != 0
+      ORDER BY balance DESC
+    `).all();
+
+    const totalCash = (rows as any[]).reduce((sum, r) => sum + r.balance, 0);
+    res.json({ accounts: rows, total: totalCash });
+  });
+
+  // Cash flow over time (monthly inflows/outflows on cash accounts)
+  router.get('/cash-flow', (_req, res) => {
+    const rows = db.prepare(`
+      SELECT
+        strftime('%Y-%m', je.date) as month,
+        SUM(li.debit) as inflows,
+        SUM(li.credit) as outflows,
+        SUM(li.debit) - SUM(li.credit) as net_flow
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%'
+      GROUP BY strftime('%Y-%m', je.date)
+      ORDER BY month DESC
+      LIMIT 12
+    `).all();
+
+    // Calculate running balance
+    let runningBalance = 0;
+    const reversed = (rows as any[]).reverse();
+    const withBalance = reversed.map(r => {
+      runningBalance += r.net_flow;
+      return { ...r, running_balance: runningBalance };
+    });
+
+    res.json(withBalance);
+  });
+
   // Revenue vs Expenses monthly
   router.get('/revenue-vs-expenses', (_req, res) => {
     const rows = db.prepare(`

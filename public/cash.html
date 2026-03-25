@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cash Balances — Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232734;
+      --border: #2e3344;
+      --text: #e4e6ef;
+      --text-dim: #8b8fa3;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* Header */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+    .header .nav { display: flex; gap: 4px; }
+    .header .nav a {
+      padding: 6px 14px;
+      border-radius: 6px;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .header .nav a:hover { background: var(--surface2); color: var(--text); }
+    .header .nav a.active { background: var(--accent); color: white; }
+    .header .actions { display: flex; gap: 8px; }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); }
+    .btn.primary:hover { opacity: 0.9; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* Total Cash Hero */
+    .hero {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(34,197,94,0.06) 0%, transparent 50%);
+    }
+    .hero .label {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .hero .total {
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 8px;
+    }
+    .hero .total.positive { color: var(--green); }
+    .hero .total.negative { color: var(--red); }
+    .hero .sub {
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .stat-card .value {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    /* Charts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card.fullwidth { margin-bottom: 24px; }
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .chart-container { position: relative; height: 300px; }
+
+    /* Account list */
+    .account-list { list-style: none; }
+    .account-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .account-item:last-child { border-bottom: none; }
+    .account-item:hover { background: var(--surface2); }
+    .account-item .info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .account-item .name { font-size: 14px; font-weight: 500; }
+    .account-item .code { font-size: 12px; color: var(--text-dim); }
+    .account-item .type-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(6,182,212,0.12);
+      color: var(--cyan);
+      margin-left: 8px;
+    }
+    .account-item .balance-col {
+      text-align: right;
+      min-width: 140px;
+    }
+    .account-item .balance {
+      font-size: 18px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+    }
+    .account-item .balance.positive { color: var(--green); }
+    .account-item .balance.negative { color: var(--red); }
+    .account-item .balance.zero { color: var(--text-dim); }
+    .account-item .debit-credit {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Bar visualization */
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .bar-row .bar-label {
+      font-size: 13px;
+      width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bar-row .bar-track {
+      flex: 1;
+      height: 28px;
+      background: var(--surface2);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .bar-row .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.6s ease;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      min-width: fit-content;
+    }
+    .bar-row .bar-amount {
+      font-size: 14px;
+      font-weight: 600;
+      width: 130px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: var(--text-dim);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Cash Balances</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html" class="active">Cash</a>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="loadAll()">Refresh</button>
+      <button class="btn primary" onclick="triggerSync()">Sync from Odoo</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Hero total -->
+    <div class="hero">
+      <div class="label">Total Cash & Bank Balance</div>
+      <div class="total" id="heroTotal">--</div>
+      <div class="sub" id="heroSub">Loading...</div>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="label">Cash Accounts</div>
+        <div class="value" id="statCount">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Positive Accounts</div>
+        <div class="value text-green" id="statPositive">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Negative / Overdrawn</div>
+        <div class="value text-red" id="statNegative">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Largest Account</div>
+        <div class="value" id="statLargest">--</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Cash Distribution</h2>
+        <div class="chart-container"><canvas id="distributionChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Cash Flow (Monthly)</h2>
+        <div class="chart-container"><canvas id="cashFlowChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Running balance chart -->
+    <div class="card fullwidth">
+      <h2>Running Cash Balance</h2>
+      <div class="chart-container"><canvas id="runningBalanceChart"></canvas></div>
+    </div>
+
+    <!-- Cash accounts bar chart -->
+    <div class="card fullwidth">
+      <h2>Cash Accounts Breakdown</h2>
+      <div id="accountBars"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Detailed account list -->
+    <div class="card fullwidth">
+      <h2>All Cash & Bank Accounts</h2>
+      <div id="accountList"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <script>
+    let charts = {};
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '--';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency', currency: 'USD',
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+      }).format(n);
+    }
+    function fmtShort(n) {
+      if (n == null || isNaN(n)) return '--';
+      const abs = Math.abs(n);
+      if (abs >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return n.toFixed(0);
+    }
+    function fmtNum(n) { return new Intl.NumberFormat('en-US').format(n); }
+
+    const palette = [
+      '#3b82f6','#22c55e','#f97316','#8b5cf6','#06b6d4',
+      '#ec4899','#eab308','#14b8a6','#f43f5e','#a855f7',
+      '#64748b','#0ea5e9','#84cc16','#d946ef','#f59e0b'
+    ];
+
+    function odooTypeLabel(t) {
+      const map = {
+        'asset_cash': 'Cash',
+        'asset_current': 'Current Asset',
+        'asset_receivable': 'Receivable',
+      };
+      return map[t] || t;
+    }
+
+    async function fetchJSON(url) {
+      const res = await fetch(url);
+      return res.json();
+    }
+
+    async function loadCashBalances() {
+      const data = await fetchJSON('/api/dashboard/cash-balances');
+      const accounts = data.accounts || [];
+      const total = data.total || 0;
+
+      // Hero
+      const heroEl = document.getElementById('heroTotal');
+      heroEl.textContent = fmt(total);
+      heroEl.className = 'total ' + (total >= 0 ? 'positive' : 'negative');
+      document.getElementById('heroSub').textContent =
+        `Across ${accounts.length} cash & bank account${accounts.length !== 1 ? 's' : ''}`;
+
+      // Stats
+      const positive = accounts.filter(a => a.balance > 0);
+      const negative = accounts.filter(a => a.balance < 0);
+      document.getElementById('statCount').textContent = fmtNum(accounts.length);
+      document.getElementById('statPositive').textContent = fmtNum(positive.length);
+      document.getElementById('statNegative').textContent = fmtNum(negative.length);
+
+      if (accounts.length > 0) {
+        const largest = accounts.reduce((a, b) => Math.abs(a.balance) > Math.abs(b.balance) ? a : b);
+        document.getElementById('statLargest').textContent = largest.name.slice(0, 25);
+      }
+
+      // Distribution doughnut
+      renderDistribution(accounts);
+
+      // Bar breakdown
+      renderBars(accounts, total);
+
+      // Account list
+      renderAccountList(accounts);
+    }
+
+    function renderDistribution(accounts) {
+      const top = accounts.filter(a => a.balance > 0).slice(0, 10);
+      const ctx = document.getElementById('distributionChart').getContext('2d');
+
+      if (charts.dist) charts.dist.destroy();
+      if (top.length === 0) return;
+
+      charts.dist = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: top.map(a => a.name.length > 25 ? a.name.slice(0, 25) + '...' : a.name),
+          datasets: [{
+            data: top.map(a => a.balance),
+            backgroundColor: top.map((_, i) => palette[i % palette.length]),
+            borderWidth: 0,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: '#8b8fa3', padding: 10, font: { size: 11 }, boxWidth: 12 }
+            },
+            tooltip: {
+              callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.parsed)}` }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadCashFlow() {
+      const data = await fetchJSON('/api/dashboard/cash-flow');
+      if (!data.length) return;
+
+      // Inflows/Outflows bar chart
+      const ctx = document.getElementById('cashFlowChart').getContext('2d');
+      if (charts.flow) charts.flow.destroy();
+
+      charts.flow = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(r => r.month),
+          datasets: [
+            {
+              label: 'Inflows',
+              data: data.map(r => r.inflows),
+              backgroundColor: 'rgba(34, 197, 94, 0.7)',
+              borderRadius: 4,
+            },
+            {
+              label: 'Outflows',
+              data: data.map(r => -r.outflows),
+              backgroundColor: 'rgba(239, 68, 68, 0.6)',
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 11 } } },
+            y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: v => fmtShort(v) } }
+          },
+          plugins: {
+            legend: { labels: { color: '#8b8fa3' } },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(Math.abs(ctx.parsed.y))}` } }
+          }
+        }
+      });
+
+      // Running balance line chart
+      const ctx2 = document.getElementById('runningBalanceChart').getContext('2d');
+      if (charts.running) charts.running.destroy();
+
+      charts.running = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: data.map(r => r.month),
+          datasets: [{
+            label: 'Cash Balance',
+            data: data.map(r => r.running_balance),
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34,197,94,0.08)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: '#22c55e',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 11 } } },
+            y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: v => fmtShort(v) } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `Balance: ${fmt(ctx.parsed.y)}` } }
+          }
+        }
+      });
+    }
+
+    function renderBars(accounts, total) {
+      const el = document.getElementById('accountBars');
+      const sorted = [...accounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 20);
+
+      if (sorted.length === 0) {
+        el.innerHTML = '<div class="empty-state"><p>No cash accounts found. Sync from Odoo first.</p></div>';
+        return;
+      }
+
+      const maxAbs = Math.max(...sorted.map(a => Math.abs(a.balance)));
+
+      el.innerHTML = sorted.map((a, i) => {
+        const pct = maxAbs > 0 ? (Math.abs(a.balance) / maxAbs * 100) : 0;
+        const color = a.balance >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)';
+        return `<div class="bar-row">
+          <div class="bar-label">${a.code} ${a.name.slice(0, 30)}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${Math.max(pct, 2)}%;background:${color}"></div>
+          </div>
+          <div class="bar-amount" style="color:${a.balance >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(a.balance)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderAccountList(accounts) {
+      const el = document.getElementById('accountList');
+
+      if (accounts.length === 0) {
+        el.innerHTML = '<div class="empty-state"><p>No cash or bank accounts found. Make sure accounts are synced from Odoo.</p></div>';
+        return;
+      }
+
+      const sorted = [...accounts].sort((a, b) => b.balance - a.balance);
+      el.innerHTML = '<ul class="account-list">' + sorted.map(a => {
+        const cls = a.balance > 0 ? 'positive' : a.balance < 0 ? 'negative' : 'zero';
+        return `<li class="account-item">
+          <div class="info">
+            <div class="name">${a.name} <span class="type-badge">${odooTypeLabel(a.odoo_type)}</span></div>
+            <div class="code">${a.code}</div>
+          </div>
+          <div class="balance-col">
+            <div class="balance ${cls}">${fmt(a.balance)}</div>
+            <div class="debit-credit">Dr: ${fmt(a.total_debits)} / Cr: ${fmt(a.total_credits)}</div>
+          </div>
+        </li>`;
+      }).join('') + '</ul>';
+    }
+
+    async function loadAll() {
+      await Promise.all([loadCashBalances(), loadCashFlow()]);
+    }
+
+    async function triggerSync() {
+      const btn = document.querySelector('.btn.primary');
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      try {
+        await fetch('/api/sync/accounts', { method: 'POST' });
+        await fetch('/api/sync/journal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 500 }) });
+        await loadAll();
+      } catch (e) { console.error(e); }
+      btn.disabled = false;
+      btn.textContent = 'Sync from Odoo';
+    }
+
+    loadAll();
+    setInterval(loadAll, 5 * 60 * 1000);
+  </script>
+</body>
+</html>

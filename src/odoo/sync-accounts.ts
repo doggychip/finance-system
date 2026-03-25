@@ -52,11 +52,12 @@ export async function syncAccounts(odoo: OdooClient, db: Database.Database): Pro
   result.total = odooAccounts.length;
 
   const upsertAccount = db.prepare(`
-    INSERT INTO accounts (id, odoo_id, name, type, code, description, is_active, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO accounts (id, odoo_id, name, type, odoo_type, code, description, is_active, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(odoo_id) DO UPDATE SET
       name = excluded.name,
       type = excluded.type,
+      odoo_type = excluded.odoo_type,
       code = excluded.code,
       is_active = excluded.is_active,
       updated_at = datetime('now')
@@ -81,11 +82,11 @@ export async function syncAccounts(odoo: OdooClient, db: Database.Database): Pro
         const existing = getByOdooId.get(odooId) as { id: string } | undefined;
 
         if (existing) {
-          upsertAccount.run(existing.id, odooId, name, mappedType, code, '', isActive);
+          upsertAccount.run(existing.id, odooId, name, mappedType, accountType, code, '', isActive);
           result.updated++;
         } else {
           const id = crypto.randomUUID();
-          upsertAccount.run(id, odooId, name, mappedType, code, '', isActive);
+          upsertAccount.run(id, odooId, name, mappedType, accountType, code, '', isActive);
           result.created++;
         }
       } catch (err) {
