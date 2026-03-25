@@ -9,6 +9,12 @@ import { invoiceRoutes } from './routes/invoices';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
 
 const app = express();
+
+// Health check before any middleware
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.use(express.json());
 
 const db = initDb();
@@ -18,10 +24,6 @@ app.use('/api/journal', journalRoutes(db));
 app.use('/api/reports', reportRoutes(db));
 app.use('/api/sync', syncRoutes(db));
 app.use('/api/invoices', invoiceRoutes(db));
-
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
