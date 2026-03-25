@@ -11,7 +11,7 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       odoo_id INTEGER UNIQUE,
       name TEXT NOT NULL,
       type TEXT NOT NULL CHECK(type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
-      code TEXT UNIQUE NOT NULL,
+      code TEXT NOT NULL,
       parent_id TEXT REFERENCES accounts(id),
       description TEXT DEFAULT '',
       is_active INTEGER DEFAULT 1,

@@ -69,18 +69,23 @@ export async function syncAccounts(odoo: OdooClient, db: Database.Database): Pro
       try {
         const odooId = acc.id as number;
         const name = acc.name as string;
-        const code = acc.code as string;
-        const accountType = mapOdooType(acc.account_type as string);
+        const code = acc.code as string | false;
+        const accountType = acc.account_type as string | false;
+
+        // Skip accounts with no code or no account_type (Odoo returns false for empty fields)
+        if (!code || !accountType) continue;
+
+        const mappedType = mapOdooType(accountType);
         const isActive = acc.deprecated === true ? 0 : 1;
 
         const existing = getByOdooId.get(odooId) as { id: string } | undefined;
 
         if (existing) {
-          upsertAccount.run(existing.id, odooId, name, accountType, code, '', isActive);
+          upsertAccount.run(existing.id, odooId, name, mappedType, code, '', isActive);
           result.updated++;
         } else {
           const id = crypto.randomUUID();
-          upsertAccount.run(id, odooId, name, accountType, code, '', isActive);
+          upsertAccount.run(id, odooId, name, mappedType, code, '', isActive);
           result.created++;
         }
       } catch (err) {
