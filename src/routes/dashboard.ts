@@ -130,7 +130,121 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json({ accounts: rows, total: totalCash });
   });
 
-  // Cash flow over time (monthly inflows/outflows on cash accounts)
+  // Cash balances over time — supports daily, weekly, monthly periods
+  router.get('/cash-history', (req, res) => {
+    const period = (req.query.period as string) || 'monthly';
+    const limit = parseInt(req.query.limit as string) || 90;
+
+    let groupExpr: string;
+    let labelExpr: string;
+    switch (period) {
+      case 'daily':
+        groupExpr = "je.date";
+        labelExpr = "je.date";
+        break;
+      case 'weekly':
+        // ISO week: group by year + week number
+        groupExpr = "strftime('%Y-W%W', je.date)";
+        labelExpr = "strftime('%Y-W%W', je.date)";
+        break;
+      case 'monthly':
+      default:
+        groupExpr = "strftime('%Y-%m', je.date)";
+        labelExpr = "strftime('%Y-%m', je.date)";
+        break;
+    }
+
+    const cashFilter = `(a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')`;
+
+    const rows = db.prepare(`
+      SELECT
+        ${labelExpr} as period,
+        SUM(li.debit) as inflows,
+        SUM(li.credit) as outflows,
+        SUM(li.debit) - SUM(li.credit) as net_flow
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE ${cashFilter}
+      GROUP BY ${groupExpr}
+      ORDER BY period DESC
+      LIMIT ?
+    `).all(limit) as any[];
+
+    // Calculate running balance from oldest to newest
+    const reversed = rows.reverse();
+    let runningBalance = 0;
+    const withBalance = reversed.map(r => {
+      runningBalance += r.net_flow;
+      return {
+        period: r.period,
+        inflows: r.inflows,
+        outflows: r.outflows,
+        net_flow: r.net_flow,
+        balance: runningBalance,
+      };
+    });
+
+    res.json(withBalance);
+  });
+
+  // Per-account cash history over time
+  router.get('/cash-account-history', (req, res) => {
+    const period = (req.query.period as string) || 'monthly';
+    const limit = parseInt(req.query.limit as string) || 90;
+
+    let groupExpr: string;
+    switch (period) {
+      case 'daily': groupExpr = "je.date"; break;
+      case 'weekly': groupExpr = "strftime('%Y-W%W', je.date)"; break;
+      case 'monthly': default: groupExpr = "strftime('%Y-%m', je.date)"; break;
+    }
+
+    const cashFilter = `(a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')`;
+
+    const rows = db.prepare(`
+      SELECT
+        ${groupExpr} as period,
+        a.id as account_id,
+        a.name as account_name,
+        a.code as account_code,
+        SUM(li.debit) as inflows,
+        SUM(li.credit) as outflows,
+        SUM(li.debit) - SUM(li.credit) as net_flow
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE ${cashFilter}
+      GROUP BY ${groupExpr}, a.id
+      ORDER BY period DESC
+      LIMIT ?
+    `).all(limit * 50) as any[]; // more rows since grouped by account
+
+    // Group by account, compute running balances
+    const byAccount: Record<string, { name: string; code: string; periods: any[] }> = {};
+    for (const r of rows) {
+      if (!byAccount[r.account_id]) {
+        byAccount[r.account_id] = { name: r.account_name, code: r.account_code, periods: [] };
+      }
+      byAccount[r.account_id].periods.push(r);
+    }
+
+    // Reverse and compute running balance per account
+    const result = Object.entries(byAccount).map(([id, data]) => {
+      const sorted = data.periods.sort((a: any, b: any) => a.period.localeCompare(b.period));
+      let balance = 0;
+      const periods = sorted.map((p: any) => {
+        balance += p.net_flow;
+        return { period: p.period, inflows: p.inflows, outflows: p.outflows, net_flow: p.net_flow, balance };
+      });
+      return { account_id: id, name: data.name, code: data.code, periods, current_balance: balance };
+    });
+
+    result.sort((a, b) => Math.abs(b.current_balance) - Math.abs(a.current_balance));
+    res.json(result);
+  });
+
+  // Keep old endpoint for backward compat
   router.get('/cash-flow', (_req, res) => {
     const rows = db.prepare(`
       SELECT
