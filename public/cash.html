@@ -89,6 +89,8 @@
     .category-box .box-header .box-total { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .category-box .box-header .box-count { font-size: 12px; color: var(--text-dim); }
     .category-box.cash-box .box-header { border-left: 3px solid var(--green); }
+    .category-box.overworld-box .box-header { border-left: 3px solid var(--yellow); }
+    .category-box.reach-box .box-header { border-left: 3px solid var(--cyan); }
     .category-box.receivable-box .box-header { border-left: 3px solid var(--blue); }
     .category-box.overdrawn-box .box-header { border-left: 3px solid var(--red); }
     .category-box .box-list { max-height: 400px; overflow-y: auto; }
@@ -172,7 +174,26 @@
       <div class="chart-container" style="height:400px"><canvas id="accountHistoryChart"></canvas></div>
     </div>
 
-    <!-- Three category boxes -->
+    <!-- Overworld & Reach boxes -->
+    <div class="grid-2">
+      <div class="category-box overworld-box">
+        <div class="box-header">
+          <div><h3>Overworld</h3><div class="box-count" id="overworldCount">--</div></div>
+          <div class="box-total" style="color:var(--yellow)" id="overworldTotal">--</div>
+        </div>
+        <div class="box-list" id="overworldList"><div class="box-empty">Loading...</div></div>
+      </div>
+
+      <div class="category-box reach-box">
+        <div class="box-header">
+          <div><h3>Reach Labs</h3><div class="box-count" id="reachCount">--</div></div>
+          <div class="box-total" style="color:var(--cyan)" id="reachTotal">--</div>
+        </div>
+        <div class="box-list" id="reachList"><div class="box-empty">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Cash, Receivables, Overdrawn boxes -->
     <div class="grid-3">
       <div class="category-box cash-box">
         <div class="box-header">
@@ -245,29 +266,34 @@
       const cashAccs = data.cash?.accounts || [];
       const recvAccs = data.receivable?.accounts || [];
       const overAccs = data.overdrawn?.accounts || [];
-      const allAccs = [...cashAccs, ...recvAccs, ...overAccs];
+      const owAccs = data.overworld?.accounts || [];
+      const reachAccs = data.reach?.accounts || [];
+      const mainAccs = [...cashAccs, ...recvAccs, ...overAccs];
       const grandTotal = data.grand_total || 0;
 
+      // Hero shows only main company cash (excludes Overworld & Reach)
       const heroEl = document.getElementById('heroTotal');
       heroEl.textContent = fmt(grandTotal);
       heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
-      document.getElementById('heroSub').textContent = `Across ${allAccs.length} account${allAccs.length !== 1 ? 's' : ''}`;
+      document.getElementById('heroSub').textContent = `Across ${mainAccs.length} account${mainAccs.length !== 1 ? 's' : ''} (excl. Overworld & Reach)`;
 
       document.getElementById('statCount').textContent = fmtNum(cashAccs.length);
       document.getElementById('statPositive').textContent = fmtNum(cashAccs.length + recvAccs.length);
       document.getElementById('statNegative').textContent = fmtNum(overAccs.length);
-      if (allAccs.length > 0) {
-        const largest = allAccs.reduce((a, b) => Math.abs(a.balance) > Math.abs(b.balance) ? a : b);
+      if (mainAccs.length > 0) {
+        const largest = mainAccs.reduce((a, b) => Math.abs(a.balance) > Math.abs(b.balance) ? a : b);
         document.getElementById('statLargest').textContent = largest.name.slice(0, 25);
       }
 
       renderDistribution(cashAccs);
-      renderCategoryBox('cash', cashAccs, data.cash?.total || 0, 'var(--green)');
-      renderCategoryBox('receivable', recvAccs, data.receivable?.total || 0, 'var(--blue)');
-      renderCategoryBox('overdrawn', overAccs, data.overdrawn?.total || 0, 'var(--red)');
+      renderCategoryBox('overworld', owAccs, data.overworld?.total || 0);
+      renderCategoryBox('reach', reachAccs, data.reach?.total || 0);
+      renderCategoryBox('cash', cashAccs, data.cash?.total || 0);
+      renderCategoryBox('receivable', recvAccs, data.receivable?.total || 0);
+      renderCategoryBox('overdrawn', overAccs, data.overdrawn?.total || 0);
     }
 
-    function renderCategoryBox(type, accounts, total, color) {
+    function renderCategoryBox(type, accounts, total) {
       document.getElementById(type + 'Total').textContent = fmt(total);
       document.getElementById(type + 'Count').textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
 

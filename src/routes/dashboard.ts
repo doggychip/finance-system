@@ -127,15 +127,31 @@ export function dashboardRoutes(db: Database.Database): Router {
       ORDER BY balance DESC
     `).all() as any[];
 
-    const overdrawn = rows.filter(r => r.balance < 0);
-    const receivable = rows.filter(r => r.balance > 0 && r.odoo_type === 'asset_receivable');
-    const cash = rows.filter(r => r.balance > 0 && r.odoo_type !== 'asset_receivable');
+    // Overworld: codes starting with 10W or specific codes
+    const overworldCodes = new Set(['100030', '100031', '100032']);
+    const isOverworld = (r: any) => r.code.startsWith('10W') || overworldCodes.has(r.code);
+
+    // Reach Labs: specific codes
+    const reachCodes = new Set(['100180', '100190']);
+    const isReach = (r: any) => reachCodes.has(r.code);
+
+    const overworld = rows.filter(isOverworld);
+    const reach = rows.filter(isReach);
+    const remaining = rows.filter(r => !isOverworld(r) && !isReach(r));
+
+    const overdrawn = remaining.filter(r => r.balance < 0);
+    const receivable = remaining.filter(r => r.balance > 0 && r.odoo_type === 'asset_receivable');
+    const cash = remaining.filter(r => r.balance > 0 && r.odoo_type !== 'asset_receivable');
+
+    const sum = (arr: any[]) => arr.reduce((s: number, r: any) => s + r.balance, 0);
 
     res.json({
-      cash: { accounts: cash, total: cash.reduce((s, r) => s + r.balance, 0) },
-      receivable: { accounts: receivable, total: receivable.reduce((s, r) => s + r.balance, 0) },
-      overdrawn: { accounts: overdrawn, total: overdrawn.reduce((s, r) => s + r.balance, 0) },
-      grand_total: rows.reduce((s, r) => s + r.balance, 0),
+      cash: { accounts: cash, total: sum(cash) },
+      receivable: { accounts: receivable, total: sum(receivable) },
+      overdrawn: { accounts: overdrawn, total: sum(overdrawn) },
+      overworld: { accounts: overworld, total: sum(overworld) },
+      reach: { accounts: reach, total: sum(reach) },
+      grand_total: sum(remaining),
     });
   });
 
