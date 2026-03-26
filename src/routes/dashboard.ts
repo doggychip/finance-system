@@ -507,5 +507,112 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(result);
   });
 
+  // Per-entity cash flow statement
+  // Shows cash movements by account code for each company
+  router.get('/cash-flow-statement', (req, res) => {
+    const companyIds = req.query.companies
+      ? (req.query.companies as string).split(',').map(Number)
+      : undefined;
+
+    // The standard account codes from the spreadsheet
+    const accountCodes = [
+      '800010', '800020',  // Interest Income, Grant Income
+      '101000', '101010',  // Accounts Receivable, Other Receivable
+      '107010',            // GST Control
+      '202000',            // Deposits
+      '300050',            // Other Payables - Fiat to/from Crypto
+      '303010', '303011', '303020', '303021', '303041', '303050', '303061',
+      '303080', '303180',  // Intercompany amounts
+      '700800',            // Control Account - R&D
+      '701010', '701020', '701030', '701060', '701070',
+      '701110', '701203', '701208', '701217',  // Expenses
+      '902000', '902010',  // Exchange Difference
+      '903010',            // Unrealized Gain or Loss
+    ];
+
+    // Get companies
+    let companies: any[];
+    if (companyIds) {
+      const placeholders = companyIds.map(() => '?').join(',');
+      companies = db.prepare(`
+        SELECT DISTINCT company_id, company_name
+        FROM journal_entries
+        WHERE company_id IN (${placeholders})
+        ORDER BY company_name
+      `).all(...companyIds);
+    } else {
+      companies = db.prepare(`
+        SELECT DISTINCT company_id, company_name
+        FROM journal_entries
+        WHERE company_id IS NOT NULL AND company_name != ''
+        ORDER BY company_name
+      `).all();
+    }
+
+    const result: any[] = [];
+
+    for (const company of companies as any[]) {
+      // Get cash account balances (opening = all posted entries)
+      const cashBalance = db.prepare(`
+        SELECT
+          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id = ?
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE a.odoo_type = 'asset_cash'
+      `).get(company.company_id) as any;
+
+      // Get all account movements for this company
+      const movements = db.prepare(`
+        SELECT
+          a.code,
+          a.name,
+          COALESCE(SUM(li.debit), 0) as total_debit,
+          COALESCE(SUM(li.credit), 0) as total_credit,
+          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as net
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id = ?
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE a.odoo_type != 'asset_cash'
+        GROUP BY a.code, a.name
+        HAVING net != 0
+        ORDER BY a.code
+      `).all(company.company_id) as any[];
+
+      // Get cash accounts with balances
+      const cashAccounts = db.prepare(`
+        SELECT
+          a.code, a.name,
+          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id = ?
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE a.odoo_type = 'asset_cash'
+        GROUP BY a.code, a.name
+        HAVING balance != 0
+        ORDER BY a.code
+      `).all(company.company_id) as any[];
+
+      // Compute cash in / cash out from movements
+      const cashIn = movements.filter((m: any) => m.net > 0).reduce((s: number, m: any) => s + m.net, 0);
+      const cashOut = movements.filter((m: any) => m.net < 0).reduce((s: number, m: any) => s + m.net, 0);
+
+      result.push({
+        company_id: company.company_id,
+        company_name: company.company_name,
+        cash_balance: cashBalance?.balance || 0,
+        cash_in: cashIn,
+        cash_out: cashOut,
+        movements,
+        cash_accounts: cashAccounts,
+      });
+    }
+
+    res.json(result);
+  });
+
   return router;
 }

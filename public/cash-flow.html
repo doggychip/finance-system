@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cash Flow Statement — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344;
+      --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1;
+      --green: #22c55e; --red: #ef4444; --blue: #3b82f6;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; font-size: 12px; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+
+    .scroll-container { overflow-x: auto; padding: 16px; }
+
+    .cf-table { border-collapse: collapse; min-width: 100%; }
+    .cf-table th, .cf-table td { padding: 3px 10px; white-space: nowrap; border: 1px solid var(--border); font-size: 11px; }
+
+    /* Company header row */
+    .cf-table .company-header th {
+      background: #1e3a5f;
+      color: white;
+      font-weight: 700;
+      font-size: 12px;
+      text-align: center;
+      padding: 8px 10px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    /* Row label (leftmost) */
+    .cf-table .row-label {
+      position: sticky;
+      left: 0;
+      background: var(--surface);
+      z-index: 1;
+      font-weight: 500;
+      min-width: 280px;
+      max-width: 280px;
+    }
+
+    /* Section headers */
+    .cf-table .section-header td {
+      background: var(--surface2);
+      font-weight: 700;
+      padding: 6px 10px;
+    }
+    .cf-table .section-header .row-label {
+      background: var(--surface2);
+    }
+
+    /* Cash account rows */
+    .cf-table .cash-account td { color: var(--text-dim); font-size: 10px; }
+    .cf-table .cash-account .row-label { padding-left: 20px; background: var(--surface); }
+
+    /* Total rows */
+    .cf-table .total-row td {
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+      background: rgba(34, 197, 94, 0.05);
+      padding: 6px 10px;
+    }
+    .cf-table .total-row .row-label {
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    /* Movement rows */
+    .cf-table .movement-row td { }
+    .cf-table .movement-row .row-label { padding-left: 16px; }
+
+    /* Cash in/out sub-headers */
+    .cf-table .sub-header td {
+      font-weight: 600;
+      background: rgba(99, 102, 241, 0.06);
+    }
+    .cf-table .sub-header .row-label {
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    /* Values */
+    .cf-table .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .cf-table .val.positive { color: var(--green); }
+    .cf-table .val.negative { color: var(--red); }
+    .cf-table .val.zero { color: var(--text-dim); }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 400px; color: var(--text-dim); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Cash Flow Statement</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html" class="active">Cash Flow</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px">
+      <button class="btn" onclick="loadData()">Refresh</button>
+    </div>
+  </div>
+
+  <div class="scroll-container">
+    <div id="content"><div class="loading">Loading cash flow data...</div></div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.01) return '-';
+      var s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      return n < 0 ? '(' + s + ')' : s;
+    }
+
+    function valCls(n) {
+      if (n > 0.01) return 'val positive';
+      if (n < -0.01) return 'val negative';
+      return 'val zero';
+    }
+
+    // Collect all unique account codes across all companies
+    function getAllCodes(data) {
+      var codeMap = {};
+      data.forEach(function(c) {
+        c.movements.forEach(function(m) {
+          if (!codeMap[m.code]) codeMap[m.code] = m.name;
+        });
+      });
+      // Sort by code
+      return Object.entries(codeMap).sort(function(a, b) { return a[0].localeCompare(b[0]); });
+    }
+
+    // Separate into cash-in codes (positive net across companies) and cash-out codes
+    function categorizeCodes(allCodes, data) {
+      var cashInCodes = [];
+      var cashOutCodes = [];
+
+      allCodes.forEach(function(entry) {
+        var code = entry[0];
+        var name = entry[1];
+        var totalNet = 0;
+        data.forEach(function(c) {
+          var m = c.movements.find(function(x) { return x.code === code; });
+          if (m) totalNet += m.net;
+        });
+        // Categorize by typical account code ranges
+        // 8xxxxx = income, rest = expenses/movements
+        if (code.startsWith('8')) {
+          cashInCodes.push([code, name]);
+        } else {
+          cashOutCodes.push([code, name]);
+        }
+      });
+
+      return { cashIn: cashInCodes, cashOut: cashOutCodes };
+    }
+
+    function getMovement(company, code) {
+      var m = company.movements.find(function(x) { return x.code === code; });
+      return m ? m.net : 0;
+    }
+
+    function renderTable(data) {
+      if (!data.length) return '<div class="loading">No data. Sync journal entries first.</div>';
+
+      var allCodes = getAllCodes(data);
+      var cats = categorizeCodes(allCodes, data);
+      var cols = data.length;
+
+      var html = '<table class="cf-table">';
+
+      // Company header row
+      html += '<tr class="company-header"><th class="row-label" style="background:#1e3a5f;color:white">Account</th>';
+      data.forEach(function(c) {
+        html += '<th>' + c.company_name + '</th>';
+      });
+      html += '</tr>';
+
+      // Cash accounts section
+      html += sectionRow('Bank & Cash Accounts', cols);
+      data[0].cash_accounts.length; // just to check
+      // Get all unique cash account names across companies
+      var allCashAccs = {};
+      data.forEach(function(c) {
+        c.cash_accounts.forEach(function(a) {
+          var key = a.code + ' ' + a.name;
+          if (!allCashAccs[key]) allCashAccs[key] = { code: a.code, name: a.name };
+        });
+      });
+      Object.values(allCashAccs).sort(function(a, b) { return a.code.localeCompare(b.code); }).forEach(function(acc) {
+        html += '<tr class="cash-account"><td class="row-label">' + acc.code + ' ' + acc.name + '</td>';
+        data.forEach(function(c) {
+          var ca = c.cash_accounts.find(function(x) { return x.code === acc.code && x.name === acc.name; });
+          var val = ca ? ca.balance : 0;
+          html += '<td class="' + valCls(val) + '">' + fmt(val) + '</td>';
+        });
+        html += '</tr>';
+      });
+
+      // Cash balance total
+      html += totalRow('Cash and cash equivalents', data.map(function(c) { return c.cash_balance; }));
+
+      // Blank separator
+      html += separatorRow(cols);
+
+      // Cash In section
+      html += subHeaderRow('Cash in', data.map(function(c) { return c.cash_in; }));
+      cats.cashIn.forEach(function(entry) {
+        var code = entry[0], name = entry[1];
+        html += movementRow(code + ' ' + name, data.map(function(c) { return getMovement(c, code); }));
+      });
+
+      // Cash Out section
+      html += subHeaderRow('Cash out', data.map(function(c) { return c.cash_out; }));
+      cats.cashOut.forEach(function(entry) {
+        var code = entry[0], name = entry[1];
+        html += movementRow(code + ' ' + name, data.map(function(c) { return getMovement(c, code); }));
+      });
+
+      // Closing balance
+      html += separatorRow(cols);
+      html += totalRow('Cash and cash equivalents, closing balance', data.map(function(c) { return c.cash_balance; }));
+
+      html += '</table>';
+      return html;
+    }
+
+    function sectionRow(label, cols) {
+      var html = '<tr class="section-header"><td class="row-label">' + label + '</td>';
+      for (var i = 0; i < cols; i++) html += '<td></td>';
+      return html + '</tr>';
+    }
+
+    function subHeaderRow(label, values) {
+      var html = '<tr class="sub-header"><td class="row-label">' + label + '</td>';
+      values.forEach(function(v) {
+        html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>';
+      });
+      return html + '</tr>';
+    }
+
+    function movementRow(label, values) {
+      // Skip if all zeros
+      var hasValue = values.some(function(v) { return Math.abs(v) > 0.01; });
+      if (!hasValue) return '';
+      var html = '<tr class="movement-row"><td class="row-label">' + label + '</td>';
+      values.forEach(function(v) {
+        html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>';
+      });
+      return html + '</tr>';
+    }
+
+    function totalRow(label, values) {
+      var html = '<tr class="total-row"><td class="row-label">' + label + '</td>';
+      values.forEach(function(v) {
+        html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>';
+      });
+      return html + '</tr>';
+    }
+
+    function separatorRow(cols) {
+      var html = '<tr><td class="row-label" style="border:none"></td>';
+      for (var i = 0; i < cols; i++) html += '<td style="border:none"></td>';
+      return html + '</tr>';
+    }
+
+    async function loadData() {
+      var el = document.getElementById('content');
+      try {
+        var res = await fetch('/api/dashboard/cash-flow-statement');
+        var data = await res.json();
+
+        // Sort by company name
+        data.sort(function(a, b) { return a.company_name.localeCompare(b.company_name); });
+
+        el.innerHTML = renderTable(data);
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
