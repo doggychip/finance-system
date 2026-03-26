@@ -251,7 +251,7 @@
 
     // Period toggle
     document.getElementById('periodToggle').addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest('button');
+      const btn = e.target.closest('button');
       if (!btn) return;
       const period = btn.dataset.period;
       if (!period || period === currentPeriod) return;
