@@ -644,6 +644,44 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     for (const group of ENTITY_GROUPS) {
       if (group.is_subtotal) continue;
+
+      // Handle manual entities (e.g. Xterio Foundation)
+      if (group.is_manual) {
+        const latestPeriod = db.prepare(`
+          SELECT period, SUM(amount_usd) as total_usd
+          FROM manual_balances
+          WHERE entity = ?
+          GROUP BY period
+          ORDER BY period DESC
+          LIMIT 1
+        `).get(group.name) as any;
+
+        const balances: Record<string, number> = {};
+        // Put the total as Bank & Cash for the BS
+        const totalUsd = latestPeriod?.total_usd || 0;
+        balances['BANK_CASH'] = totalUsd;
+        // Zero out everything else
+        for (const line of BS_LINES) {
+          if (line.computed_from) continue;
+          if (!(line.code in balances)) balances[line.code] = 0;
+        }
+        // Compute derived
+        for (let pass = 0; pass < 10; pass++) {
+          let resolved = 0;
+          for (const line of BS_LINES) {
+            if (!line.computed_from) continue;
+            if (line.code in balances) continue;
+            const allReady = line.computed_from.every((c: string) => c in balances);
+            if (!allReady) continue;
+            balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
+            resolved++;
+          }
+          if (resolved === 0) break;
+        }
+        groupBalances[group.name] = balances;
+        continue;
+      }
+
       if (group.company_ids.length === 0) continue;
 
       const placeholders = group.company_ids.map(() => '?').join(',');

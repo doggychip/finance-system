@@ -2,6 +2,7 @@ export interface EntityGroup {
   name: string;
   company_ids: number[];
   is_subtotal?: boolean;
+  is_manual?: boolean;
   subtotal_groups?: string[];
 }
 
@@ -9,7 +10,7 @@ export const ENTITY_GROUPS: EntityGroup[] = [
   { name: 'LTECH, LTECH W3', company_ids: [1, 23] },
   { name: 'XLABS, XLAB W3', company_ids: [17, 18] },
   { name: 'PRIVILEGE HK', company_ids: [21] },
-  { name: 'Xterio Foundation', company_ids: [22] },
+  { name: 'Xterio Foundation', company_ids: [22], is_manual: true },
   { name: 'Xterio Total', company_ids: [], is_subtotal: true, subtotal_groups: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation'] },
 
   { name: 'AOD', company_ids: [5, 6, 7, 10] },
