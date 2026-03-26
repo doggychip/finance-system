@@ -617,64 +617,60 @@ export function dashboardRoutes(db: Database.Database): Router {
 
   // Consolidated balance sheet with entity groupings
   router.get('/consolidated-bs', (_req, res) => {
-    // Helper: get balance for a set of company IDs filtered by odoo_types or account codes
-    function getBalance(companyIds: number[], odooTypes?: string[], accountCodes?: string[]): number {
-      if (companyIds.length === 0) return 0;
-
-      const companyPlaceholders = companyIds.map(() => '?').join(',');
-      let filterClause = '';
-      const params: any[] = [...companyIds];
-
-      if (odooTypes && odooTypes.length > 0) {
-        filterClause = `AND a.odoo_type IN (${odooTypes.map(() => '?').join(',')})`;
-        params.push(...odooTypes);
-      } else if (accountCodes && accountCodes.length > 0) {
-        filterClause = `AND a.code IN (${accountCodes.map(() => '?').join(',')})`;
-        params.push(...accountCodes);
-      } else {
-        return 0;
-      }
-
-      const row = db.prepare(`
-        SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-        FROM line_items li
-        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id IN (${companyPlaceholders})
-        INNER JOIN accounts a ON a.id = li.account_id
-        WHERE 1=1 ${filterClause}
-      `).get(...params) as any;
-
-      return row?.balance || 0;
-    }
-
-    // Step 1: Compute raw balances for non-subtotal groups
+    // Step 1: Compute raw balances for non-subtotal groups using ONE query per group
     const groupBalances: Record<string, Record<string, number>> = {};
 
     for (const group of ENTITY_GROUPS) {
       if (group.is_subtotal) continue;
+      if (group.company_ids.length === 0) continue;
 
+      const placeholders = group.company_ids.map(() => '?').join(',');
+
+      // Single query: get balance per odoo_type for this group
+      const typeBalances = db.prepare(`
+        SELECT a.odoo_type,
+          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id IN (${placeholders})
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE a.odoo_type != ''
+        GROUP BY a.odoo_type
+      `).all(...group.company_ids) as any[];
+
+      const byType: Record<string, number> = {};
+      for (const row of typeBalances) byType[row.odoo_type] = row.balance;
+
+      // Map BS_LINES leaf nodes from odoo_types
       const balances: Record<string, number> = {};
-
       for (const line of BS_LINES) {
-        if (line.computed_from) continue; // computed later
+        if (line.computed_from) continue;
         if (line.odoo_types) {
-          balances[line.code] = getBalance(group.company_ids, line.odoo_types);
+          balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byType[t] || 0), 0);
         } else if (line.account_codes) {
-          balances[line.code] = getBalance(group.company_ids, undefined, line.account_codes);
+          // For specific account codes, need a targeted query
+          const codePlaceholders = line.account_codes.map(() => '?').join(',');
+          const row = db.prepare(`
+            SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+            FROM line_items li
+            INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+              AND je.status = 'posted' AND je.company_id IN (${placeholders})
+            INNER JOIN accounts a ON a.id = li.account_id
+            WHERE a.code IN (${codePlaceholders})
+          `).get(...group.company_ids, ...line.account_codes) as any;
+          balances[line.code] = row?.balance || 0;
         }
       }
 
-      // Compute derived lines — multiple passes to resolve nested dependencies
-      const maxPasses = 10;
-      for (let pass = 0; pass < maxPasses; pass++) {
+      // Compute derived lines — multiple passes for nested dependencies
+      for (let pass = 0; pass < 10; pass++) {
         let resolved = 0;
         for (const line of BS_LINES) {
           if (!line.computed_from) continue;
-          if (line.code in balances) continue; // already resolved
-          const deps = line.computed_from;
-          const allReady = deps.every((c: string) => c in balances);
+          if (line.code in balances) continue;
+          const allReady = line.computed_from.every((c: string) => c in balances);
           if (!allReady) continue;
-          balances[line.code] = deps.reduce((sum: number, c: string) => sum + (balances[c] || 0), 0);
+          balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
           resolved++;
         }
         if (resolved === 0) break;
