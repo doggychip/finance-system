@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
+import { ENTITY_GROUPS, BS_LINES, EntityGroup, BSLineItem } from '../config/entity-groups';
 
 export function dashboardRoutes(db: Database.Database): Router {
   const router = Router();
@@ -612,6 +613,110 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
 
     res.json(result);
+  });
+
+  // Consolidated balance sheet with entity groupings
+  router.get('/consolidated-bs', (_req, res) => {
+    // Helper: get balance for a set of company IDs filtered by odoo_types or account codes
+    function getBalance(companyIds: number[], odooTypes?: string[], accountCodes?: string[]): number {
+      if (companyIds.length === 0) return 0;
+
+      const companyPlaceholders = companyIds.map(() => '?').join(',');
+      let filterClause = '';
+      const params: any[] = [...companyIds];
+
+      if (odooTypes && odooTypes.length > 0) {
+        filterClause = `AND a.odoo_type IN (${odooTypes.map(() => '?').join(',')})`;
+        params.push(...odooTypes);
+      } else if (accountCodes && accountCodes.length > 0) {
+        filterClause = `AND a.code IN (${accountCodes.map(() => '?').join(',')})`;
+        params.push(...accountCodes);
+      } else {
+        return 0;
+      }
+
+      const row = db.prepare(`
+        SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id IN (${companyPlaceholders})
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE 1=1 ${filterClause}
+      `).get(...params) as any;
+
+      return row?.balance || 0;
+    }
+
+    // Step 1: Compute raw balances for non-subtotal groups
+    const groupBalances: Record<string, Record<string, number>> = {};
+
+    for (const group of ENTITY_GROUPS) {
+      if (group.is_subtotal) continue;
+
+      const balances: Record<string, number> = {};
+
+      for (const line of BS_LINES) {
+        if (line.computed_from) continue; // computed later
+        if (line.odoo_types) {
+          balances[line.code] = getBalance(group.company_ids, line.odoo_types);
+        } else if (line.account_codes) {
+          balances[line.code] = getBalance(group.company_ids, undefined, line.account_codes);
+        }
+      }
+
+      // Compute derived lines
+      for (const line of BS_LINES) {
+        if (!line.computed_from) continue;
+        balances[line.code] = line.computed_from.reduce((sum: number, code: string) => sum + (balances[code] || 0), 0);
+      }
+
+      groupBalances[group.name] = balances;
+    }
+
+    // Step 2: Compute subtotals
+    for (const group of ENTITY_GROUPS) {
+      if (!group.is_subtotal || !group.subtotal_groups) continue;
+
+      const balances: Record<string, number> = {};
+
+      for (const line of BS_LINES) {
+        balances[line.code] = group.subtotal_groups.reduce((sum: number, gname: string) => {
+          return sum + (groupBalances[gname]?.[line.code] || 0);
+        }, 0);
+      }
+
+      groupBalances[group.name] = balances;
+    }
+
+    // Step 3: Build response
+    const columns = ENTITY_GROUPS.map(g => ({
+      name: g.name,
+      is_subtotal: g.is_subtotal || false,
+    }));
+
+    const rows = BS_LINES.map(line => ({
+      code: line.code,
+      label: line.label,
+      indent: line.indent,
+      is_total: line.is_total || false,
+      is_section: line.is_section || false,
+      values: ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0),
+    }));
+
+    // Add check row (Assets - Liabilities - Equity should = 0)
+    rows.push({
+      code: 'CHECK',
+      label: 'Check',
+      indent: 0,
+      is_total: false,
+      is_section: false,
+      values: ENTITY_GROUPS.map(g => {
+        const b = groupBalances[g.name] || {};
+        return (b['ASSETS'] || 0) - (b['LIAB_EQUITY'] || 0);
+      }),
+    });
+
+    res.json({ columns, rows });
   });
 
   return router;
