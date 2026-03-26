@@ -225,7 +225,7 @@
       <div class="stat-card"><div class="label">Journal Entries</div><div class="value" id="statEntries">--</div><div class="sub" id="statEntriesSub"></div></div>
       <div class="stat-card"><div class="label">Total Assets</div><div class="value" id="statAssets">--</div></div>
       <div class="stat-card"><div class="label">Total Liabilities</div><div class="value" id="statLiabilities">--</div></div>
-      <div class="stat-card"><div class="label">Net Income</div><div class="value" id="statNetIncome">--</div></div>
+      <div class="stat-card"><div class="label">Net Income (YTD)</div><div class="value" id="statNetIncome">--</div></div>
     </div>
 
     <!-- Charts row -->
@@ -316,13 +316,12 @@
 
       const assets = byType.asset?.net_balance || 0;
       const liabilities = Math.abs(byType.liability?.net_balance || 0);
-      const revenue = Math.abs(byType.revenue?.net_balance || 0);
-      const expenses = byType.expense?.net_balance || 0;
 
       document.getElementById('statAssets').textContent = fmt(assets);
       document.getElementById('statLiabilities').textContent = fmt(liabilities);
 
-      const netIncome = revenue - expenses;
+      // Current year net income from stats endpoint
+      const netIncome = stats.current_year_net_income || 0;
       const el = document.getElementById('statNetIncome');
       el.textContent = fmt(netIncome);
       el.className = 'value ' + (netIncome >= 0 ? 'text-green' : 'text-red');

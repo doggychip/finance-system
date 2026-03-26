@@ -15,6 +15,19 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     const lastSync = db.prepare('SELECT * FROM sync_log ORDER BY started_at DESC LIMIT 1').get() as any;
 
+    // Current year net income
+    const currentYear = new Date().getFullYear().toString();
+    const plRow = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN a.odoo_type IN ('income','income_other') THEN li.credit - li.debit ELSE 0 END), 0) as revenue,
+        COALESCE(SUM(CASE WHEN a.odoo_type IN ('expense','expense_direct_cost') THEN li.debit - li.credit ELSE 0 END), 0) as expenses
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.date >= ?
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type IN ('income','income_other','expense','expense_direct_cost')
+    `).get(currentYear + '-01-01') as any;
+
     res.json({
       accounts: accountCount,
       journal_entries: journalCount,
@@ -22,6 +35,9 @@ export function dashboardRoutes(db: Database.Database): Router {
       invoices: invoiceCount,
       payments: paymentCount,
       last_sync: lastSync || null,
+      current_year_revenue: plRow?.revenue || 0,
+      current_year_expenses: plRow?.expenses || 0,
+      current_year_net_income: (plRow?.revenue || 0) - (plRow?.expenses || 0),
     });
   });
 
@@ -298,31 +314,37 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(withBalance);
   });
 
-  // Revenue vs Expenses monthly
+  // Revenue vs Expenses monthly — all time
   router.get('/revenue-vs-expenses', (_req, res) => {
     const rows = db.prepare(`
       SELECT
         strftime('%Y-%m', je.date) as month,
-        a.type as account_type,
-        ABS(SUM(li.debit) - SUM(li.credit)) as amount
+        a.odoo_type,
+        SUM(li.debit) as total_debit,
+        SUM(li.credit) as total_credit
       FROM journal_entries je
       INNER JOIN line_items li ON li.journal_entry_id = je.id
       INNER JOIN accounts a ON a.id = li.account_id
-      WHERE je.status = 'posted' AND a.type IN ('revenue', 'expense')
-      GROUP BY strftime('%Y-%m', je.date), a.type
-      ORDER BY month DESC
-      LIMIT 24
-    `).all();
+      WHERE je.status = 'posted'
+        AND a.odoo_type IN ('income', 'income_other', 'expense', 'expense_direct_cost')
+      GROUP BY strftime('%Y-%m', je.date), a.odoo_type
+      ORDER BY month ASC
+    `).all() as any[];
 
     // Reshape into monthly buckets
+    // Revenue = credit - debit on income accounts (credit-normal)
+    // Expenses = debit - credit on expense accounts (debit-normal)
     const months: Record<string, { month: string; revenue: number; expenses: number }> = {};
-    for (const row of rows as any[]) {
+    for (const row of rows) {
       if (!months[row.month]) months[row.month] = { month: row.month, revenue: 0, expenses: 0 };
-      if (row.account_type === 'revenue') months[row.month].revenue = row.amount;
-      if (row.account_type === 'expense') months[row.month].expenses = row.amount;
+      if (row.odoo_type === 'income' || row.odoo_type === 'income_other') {
+        months[row.month].revenue += (row.total_credit - row.total_debit);
+      } else if (row.odoo_type === 'expense' || row.odoo_type === 'expense_direct_cost') {
+        months[row.month].expenses += (row.total_debit - row.total_credit);
+      }
     }
 
-    const result = Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
+    const result = Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
     res.json(result);
   });
 
