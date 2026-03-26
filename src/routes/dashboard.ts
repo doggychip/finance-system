@@ -638,7 +638,10 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Consolidated balance sheet with entity groupings
-  router.get('/consolidated-bs', (_req, res) => {
+  router.get('/consolidated-bs', (req, res) => {
+    const asOfDate = (req.query.as_of_date as string) || '2026-02-28';
+    const dateFilter = `AND je.date <= '${asOfDate.replace(/[^0-9-]/g, '')}'`;
+
     // Step 1: Compute raw balances for non-subtotal groups using ONE query per group
     const groupBalances: Record<string, Record<string, number>> = {};
 
@@ -688,13 +691,13 @@ export function dashboardRoutes(db: Database.Database): Router {
 
       const currentYear = new Date().getFullYear().toString();
 
-      // All-time balances per odoo_type
+      // All-time balances per odoo_type (up to as_of_date)
       const allTimeBalances = db.prepare(`
         SELECT a.odoo_type,
           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
         FROM line_items li
         INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id IN (${placeholders})
+          AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
         INNER JOIN accounts a ON a.id = li.account_id
         WHERE a.odoo_type != ''
         GROUP BY a.odoo_type
@@ -703,14 +706,14 @@ export function dashboardRoutes(db: Database.Database): Router {
       const byTypeAll: Record<string, number> = {};
       for (const row of allTimeBalances) byTypeAll[row.odoo_type] = row.balance;
 
-      // Current year balances per odoo_type
+      // Current year balances per odoo_type (up to as_of_date)
       const currentYearBalances = db.prepare(`
         SELECT a.odoo_type,
           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
         FROM line_items li
         INNER JOIN journal_entries je ON je.id = li.journal_entry_id
           AND je.status = 'posted' AND je.company_id IN (${placeholders})
-          AND je.date >= ?
+          AND je.date >= ? ${dateFilter}
         INNER JOIN accounts a ON a.id = li.account_id
         WHERE a.odoo_type != ''
         GROUP BY a.odoo_type
@@ -732,7 +735,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
           FROM line_items li
           INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-            AND je.status = 'posted' AND je.company_id IN (${placeholders})
+            AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
           INNER JOIN accounts a ON a.id = li.account_id
           WHERE a.code IN (${uniqueCodes.map(() => '?').join(',')})
           GROUP BY a.code
@@ -800,7 +803,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
       FROM line_items li
       INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.company_id IN (${icPlaceholders})
+        AND je.status = 'posted' AND je.company_id IN (${icPlaceholders}) ${dateFilter}
       INNER JOIN accounts a ON a.id = li.account_id
       WHERE a.code LIKE '303%'
       GROUP BY a.odoo_type
