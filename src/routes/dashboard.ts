@@ -892,133 +892,137 @@ export function dashboardRoutes(db: Database.Database): Router {
   router.get('/cash-position', (req, res) => {
     const months = parseInt(req.query.months as string) || 12;
 
-    // Generate list of month-end dates
+    // Generate month labels
     const now = new Date();
-    const monthDates: string[] = [];
+    const monthLabels: string[] = [];
     for (let i = 0; i < months; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0); // last day of month
-      monthDates.push(d.toISOString().slice(0, 10));
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthLabels.push(d.toISOString().slice(0, 7)); // YYYY-MM
     }
-    monthDates.reverse();
+    monthLabels.reverse();
 
-    // For each entity group, compute BS-like snapshot at each month-end
     const categories = [
-      { key: 'cash', label: 'Cash', odoo_types: ['asset_cash'] },
-      { key: 'receivable', label: 'Receivables', odoo_types: ['asset_receivable'] },
-      { key: 'current_assets', label: 'Current Assets', odoo_types: ['asset_current', 'asset_prepayments'] },
-      { key: 'non_current_assets', label: 'Non-current Assets', odoo_types: ['asset_fixed', 'asset_non_current'] },
-      { key: 'payables', label: 'Payables', odoo_types: ['liability_payable'] },
-      { key: 'current_liabilities', label: 'Current Liabilities', odoo_types: ['liability_current', 'liability_credit_card'] },
-      { key: 'non_current_liabilities', label: 'Non-current Liabilities', odoo_types: ['liability_non_current'] },
-      { key: 'ic_balances', label: 'IC Balances', account_codes_prefix: '303' },
+      { key: 'cash', label: 'Cash', filter: "a.odoo_type = 'asset_cash'" },
+      { key: 'receivable', label: 'Receivables', filter: "a.odoo_type = 'asset_receivable'" },
+      { key: 'current_assets', label: 'Current Assets', filter: "a.odoo_type IN ('asset_current','asset_prepayments')" },
+      { key: 'non_current_assets', label: 'Non-current Assets', filter: "a.odoo_type IN ('asset_fixed','asset_non_current')" },
+      { key: 'payables', label: 'Payables', filter: "a.odoo_type = 'liability_payable'" },
+      { key: 'current_liabilities', label: 'Current Liabilities', filter: "a.odoo_type IN ('liability_current','liability_credit_card')" },
+      { key: 'non_current_liabilities', label: 'Non-current Liabilities', filter: "a.odoo_type = 'liability_non_current'" },
+      { key: 'ic_balances', label: 'IC Balances', filter: "a.code LIKE '303%'" },
     ];
 
     const result: any[] = [];
 
     for (const group of ENTITY_GROUPS) {
-      if (group.company_ids.length === 0) continue; // skip subtotals
       if (group.is_subtotal) continue;
+      if (group.company_ids.length === 0) continue;
 
       const placeholders = group.company_ids.map(() => '?').join(',');
-      const snapshots: any[] = [];
 
-      for (const asOf of monthDates) {
-        const snapshot: any = { date: asOf };
+      // ONE query: get monthly net changes per category
+      const monthlyData: Record<string, Record<string, number>> = {};
 
-        for (const cat of categories) {
-          let balance: number;
-
-          if (cat.odoo_types) {
-            const typePlaceholders = cat.odoo_types.map(() => '?').join(',');
-            const row = db.prepare(`
-              SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-              FROM line_items li
-              INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-                AND je.status = 'posted' AND je.company_id IN (${placeholders}) AND je.date <= ?
-              INNER JOIN accounts a ON a.id = li.account_id
-              WHERE a.odoo_type IN (${typePlaceholders})
-            `).get(...group.company_ids, asOf, ...cat.odoo_types) as any;
-            balance = row?.balance || 0;
-          } else if (cat.account_codes_prefix) {
-            const row = db.prepare(`
-              SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-              FROM line_items li
-              INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-                AND je.status = 'posted' AND je.company_id IN (${placeholders}) AND je.date <= ?
-              INNER JOIN accounts a ON a.id = li.account_id
-              WHERE a.code LIKE ?
-            `).get(...group.company_ids, asOf, cat.account_codes_prefix + '%') as any;
-            balance = row?.balance || 0;
-          } else {
-            balance = 0;
-          }
-
-          snapshot[cat.key] = balance;
-        }
-
-        // Closing = sum of all
-        snapshot.closing = Object.keys(snapshot).filter(k => k !== 'date').reduce((s: number, k: string) => s + (snapshot[k] || 0), 0);
-        snapshots.push(snapshot);
-      }
-
-      // Monthly burn = average expense over last 3 months
-      const recentMonths = monthDates.slice(-3);
-      if (recentMonths.length >= 2) {
-        const row = db.prepare(`
-          SELECT COALESCE(SUM(li.debit) - SUM(li.credit), 0) as total_expense
+      for (const cat of categories) {
+        const rows = db.prepare(`
+          SELECT strftime('%Y-%m', je.date) as month,
+            SUM(li.debit) - SUM(li.credit) as net
           FROM line_items li
           INNER JOIN journal_entries je ON je.id = li.journal_entry_id
             AND je.status = 'posted' AND je.company_id IN (${placeholders})
-            AND je.date >= ? AND je.date <= ?
+          INNER JOIN accounts a ON a.id = li.account_id
+          WHERE ${cat.filter}
+          GROUP BY strftime('%Y-%m', je.date)
+        `).all(...group.company_ids) as any[];
+
+        for (const r of rows) {
+          if (!monthlyData[r.month]) monthlyData[r.month] = {};
+          monthlyData[r.month][cat.key] = r.net;
+        }
+      }
+
+      // Build cumulative snapshots
+      const cumulative: Record<string, number> = {};
+      for (const cat of categories) cumulative[cat.key] = 0;
+
+      // Get all months sorted
+      const allMonths = Object.keys(monthlyData).sort();
+
+      // Accumulate up to our display window
+      for (const m of allMonths) {
+        for (const cat of categories) {
+          cumulative[cat.key] += monthlyData[m]?.[cat.key] || 0;
+        }
+      }
+
+      // Now build snapshots for requested months
+      // First reset and re-accumulate
+      for (const cat of categories) cumulative[cat.key] = 0;
+      const snapshots: any[] = [];
+
+      for (const m of allMonths) {
+        for (const cat of categories) {
+          cumulative[cat.key] += monthlyData[m]?.[cat.key] || 0;
+        }
+        if (monthLabels.includes(m)) {
+          const snap: any = { date: m };
+          for (const cat of categories) snap[cat.key] = cumulative[cat.key];
+          snap.closing = categories.reduce((s, cat) => s + cumulative[cat.key], 0);
+          snapshots.push(snap);
+        }
+      }
+
+      // Monthly burn
+      const last3 = snapshots.slice(-3);
+      let avgBurn = 0;
+      if (last3.length >= 2) {
+        const expRow = db.prepare(`
+          SELECT COALESCE(SUM(li.debit) - SUM(li.credit), 0) as total
+          FROM line_items li
+          INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+            AND je.status = 'posted' AND je.company_id IN (${placeholders})
+            AND je.date >= ?
           INNER JOIN accounts a ON a.id = li.account_id
           WHERE a.odoo_type IN ('expense', 'expense_direct_cost')
-        `).get(...group.company_ids, recentMonths[0].slice(0, 7) + '-01', recentMonths[recentMonths.length - 1]) as any;
-        const avgBurn = (row?.total_expense || 0) / recentMonths.length;
-        const lastClosing = snapshots[snapshots.length - 1]?.closing || 0;
-        const runway = avgBurn > 0 ? Math.round(lastClosing / avgBurn) : null;
-
-        result.push({
-          group: group.name,
-          company_ids: group.company_ids,
-          snapshots,
-          monthly_burn: avgBurn,
-          available_balance: lastClosing,
-          runway_months: runway,
-        });
-      } else {
-        result.push({
-          group: group.name,
-          company_ids: group.company_ids,
-          snapshots,
-          monthly_burn: 0,
-          available_balance: snapshots[snapshots.length - 1]?.closing || 0,
-          runway_months: null,
-        });
+        `).get(...group.company_ids, last3[0].date + '-01') as any;
+        avgBurn = (expRow?.total || 0) / last3.length;
       }
+
+      const lastClosing = snapshots.length > 0 ? snapshots[snapshots.length - 1].closing : 0;
+
+      result.push({
+        group: group.name,
+        company_ids: group.company_ids,
+        snapshots,
+        monthly_burn: avgBurn,
+        available_balance: lastClosing,
+        runway_months: avgBurn > 0 ? Math.round(lastClosing / avgBurn) : null,
+      });
     }
 
     // Add subtotals
     for (const group of ENTITY_GROUPS) {
       if (!group.is_subtotal || !group.subtotal_groups) continue;
+      const children = result.filter(r => group.subtotal_groups!.includes(r.group));
+      if (children.length === 0) continue;
 
-      const childResults = result.filter(r => group.subtotal_groups!.includes(r.group));
-      if (childResults.length === 0) continue;
-
-      const snapshots = monthDates.map((date, i) => {
-        const snapshot: any = { date };
+      const snapshots = monthLabels.map((m) => {
+        const snap: any = { date: m };
         for (const cat of categories) {
-          snapshot[cat.key] = childResults.reduce((s: number, cr: any) => s + (cr.snapshots[i]?.[cat.key] || 0), 0);
+          snap[cat.key] = children.reduce((s: number, c: any) => {
+            const cs = c.snapshots.find((x: any) => x.date === m);
+            return s + (cs?.[cat.key] || 0);
+          }, 0);
         }
-        snapshot.closing = Object.keys(snapshot).filter(k => k !== 'date').reduce((s: number, k: string) => s + (snapshot[k] || 0), 0);
-        return snapshot;
-      });
+        snap.closing = categories.reduce((s, cat) => s + (snap[cat.key] || 0), 0);
+        return snap;
+      }).filter((s: any) => Math.abs(s.closing) > 0.01 || categories.some(c => Math.abs(s[c.key]) > 0.01));
 
-      const totalBurn = childResults.reduce((s: number, cr: any) => s + (cr.monthly_burn || 0), 0);
-      const lastClosing = snapshots[snapshots.length - 1]?.closing || 0;
+      const totalBurn = children.reduce((s: number, c: any) => s + (c.monthly_burn || 0), 0);
+      const lastClosing = snapshots.length > 0 ? snapshots[snapshots.length - 1].closing : 0;
 
       result.push({
         group: group.name,
-        company_ids: [],
         is_subtotal: true,
         snapshots,
         monthly_burn: totalBurn,
@@ -1027,7 +1031,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       });
     }
 
-    res.json({ months: monthDates, categories, groups: result });
+    res.json({ months: monthLabels, categories, groups: result });
   });
 
   // ====== Bank Account Detail ======
