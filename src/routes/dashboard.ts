@@ -626,8 +626,10 @@ export function dashboardRoutes(db: Database.Database): Router {
 
       const placeholders = group.company_ids.map(() => '?').join(',');
 
-      // Single query: get balance per odoo_type for this group
-      const typeBalances = db.prepare(`
+      const currentYear = new Date().getFullYear().toString();
+
+      // All-time balances per odoo_type
+      const allTimeBalances = db.prepare(`
         SELECT a.odoo_type,
           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
         FROM line_items li
@@ -638,15 +640,38 @@ export function dashboardRoutes(db: Database.Database): Router {
         GROUP BY a.odoo_type
       `).all(...group.company_ids) as any[];
 
-      const byType: Record<string, number> = {};
-      for (const row of typeBalances) byType[row.odoo_type] = row.balance;
+      const byTypeAll: Record<string, number> = {};
+      for (const row of allTimeBalances) byTypeAll[row.odoo_type] = row.balance;
 
-      // Map BS_LINES leaf nodes from odoo_types
+      // Current year balances per odoo_type
+      const currentYearBalances = db.prepare(`
+        SELECT a.odoo_type,
+          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id IN (${placeholders})
+          AND je.date >= ?
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE a.odoo_type != ''
+        GROUP BY a.odoo_type
+      `).all(...group.company_ids, currentYear + '-01-01') as any[];
+
+      const byTypeCY: Record<string, number> = {};
+      for (const row of currentYearBalances) byTypeCY[row.odoo_type] = row.balance;
+
+      // Map BS_LINES leaf nodes
       const balances: Record<string, number> = {};
       for (const line of BS_LINES) {
         if (line.computed_from) continue;
         if (line.odoo_types) {
-          balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byType[t] || 0), 0);
+          if (line.date_filter === 'current_year') {
+            balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeCY[t] || 0), 0);
+          } else if (line.date_filter === 'prior_years') {
+            // Prior years = all time minus current year
+            balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + ((byTypeAll[t] || 0) - (byTypeCY[t] || 0)), 0);
+          } else {
+            balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeAll[t] || 0), 0);
+          }
         } else if (line.account_codes) {
           // For specific account codes, need a targeted query
           const codePlaceholders = line.account_codes.map(() => '?').join(',');

@@ -43,6 +43,7 @@ export interface BSLineItem {
   odoo_types?: string[];
   account_codes?: string[];
   computed_from?: string[];
+  date_filter?: 'current_year' | 'prior_years';  // filter by year
 }
 
 export const BS_LINES: BSLineItem[] = [
@@ -67,10 +68,11 @@ export const BS_LINES: BSLineItem[] = [
   { code: 'NON_CURRENT_LIABILITIES', label: 'Plus Non-current Liabilities', indent: 1, odoo_types: ['liability_non_current'] },
 
   // ===== EQUITY =====
-  { code: 'EQUITY', label: 'EQUITY', indent: 0, is_section: true, computed_from: ['EQUITY_RETAINED', 'CURRENT_YEAR_PL'] },
+  { code: 'EQUITY', label: 'EQUITY', indent: 0, is_section: true, computed_from: ['EQUITY_RETAINED', 'PRIOR_YEAR_PL', 'CURRENT_YEAR_PL'] },
 
-  { code: 'EQUITY_RETAINED', label: 'Accumulated P/L', indent: 1, odoo_types: ['equity', 'equity_unaffected'] },
-  { code: 'CURRENT_YEAR_PL', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['income', 'income_other', 'expense', 'expense_direct_cost'] },
+  { code: 'EQUITY_RETAINED', label: 'Retained Earnings', indent: 1, odoo_types: ['equity', 'equity_unaffected'] },
+  { code: 'PRIOR_YEAR_PL', label: 'Previous Years Unallocated Earnings', indent: 1, odoo_types: ['income', 'income_other', 'expense', 'expense_direct_cost'], date_filter: 'prior_years' },
+  { code: 'CURRENT_YEAR_PL', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['income', 'income_other', 'expense', 'expense_direct_cost'], date_filter: 'current_year' },
 
   // ===== TOTALS =====
   { code: 'LIAB_EQUITY', label: 'LIABILITIES + EQUITY', indent: 0, is_section: true, computed_from: ['LIABILITIES', 'EQUITY'] },
