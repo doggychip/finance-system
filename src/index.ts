@@ -8,6 +8,7 @@ import { reportRoutes } from './routes/reports';
 import { syncRoutes } from './routes/sync';
 import { invoiceRoutes } from './routes/invoices';
 import { dashboardRoutes } from './routes/dashboard';
+import { reportingRoutes } from './routes/reporting';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
 
 const app = express();
@@ -52,6 +53,7 @@ app.use('/api/reports', reportRoutes(db));
 app.use('/api/sync', syncRoutes(db));
 app.use('/api/invoices', invoiceRoutes(db));
 app.use('/api/dashboard', dashboardRoutes(db));
+app.use('/api/reporting', reportingRoutes(db));
 
 const PORT = process.env.PORT || 3000;
 app.listen(Number(PORT), '0.0.0.0', () => {

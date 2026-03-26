@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports — Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --cyan: #06b6d4; --yellow: #eab308; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+
+    .controls { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .control-group { display: flex; align-items: center; gap: 6px; }
+    .control-group label { font-size: 12px; color: var(--text-dim); }
+    .control-group select, .control-group input { padding: 6px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; }
+    .period-btns { display: flex; gap: 2px; background: var(--surface2); border-radius: 6px; padding: 2px; }
+    .period-btns button { padding: 5px 14px; border: none; border-radius: 4px; background: transparent; color: var(--text-dim); font-size: 12px; cursor: pointer; }
+    .period-btns button.active { background: var(--accent); color: white; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+    .chart-box { position: relative; height: 350px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { text-align: left; padding: 6px 8px; color: var(--text-dim); font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: var(--surface2); }
+    .text-right { text-align: right; }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .val.pos { color: var(--green); }
+    .val.neg { color: var(--red); }
+    .val.zero { color: var(--text-dim); }
+    .section-row td { font-weight: 700; background: var(--surface2); }
+    .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Financial Reports</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html" class="active">Reports</a>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>Period:</label>
+      <div class="period-btns" id="periodBtns">
+        <button data-p="daily">Daily</button>
+        <button data-p="weekly">Weekly</button>
+        <button data-p="monthly" class="active">Monthly</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <label>From:</label>
+      <input type="date" id="dateFrom" value="">
+    </div>
+    <div class="control-group">
+      <label>To:</label>
+      <input type="date" id="dateTo" value="">
+    </div>
+    <div class="control-group">
+      <label>Company:</label>
+      <select id="companySelect"><option value="">All</option></select>
+    </div>
+    <button class="btn primary" onclick="loadAll()">Apply</button>
+  </div>
+
+  <div class="container">
+    <!-- Revenue & Expenses -->
+    <div class="card">
+      <h2>Revenue & Expenses</h2>
+      <div class="chart-box"><canvas id="revExpChart"></canvas></div>
+    </div>
+
+    <!-- Net Income -->
+    <div class="card">
+      <h2>Net Income</h2>
+      <div class="chart-box"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+
+    <!-- Balance Sheet Trends -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Assets Over Time</h2>
+        <div class="chart-box"><canvas id="assetsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Liabilities & Equity Over Time</h2>
+        <div class="chart-box"><canvas id="liabEquityChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Cash Flow -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Cash Inflows vs Outflows</h2>
+        <div class="chart-box"><canvas id="cashFlowBarChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Cash Balance</h2>
+        <div class="chart-box"><canvas id="cashBalanceChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- P&L Detail Table -->
+    <div class="card">
+      <h2>P&L Detail</h2>
+      <div id="pnlTable"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <script>
+    var currentPeriod = 'monthly';
+    var charts = {};
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      return Math.round(n).toLocaleString('en-US');
+    }
+    function fmtShort(n) {
+      var abs = Math.abs(n);
+      if (abs >= 1e6) return (n/1e6).toFixed(1)+'M';
+      if (abs >= 1e3) return (n/1e3).toFixed(0)+'K';
+      return Math.round(n).toString();
+    }
+
+    var palette = { green: '#22c55e', red: '#ef4444', blue: '#3b82f6', purple: '#8b5cf6', cyan: '#06b6d4', orange: '#f97316', yellow: '#eab308' };
+    var chartDefaults = { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 30 } }, y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } } }, plugins: { legend: { labels: { color: '#8b8fa3', font: { size: 11 } } } } };
+
+    function getParams() {
+      var p = '?period=' + currentPeriod;
+      var df = document.getElementById('dateFrom').value;
+      var dt = document.getElementById('dateTo').value;
+      var co = document.getElementById('companySelect').value;
+      if (df) p += '&date_from=' + df;
+      if (dt) p += '&date_to=' + dt;
+      if (co) p += '&company_id=' + co;
+      return p;
+    }
+
+    // Period buttons
+    document.getElementById('periodBtns').addEventListener('click', function(e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      currentPeriod = btn.dataset.p;
+      document.querySelectorAll('.period-btns button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      loadAll();
+    });
+
+    // Set default dates
+    var now = new Date();
+    document.getElementById('dateTo').value = now.toISOString().slice(0, 10);
+    document.getElementById('dateFrom').value = (now.getFullYear() - 1) + now.toISOString().slice(4, 10);
+
+    // Load companies
+    fetch('/api/dashboard/companies').then(function(r) { return r.json(); }).then(function(data) {
+      var sel = document.getElementById('companySelect');
+      data.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c.company_id;
+        opt.textContent = c.company_name;
+        sel.appendChild(opt);
+      });
+    });
+
+    function destroyChart(name) { if (charts[name]) charts[name].destroy(); }
+
+    async function loadRevExp() {
+      var data = await (await fetch('/api/reporting/revenue-expenses' + getParams())).json();
+      destroyChart('revExp');
+      charts.revExp = new Chart(document.getElementById('revExpChart').getContext('2d'), {
+        type: 'bar', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Revenue', data: data.map(function(r) { return r.total_revenue; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+            { label: 'Expenses', data: data.map(function(r) { return r.total_expenses; }), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 3 },
+          ]
+        }, options: Object.assign({}, chartDefaults, { plugins: { legend: { labels: { color: '#8b8fa3' } }, tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + fmt(ctx.parsed.y); } } } } })
+      });
+    }
+
+    async function loadNetIncome() {
+      var data = await (await fetch('/api/reporting/revenue-expenses' + getParams())).json();
+      destroyChart('netIncome');
+
+      var cumulative = 0;
+      var cumData = data.map(function(r) { cumulative += r.net_income; return cumulative; });
+
+      charts.netIncome = new Chart(document.getElementById('netIncomeChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Net Income (Period)', data: data.map(function(r) { return r.net_income; }), type: 'bar', backgroundColor: data.map(function(r) { return r.net_income >= 0 ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)'; }), borderRadius: 3, order: 2 },
+            { label: 'Cumulative Net Income', data: cumData, borderColor: palette.blue, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1, order: 1 },
+          ]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadBalanceSheet() {
+      var data = await (await fetch('/api/reporting/balance-sheet-series' + getParams())).json();
+
+      destroyChart('assets');
+      charts.assets = new Chart(document.getElementById('assetsChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Cash', data: data.map(function(r) { return r.assets.bank_cash; }), borderColor: palette.green, backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Receivable', data: data.map(function(r) { return r.assets.receivable; }), borderColor: palette.cyan, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Fixed Assets', data: data.map(function(r) { return r.assets.fixed_assets; }), borderColor: palette.purple, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Total Assets', data: data.map(function(r) { return r.assets.total; }), borderColor: palette.blue, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2.5, pointRadius: 1, borderDash: [5,3] },
+          ]
+        }, options: chartDefaults
+      });
+
+      destroyChart('liabEquity');
+      charts.liabEquity = new Chart(document.getElementById('liabEquityChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Liabilities', data: data.map(function(r) { return Math.abs(r.liabilities.total); }), borderColor: palette.red, backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Equity', data: data.map(function(r) { return Math.abs(r.equity); }), borderColor: palette.purple, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1 },
+          ]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadCashFlow() {
+      var data = await (await fetch('/api/reporting/cash-flow-series' + getParams())).json();
+
+      destroyChart('cashFlowBar');
+      charts.cashFlowBar = new Chart(document.getElementById('cashFlowBarChart').getContext('2d'), {
+        type: 'bar', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Inflows', data: data.map(function(r) { return r.inflows; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+            { label: 'Outflows', data: data.map(function(r) { return -r.outflows; }), backgroundColor: 'rgba(239,68,68,0.6)', borderRadius: 3 },
+          ]
+        }, options: chartDefaults
+      });
+
+      destroyChart('cashBalance');
+      charts.cashBalance = new Chart(document.getElementById('cashBalanceChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [{ label: 'Cash Balance', data: data.map(function(r) { return r.balance; }), borderColor: palette.green, backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2 }]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadPnlTable() {
+      var data = await (await fetch('/api/reporting/pnl' + getParams())).json();
+      var el = document.getElementById('pnlTable');
+
+      if (!data.length) { el.innerHTML = '<div class="loading">No data for selected range</div>'; return; }
+
+      // Group by account
+      var accounts = {};
+      data.forEach(function(r) {
+        var key = r.code + ' ' + r.name;
+        if (!accounts[key]) accounts[key] = { code: r.code, name: r.name, odoo_type: r.odoo_type, total: 0 };
+        accounts[key].total += r.amount;
+      });
+
+      var sorted = Object.values(accounts).sort(function(a, b) {
+        if (a.odoo_type !== b.odoo_type) return a.odoo_type.localeCompare(b.odoo_type);
+        return Math.abs(b.total) - Math.abs(a.total);
+      });
+
+      var totalRevenue = 0, totalExpense = 0;
+      var html = '<table><thead><tr><th>Code</th><th>Account</th><th>Type</th><th class="text-right">Amount</th></tr></thead><tbody>';
+
+      var lastType = '';
+      sorted.forEach(function(a) {
+        var typeLabel = a.odoo_type.replace('_', ' ');
+        if (a.odoo_type !== lastType) {
+          html += '<tr class="section-row"><td colspan="4">' + typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1) + '</td></tr>';
+          lastType = a.odoo_type;
+        }
+        var cls = a.total > 0.5 ? 'val pos' : a.total < -0.5 ? 'val neg' : 'val zero';
+        html += '<tr><td>' + a.code + '</td><td>' + a.name + '</td><td style="color:var(--text-dim)">' + typeLabel + '</td><td class="' + cls + '">' + fmt(a.total) + '</td></tr>';
+
+        if (a.odoo_type === 'income' || a.odoo_type === 'income_other') totalRevenue += a.total;
+        else totalExpense += a.total;
+      });
+
+      var netIncome = totalRevenue - totalExpense;
+      html += '<tr class="total-row"><td colspan="3">Total Revenue</td><td class="val pos">' + fmt(totalRevenue) + '</td></tr>';
+      html += '<tr class="total-row"><td colspan="3">Total Expenses</td><td class="val neg">' + fmt(totalExpense) + '</td></tr>';
+      html += '<tr class="total-row"><td colspan="3"><strong>Net Income</strong></td><td class="val ' + (netIncome >= 0 ? 'pos' : 'neg') + '"><strong>' + fmt(netIncome) + '</strong></td></tr>';
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    async function loadAll() {
+      await Promise.all([loadRevExp(), loadNetIncome(), loadBalanceSheet(), loadCashFlow(), loadPnlTable()]);
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>
