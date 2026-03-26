@@ -10,6 +10,7 @@ import { invoiceRoutes } from './routes/invoices';
 import { dashboardRoutes } from './routes/dashboard';
 import { reportingRoutes } from './routes/reporting';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
+import { seedXterioFoundation } from './data/xterio-seed';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use(express.static(publicDir));
 app.use(express.static(devPublicDir));
 
 const db = initDb();
+seedXterioFoundation(db);
 
 app.use('/api/accounts', accountRoutes(db));
 app.use('/api/journal', journalRoutes(db));

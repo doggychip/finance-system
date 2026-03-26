@@ -102,6 +102,21 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_payments_odoo_id ON payments(odoo_id);
     CREATE INDEX IF NOT EXISTS idx_invoices_state ON invoices(state);
     CREATE INDEX IF NOT EXISTS idx_payments_state ON payments(state);
+
+    CREATE TABLE IF NOT EXISTS manual_balances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity TEXT NOT NULL,
+      account_code TEXT NOT NULL,
+      account_name TEXT NOT NULL,
+      period TEXT NOT NULL,
+      amount_local REAL DEFAULT 0,
+      currency TEXT DEFAULT 'CHF',
+      exchange_rate REAL DEFAULT 1,
+      amount_usd REAL DEFAULT 0,
+      category TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_manual_entity_period ON manual_balances(entity, period);
   `);
 
   return db;

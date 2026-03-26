@@ -1143,5 +1143,47 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json({ prior_date: priorDate, groups });
   });
 
+  // Xterio Foundation manual data
+  router.get('/xterio-foundation', (_req, res) => {
+    const rows = db.prepare(`
+      SELECT entity, account_code, account_name, period, amount_local, currency, exchange_rate, amount_usd, category
+      FROM manual_balances
+      WHERE entity = 'Xterio Foundation'
+      ORDER BY category, account_code, period
+    `).all() as any[];
+
+    // Group by period for totals
+    const periods = [...new Set(rows.map(r => r.period))].sort();
+    const byPeriod: Record<string, any> = {};
+
+    for (const p of periods) {
+      const periodRows = rows.filter(r => r.period === p);
+      const corpPremium = periodRows.filter(r => r.category === 'Corporate Premium');
+      const liqOpt = periodRows.filter(r => r.category === 'Liquidity Optimizer');
+      const fxFwd = periodRows.filter(r => r.category === 'FX Forward');
+
+      byPeriod[p] = {
+        period: p,
+        exchange_rate: periodRows[0]?.exchange_rate || 1.25,
+        corporate_premium_chf: corpPremium.reduce((s: number, r: any) => s + r.amount_local, 0),
+        corporate_premium_usd: corpPremium.reduce((s: number, r: any) => s + r.amount_usd, 0),
+        liquidity_optimizer_chf: liqOpt.reduce((s: number, r: any) => s + r.amount_local, 0),
+        liquidity_optimizer_usd: liqOpt.reduce((s: number, r: any) => s + r.amount_usd, 0),
+        fx_forward_chf: fxFwd.reduce((s: number, r: any) => s + r.amount_local, 0),
+        fx_forward_usd: fxFwd.reduce((s: number, r: any) => s + r.amount_usd, 0),
+        total_chf: periodRows.reduce((s: number, r: any) => s + r.amount_local, 0),
+        total_usd: periodRows.reduce((s: number, r: any) => s + r.amount_usd, 0),
+      };
+    }
+
+    res.json({
+      entity: 'Xterio Foundation',
+      currency: 'CHF',
+      periods: Object.values(byPeriod),
+      accounts: rows,
+      latest_total_usd: byPeriod[periods[periods.length - 1]]?.total_usd || 0,
+    });
+  });
+
   return router;
 }
