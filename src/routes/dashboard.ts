@@ -664,10 +664,20 @@ export function dashboardRoutes(db: Database.Database): Router {
         }
       }
 
-      // Compute derived lines
-      for (const line of BS_LINES) {
-        if (!line.computed_from) continue;
-        balances[line.code] = line.computed_from.reduce((sum: number, code: string) => sum + (balances[code] || 0), 0);
+      // Compute derived lines — multiple passes to resolve nested dependencies
+      const maxPasses = 10;
+      for (let pass = 0; pass < maxPasses; pass++) {
+        let resolved = 0;
+        for (const line of BS_LINES) {
+          if (!line.computed_from) continue;
+          if (line.code in balances) continue; // already resolved
+          const deps = line.computed_from;
+          const allReady = deps.every((c: string) => c in balances);
+          if (!allReady) continue;
+          balances[line.code] = deps.reduce((sum: number, c: string) => sum + (balances[c] || 0), 0);
+          resolved++;
+        }
+        if (resolved === 0) break;
       }
 
       groupBalances[group.name] = balances;
