@@ -19,8 +19,11 @@ app.get('/health', (_req, res) => {
 
 app.use(express.json());
 
-// Serve dashboard
-app.use(express.static(path.join(process.cwd(), 'public')));
+// Serve dashboard — check dist/public (production) and public/ (dev)
+const publicDir = path.join(__dirname, 'public');
+const devPublicDir = path.join(process.cwd(), 'public');
+app.use(express.static(publicDir));
+app.use(express.static(devPublicDir));
 
 const db = initDb();
 
@@ -32,7 +35,7 @@ app.use('/api/invoices', invoiceRoutes(db));
 app.use('/api/dashboard', dashboardRoutes(db));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Finance system running on port ${PORT}`);
   console.log(`Dashboard: http://localhost:${PORT}`);
 
