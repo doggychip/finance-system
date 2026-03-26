@@ -39,9 +39,11 @@ export async function syncJournalEntries(
   console.log(`[sync-journal] ${totalCount} journal entries to sync`);
 
   const upsertEntry = db.prepare(`
-    INSERT INTO journal_entries (id, odoo_id, date, description, reference, status, posted_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO journal_entries (id, odoo_id, company_id, company_name, date, description, reference, status, posted_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(odoo_id) DO UPDATE SET
+      company_id = excluded.company_id,
+      company_name = excluded.company_name,
       date = excluded.date,
       description = excluded.description,
       reference = excluded.reference,
@@ -70,7 +72,7 @@ export async function syncJournalEntries(
     const odooEntries = await odoo.searchRead(
       'account.move',
       domain,
-      ['id', 'name', 'date', 'ref', 'state', 'move_type', 'amount_total'],
+      ['id', 'name', 'date', 'ref', 'state', 'move_type', 'amount_total', 'company_id'],
       { order: 'date desc', limit: batchSize, offset }
     );
 
@@ -108,6 +110,9 @@ export async function syncJournalEntries(
           const ref = (entry.ref as string | false) || '';
           const state = mapOdooState(entry.state as string);
           const postedAt = state === 'posted' ? date : null;
+          const companyRef = entry.company_id as [number, string] | false;
+          const companyId = companyRef ? companyRef[0] : null;
+          const companyName = companyRef ? companyRef[1] : '';
 
           const existing = getEntryByOdooId.get(odooId) as { id: string } | undefined;
           const entryId = existing?.id || crypto.randomUUID();
@@ -126,7 +131,7 @@ export async function syncJournalEntries(
             return; // skip this entry within transaction
           }
 
-          upsertEntry.run(entryId, odooId, date, name, ref, state, postedAt);
+          upsertEntry.run(entryId, odooId, companyId, companyName, date, name, ref, state, postedAt);
 
           if (existing) {
             deleteLineItems.run(entryId);

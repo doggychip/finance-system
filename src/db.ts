@@ -23,6 +23,8 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     CREATE TABLE IF NOT EXISTS journal_entries (
       id TEXT PRIMARY KEY,
       odoo_id INTEGER UNIQUE,
+      company_id INTEGER,
+      company_name TEXT DEFAULT '',
       date TEXT NOT NULL,
       description TEXT NOT NULL,
       reference TEXT DEFAULT '',
