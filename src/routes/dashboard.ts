@@ -681,6 +681,27 @@ export function dashboardRoutes(db: Database.Database): Router {
       const byTypeCY: Record<string, number> = {};
       for (const row of currentYearBalances) byTypeCY[row.odoo_type] = row.balance;
 
+      // Also get balances per account code for account-specific lines
+      const allAccountCodes = BS_LINES
+        .filter(l => l.account_codes && !l.computed_from)
+        .flatMap(l => l.account_codes!);
+      const uniqueCodes = [...new Set(allAccountCodes)];
+
+      const byCode: Record<string, number> = {};
+      if (uniqueCodes.length > 0) {
+        const codeRows = db.prepare(`
+          SELECT a.code,
+            COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+          FROM line_items li
+          INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+            AND je.status = 'posted' AND je.company_id IN (${placeholders})
+          INNER JOIN accounts a ON a.id = li.account_id
+          WHERE a.code IN (${uniqueCodes.map(() => '?').join(',')})
+          GROUP BY a.code
+        `).all(...group.company_ids, ...uniqueCodes) as any[];
+        for (const r of codeRows) byCode[r.code] = r.balance;
+      }
+
       // Map BS_LINES leaf nodes
       const balances: Record<string, number> = {};
       for (const line of BS_LINES) {
@@ -689,23 +710,12 @@ export function dashboardRoutes(db: Database.Database): Router {
           if (line.date_filter === 'current_year') {
             balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeCY[t] || 0), 0);
           } else if (line.date_filter === 'prior_years') {
-            // Prior years = all time minus current year
             balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + ((byTypeAll[t] || 0) - (byTypeCY[t] || 0)), 0);
           } else {
             balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeAll[t] || 0), 0);
           }
         } else if (line.account_codes) {
-          // For specific account codes, need a targeted query
-          const codePlaceholders = line.account_codes.map(() => '?').join(',');
-          const row = db.prepare(`
-            SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-            FROM line_items li
-            INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-              AND je.status = 'posted' AND je.company_id IN (${placeholders})
-            INNER JOIN accounts a ON a.id = li.account_id
-            WHERE a.code IN (${codePlaceholders})
-          `).get(...group.company_ids, ...line.account_codes) as any;
-          balances[line.code] = row?.balance || 0;
+          balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
         }
       }
 
