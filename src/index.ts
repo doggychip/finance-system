@@ -17,6 +17,25 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Basic auth protection (set AUTH_USER and AUTH_PASS env vars to enable)
+const authUser = process.env.AUTH_USER;
+const authPass = process.env.AUTH_PASS;
+if (authUser && authPass) {
+  app.use((req, res, next) => {
+    if (req.path === '/health') return next();
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Basic ')) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="Finance Dashboard"');
+      return res.status(401).send('Authentication required');
+    }
+    const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+    const [user, pass] = decoded.split(':');
+    if (user === authUser && pass === authPass) return next();
+    res.setHeader('WWW-Authenticate', 'Basic realm="Finance Dashboard"');
+    res.status(401).send('Invalid credentials');
+  });
+}
+
 app.use(express.json());
 
 // Serve dashboard — check dist/public (production) and public/ (dev)
