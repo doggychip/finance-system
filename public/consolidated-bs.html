@@ -41,6 +41,11 @@
     }
     thead th.subtotal-col { background: #2d4a22; }
     thead th.total-col { background: #4a1d1d; }
+    thead th.elim-col { background: #4a3d1d; }
+    thead th.consol-col { background: #1d2d4a; font-size: 11px; }
+
+    .elim-val { background: rgba(234,179,8,0.04); }
+    .consol-val { background: rgba(59,130,246,0.06); font-weight: 600; }
 
     /* Row label sticky */
     .row-label {
@@ -117,9 +122,11 @@
       return n < 0 ? '(' + s + ')' : s;
     }
 
-    function valCls(n, isSubtotal, isTotal) {
+    function valCls(n, isSubtotal, isTotal, isElim, isConsol) {
       var base = 'val';
-      if (isTotal) base += ' total-val';
+      if (isConsol) base += ' consol-val';
+      else if (isElim) base += ' elim-val';
+      else if (isTotal) base += ' total-val';
       else if (isSubtotal) base += ' subtotal-val';
       if (Math.abs(n) < 0.5) return base + ' zero';
       if (n < 0) return base + ' negative';
@@ -143,7 +150,9 @@
         html += '<thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">Conso Balance Sheet</th>';
         data.columns.forEach(function(col) {
           var cls = '';
-          if (col.name === 'Total') cls = 'total-col';
+          if (col.is_consolidated) cls = 'consol-col';
+          else if (col.is_elimination) cls = 'elim-col';
+          else if (col.name === 'Total') cls = 'total-col';
           else if (col.is_subtotal) cls = 'subtotal-col';
           html += '<th class="' + cls + '">' + col.name + '</th>';
         });
@@ -162,7 +171,7 @@
 
           row.values.forEach(function(val, i) {
             var col = data.columns[i];
-            var cls = valCls(val, col.is_subtotal, col.name === 'Total');
+            var cls = valCls(val, col.is_subtotal, col.name === 'Total', col.is_elimination, col.is_consolidated);
             if (row.code === 'CHECK' && Math.abs(val) > 0.5) cls += ' nonzero';
             html += '<td class="' + cls + '">' + fmt(val) + '</td>';
           });

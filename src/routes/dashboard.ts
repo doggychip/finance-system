@@ -741,35 +741,149 @@ export function dashboardRoutes(db: Database.Database): Router {
       groupBalances[group.name] = balances;
     }
 
-    // Step 3: Build response
-    const columns = ENTITY_GROUPS.map(g => ({
-      name: g.name,
-      is_subtotal: g.is_subtotal || false,
-    }));
+    // Step 3: Compute IC elimination
+    // Intercompany accounts (303xxx) should net to zero in consolidation
+    // Get total IC balance across all companies for elimination
+    const allCompanyIds = ENTITY_GROUPS.filter(g => !g.is_subtotal).flatMap(g => g.company_ids);
+    const icPlaceholders = allCompanyIds.map(() => '?').join(',');
 
-    const rows = BS_LINES.map(line => ({
-      code: line.code,
-      label: line.label,
-      indent: line.indent,
-      is_total: line.is_total || false,
-      is_section: line.is_section || false,
-      values: ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0),
-    }));
+    const icBalances = db.prepare(`
+      SELECT a.odoo_type,
+        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.company_id IN (${icPlaceholders})
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.code LIKE '303%'
+      GROUP BY a.odoo_type
+    `).all(...allCompanyIds) as any[];
 
-    // Add check row (Assets + Liabilities + Equity should = 0 in double-entry)
+    const icByType: Record<string, number> = {};
+    for (const row of icBalances) icByType[row.odoo_type] = row.balance;
+
+    // Build IC elimination balances — negate IC amounts per odoo_type
+    const icElimination: Record<string, number> = {};
+    for (const line of BS_LINES) {
+      if (line.computed_from) continue;
+      if (line.odoo_types) {
+        icElimination[line.code] = -line.odoo_types.reduce((s: number, t: string) => s + (icByType[t] || 0), 0);
+      } else {
+        icElimination[line.code] = 0;
+      }
+    }
+    // Resolve computed IC elimination
+    for (let pass = 0; pass < 10; pass++) {
+      let resolved = 0;
+      for (const line of BS_LINES) {
+        if (!line.computed_from) continue;
+        if (line.code in icElimination) continue;
+        const allReady = line.computed_from.every((c: string) => c in icElimination);
+        if (!allReady) continue;
+        icElimination[line.code] = line.computed_from.reduce((s: number, c: string) => s + (icElimination[c] || 0), 0);
+        resolved++;
+      }
+      if (resolved === 0) break;
+    }
+
+    // Step 4: Build response with IC elimination and consolidated columns
+    const columns = [
+      ...ENTITY_GROUPS.map(g => ({
+        name: g.name,
+        is_subtotal: g.is_subtotal || false,
+        is_elimination: false,
+        is_consolidated: false,
+      })),
+      { name: 'IC Elimination', is_subtotal: false, is_elimination: true, is_consolidated: false },
+      { name: 'Consolidated', is_subtotal: false, is_elimination: false, is_consolidated: true },
+    ];
+
+    const totalIdx = ENTITY_GROUPS.findIndex(g => g.name === 'Total');
+
+    const rows = BS_LINES.map(line => {
+      const entityValues = ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0);
+      const totalVal = totalIdx >= 0 ? entityValues[totalIdx] : 0;
+      const icVal = icElimination[line.code] || 0;
+      const consolidatedVal = totalVal + icVal;
+
+      return {
+        code: line.code,
+        label: line.label,
+        indent: line.indent,
+        is_total: line.is_total || false,
+        is_section: line.is_section || false,
+        values: [...entityValues, icVal, consolidatedVal],
+      };
+    });
+
+    // Add check row
     rows.push({
       code: 'CHECK',
       label: 'Check (should be 0)',
       indent: 0,
       is_total: false,
       is_section: false,
-      values: ENTITY_GROUPS.map(g => {
-        const b = groupBalances[g.name] || {};
-        return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0);
-      }),
+      values: [
+        ...ENTITY_GROUPS.map(g => {
+          const b = groupBalances[g.name] || {};
+          return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0);
+        }),
+        // IC elimination check
+        (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0),
+        // Consolidated check
+        (() => {
+          const totalBal = groupBalances['Total'] || {};
+          const t = (totalBal['ASSETS'] || 0) + (totalBal['LIABILITIES'] || 0) + (totalBal['EQUITY'] || 0);
+          return t + (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0);
+        })(),
+      ],
     });
 
     res.json({ columns, rows });
+  });
+
+  // IC Reconciliation report
+  router.get('/ic-reconciliation', (_req, res) => {
+    // Get intercompany balances per company per account
+    const rows = db.prepare(`
+      SELECT
+        je.company_id, je.company_name,
+        a.code, a.name,
+        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.code LIKE '303%'
+      GROUP BY je.company_id, je.company_name, a.code, a.name
+      HAVING ABS(balance) > 0.01
+      ORDER BY a.code, je.company_name
+    `).all() as any[];
+
+    // Group by IC account
+    const byAccount: Record<string, { code: string; name: string; entries: any[]; total: number }> = {};
+    for (const row of rows) {
+      const key = row.code;
+      if (!byAccount[key]) byAccount[key] = { code: row.code, name: row.name, entries: [], total: 0 };
+      byAccount[key].entries.push({
+        company_id: row.company_id,
+        company_name: row.company_name,
+        balance: row.balance,
+      });
+      byAccount[key].total += row.balance;
+    }
+
+    // Summary
+    const accounts = Object.values(byAccount).sort((a: any, b: any) => a.code.localeCompare(b.code));
+    const grandTotal = accounts.reduce((s, a) => s + a.total, 0);
+    const unreconciled = accounts.filter(a => Math.abs(a.total) > 1);
+
+    res.json({
+      accounts,
+      summary: {
+        total_ic_accounts: accounts.length,
+        unreconciled_count: unreconciled.length,
+        net_unreconciled: grandTotal,
+      },
+    });
   });
 
   return router;
