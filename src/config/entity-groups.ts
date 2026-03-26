@@ -67,19 +67,11 @@ export const BS_LINES: BSLineItem[] = [
   { code: 'NON_CURRENT_LIABILITIES', label: 'Plus Non-current Liabilities', indent: 1, odoo_types: ['liability_non_current'] },
 
   // ===== EQUITY =====
-  { code: 'EQUITY', label: 'EQUITY', indent: 0, is_section: true, computed_from: ['EQUITY_RETAINED', 'EQUITY_UNAFFECTED'] },
+  { code: 'EQUITY', label: 'EQUITY', indent: 0, is_section: true, computed_from: ['EQUITY_RETAINED', 'CURRENT_YEAR_PL'] },
 
-  { code: 'EQUITY_RETAINED', label: 'Retained Earnings', indent: 1, odoo_types: ['equity'] },
-  { code: 'EQUITY_UNAFFECTED', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['equity_unaffected'] },
-
-  // ===== P&L (flows into equity) =====
-  { code: 'PL', label: 'P&L (Income - Expense)', indent: 0, is_section: true, computed_from: ['INCOME', 'INCOME_OTHER', 'EXPENSE', 'EXPENSE_DIRECT'] },
-
-  { code: 'INCOME', label: 'Income', indent: 1, odoo_types: ['income'] },
-  { code: 'INCOME_OTHER', label: 'Other Income', indent: 1, odoo_types: ['income_other'] },
-  { code: 'EXPENSE', label: 'Expenses', indent: 1, odoo_types: ['expense'] },
-  { code: 'EXPENSE_DIRECT', label: 'Direct Costs', indent: 1, odoo_types: ['expense_direct_cost'] },
+  { code: 'EQUITY_RETAINED', label: 'Accumulated P/L', indent: 1, odoo_types: ['equity', 'equity_unaffected'] },
+  { code: 'CURRENT_YEAR_PL', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['income', 'income_other', 'expense', 'expense_direct_cost'] },
 
   // ===== TOTALS =====
-  { code: 'LIAB_EQUITY_PL', label: 'LIABILITIES + EQUITY + P&L', indent: 0, is_section: true, computed_from: ['LIABILITIES', 'EQUITY', 'PL'] },
+  { code: 'LIAB_EQUITY', label: 'LIABILITIES + EQUITY', indent: 0, is_section: true, computed_from: ['LIABILITIES', 'EQUITY'] },
 ];

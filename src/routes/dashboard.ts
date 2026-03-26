@@ -709,7 +709,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       values: ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0),
     }));
 
-    // Add check row (Assets + Liabilities + Equity + P&L should = 0 in double-entry)
+    // Add check row (Assets + Liabilities + Equity should = 0 in double-entry)
     rows.push({
       code: 'CHECK',
       label: 'Check (should be 0)',
@@ -718,7 +718,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       is_section: false,
       values: ENTITY_GROUPS.map(g => {
         const b = groupBalances[g.name] || {};
-        return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0) + (b['PL'] || 0);
+        return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0);
       }),
     });
 
