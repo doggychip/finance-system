@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cash Position — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; font-size: 12px; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex-wrap: wrap; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+
+    .scroll-wrap { overflow-x: auto; padding: 16px; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; padding-left: 4px; }
+
+    table { border-collapse: collapse; width: max-content; min-width: 100%; }
+    th, td { padding: 4px 10px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; }
+    thead th { background: #1a365d; color: white; font-weight: 700; font-size: 10px; text-align: center; padding: 8px 10px; position: sticky; top: 0; z-index: 2; }
+    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 200px; font-weight: 500; }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .val.pos { color: var(--text); }
+    .val.neg { color: var(--red); }
+    .val.zero { color: var(--text-dim); }
+    .total-row td { font-weight: 700; background: rgba(34,197,94,0.06); border-top: 2px solid var(--border); }
+    .total-row .row-label { background: rgba(34,197,94,0.06); font-weight: 700; }
+    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.06); }
+    .subtotal-row .row-label { background: rgba(99,102,241,0.06); }
+    .runway-row td { background: rgba(234,179,8,0.06); font-weight: 600; }
+    .runway-row .row-label { background: rgba(234,179,8,0.06); }
+    .section-header td { background: var(--surface2); font-weight: 700; font-size: 12px; }
+
+    /* Bank account detail */
+    .group-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+    .group-header { padding: 12px 16px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+    .group-header .total { font-variant-numeric: tabular-nums; }
+    .acct-table { width: 100%; }
+    .acct-table th { background: var(--surface); text-align: left; font-size: 10px; }
+    .acct-table td { font-size: 11px; }
+    .change-pos { color: var(--green); }
+    .change-neg { color: var(--red); }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Cash Position</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/ic-recon.html">IC Recon</a>
+      <a href="/cash-position.html" class="active">Cash Position</a>
+    </div>
+    <button class="btn" onclick="loadAll()">Refresh</button>
+  </div>
+
+  <div class="scroll-wrap">
+    <!-- Cash Composition Over Time -->
+    <div class="section">
+      <h2>Entity Group Cash Composition (Monthly Snapshots)</h2>
+      <div id="compositionContent"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Bank Account Detail -->
+    <div class="section">
+      <h2>Bank Account Detail (Current vs Prior Week)</h2>
+      <div id="bankContent"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(Math.round(n)).toLocaleString('en-US');
+      return n < 0 ? '(' + s + ')' : s;
+    }
+    function fmtPct(n) {
+      if (n == null || isNaN(n) || !isFinite(n)) return '-';
+      return n.toFixed(1) + '%';
+    }
+    function valCls(n) {
+      if (Math.abs(n) < 0.5) return 'val zero';
+      return n < 0 ? 'val neg' : 'val pos';
+    }
+
+    async function loadComposition() {
+      var el = document.getElementById('compositionContent');
+      try {
+        var data = await (await fetch('/api/dashboard/cash-position?months=10')).json();
+        if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
+
+        var months = data.months;
+        var cats = data.categories;
+
+        // Build one table per entity group
+        var html = '';
+
+        for (var g of data.groups) {
+          html += '<table style="margin-bottom:24px">';
+
+          // Header
+          html += '<thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">' + g.group + '</th>';
+          months.forEach(function(m) {
+            html += '<th>' + m.slice(0, 7) + '</th>';
+          });
+          html += '</tr></thead><tbody>';
+
+          // Category rows
+          cats.forEach(function(cat) {
+            html += '<tr><td class="row-label">' + cat.label + '</td>';
+            g.snapshots.forEach(function(snap) {
+              var v = snap[cat.key] || 0;
+              html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>';
+            });
+            html += '</tr>';
+          });
+
+          // Closing balance row
+          html += '<tr class="total-row"><td class="row-label"><strong>Closing Balance</strong></td>';
+          var lastClosing = 0;
+          g.snapshots.forEach(function(snap) {
+            lastClosing = snap.closing || 0;
+            html += '<td class="' + valCls(lastClosing) + '">' + fmt(lastClosing) + '</td>';
+          });
+          html += '</tr>';
+
+          // Month-over-month change
+          html += '<tr class="subtotal-row"><td class="row-label">MoM Change</td>';
+          for (var i = 0; i < g.snapshots.length; i++) {
+            if (i === 0) { html += '<td class="val zero">-</td>'; continue; }
+            var change = (g.snapshots[i].closing || 0) - (g.snapshots[i-1].closing || 0);
+            html += '<td class="' + valCls(change) + '">' + fmt(change) + '</td>';
+          }
+          html += '</tr>';
+
+          html += '</tbody></table>';
+
+          // Runway info
+          html += '<div style="margin-bottom:24px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;display:inline-flex;gap:24px;font-size:12px">';
+          html += '<span><strong>Available Balance:</strong> ' + fmt(g.available_balance) + '</span>';
+          html += '<span><strong>Monthly Burn:</strong> ' + fmt(g.monthly_burn) + '</span>';
+          html += '<span><strong>Runway:</strong> ' + (g.runway_months != null ? g.runway_months + ' months' : 'N/A') + '</span>';
+          html += '</div>';
+        }
+
+        el.innerHTML = html;
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
+    }
+
+    async function loadBankAccounts() {
+      var el = document.getElementById('bankContent');
+      try {
+        var data = await (await fetch('/api/dashboard/bank-accounts')).json();
+        if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
+
+        var html = '';
+        data.groups.forEach(function(group) {
+          var totalChange = group.total_current - group.total_prior;
+          var totalChangePct = group.total_prior !== 0 ? ((totalChange / Math.abs(group.total_prior)) * 100) : 0;
+
+          html += '<div class="group-card">';
+          html += '<div class="group-header"><span>' + group.name + '</span><span class="total">';
+          html += 'Current: ' + fmt(group.total_current);
+          html += '  |  Prior: ' + fmt(group.total_prior);
+          html += '  |  <span class="' + (totalChange >= 0 ? 'change-pos' : 'change-neg') + '">' + fmt(totalChange) + ' (' + fmtPct(totalChangePct) + ')</span>';
+          html += '</span></div>';
+
+          html += '<table class="acct-table"><thead><tr>';
+          html += '<th>Company</th><th>Code</th><th>Account</th>';
+          html += '<th class="text-right">Current</th><th class="text-right">Prior (' + data.prior_date + ')</th>';
+          html += '<th class="text-right">Change</th><th class="text-right">%</th>';
+          html += '</tr></thead><tbody>';
+
+          group.accounts.forEach(function(a) {
+            html += '<tr>';
+            html += '<td style="color:var(--text-dim)">' + a.company_name + '</td>';
+            html += '<td style="color:var(--text-dim)">' + a.code + '</td>';
+            html += '<td>' + a.name + '</td>';
+            html += '<td class="' + valCls(a.current_balance) + '">' + fmt(a.current_balance) + '</td>';
+            html += '<td class="' + valCls(a.prior_balance) + '">' + fmt(a.prior_balance) + '</td>';
+            var chgCls = a.change >= 0 ? 'change-pos' : 'change-neg';
+            html += '<td class="val ' + chgCls + '">' + fmt(a.change) + '</td>';
+            html += '<td class="val ' + chgCls + '">' + fmtPct(a.change_pct) + '</td>';
+            html += '</tr>';
+          });
+
+          html += '</tbody></table></div>';
+        });
+
+        el.innerHTML = html;
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
+    }
+
+    async function loadAll() {
+      await Promise.all([loadComposition(), loadBankAccounts()]);
+    }
+    loadAll();
+  </script>
+</body>
+</html>

@@ -886,5 +886,248 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+
+  // ====== Cash Position Report ======
+  // Entity group cash composition over time (monthly snapshots)
+  router.get('/cash-position', (req, res) => {
+    const months = parseInt(req.query.months as string) || 12;
+
+    // Generate list of month-end dates
+    const now = new Date();
+    const monthDates: string[] = [];
+    for (let i = 0; i < months; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0); // last day of month
+      monthDates.push(d.toISOString().slice(0, 10));
+    }
+    monthDates.reverse();
+
+    // For each entity group, compute BS-like snapshot at each month-end
+    const categories = [
+      { key: 'cash', label: 'Cash', odoo_types: ['asset_cash'] },
+      { key: 'receivable', label: 'Receivables', odoo_types: ['asset_receivable'] },
+      { key: 'current_assets', label: 'Current Assets', odoo_types: ['asset_current', 'asset_prepayments'] },
+      { key: 'non_current_assets', label: 'Non-current Assets', odoo_types: ['asset_fixed', 'asset_non_current'] },
+      { key: 'payables', label: 'Payables', odoo_types: ['liability_payable'] },
+      { key: 'current_liabilities', label: 'Current Liabilities', odoo_types: ['liability_current', 'liability_credit_card'] },
+      { key: 'non_current_liabilities', label: 'Non-current Liabilities', odoo_types: ['liability_non_current'] },
+      { key: 'ic_balances', label: 'IC Balances', account_codes_prefix: '303' },
+    ];
+
+    const result: any[] = [];
+
+    for (const group of ENTITY_GROUPS) {
+      if (group.company_ids.length === 0) continue; // skip subtotals
+      if (group.is_subtotal) continue;
+
+      const placeholders = group.company_ids.map(() => '?').join(',');
+      const snapshots: any[] = [];
+
+      for (const asOf of monthDates) {
+        const snapshot: any = { date: asOf };
+
+        for (const cat of categories) {
+          let balance: number;
+
+          if (cat.odoo_types) {
+            const typePlaceholders = cat.odoo_types.map(() => '?').join(',');
+            const row = db.prepare(`
+              SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+              FROM line_items li
+              INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+                AND je.status = 'posted' AND je.company_id IN (${placeholders}) AND je.date <= ?
+              INNER JOIN accounts a ON a.id = li.account_id
+              WHERE a.odoo_type IN (${typePlaceholders})
+            `).get(...group.company_ids, asOf, ...cat.odoo_types) as any;
+            balance = row?.balance || 0;
+          } else if (cat.account_codes_prefix) {
+            const row = db.prepare(`
+              SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+              FROM line_items li
+              INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+                AND je.status = 'posted' AND je.company_id IN (${placeholders}) AND je.date <= ?
+              INNER JOIN accounts a ON a.id = li.account_id
+              WHERE a.code LIKE ?
+            `).get(...group.company_ids, asOf, cat.account_codes_prefix + '%') as any;
+            balance = row?.balance || 0;
+          } else {
+            balance = 0;
+          }
+
+          snapshot[cat.key] = balance;
+        }
+
+        // Closing = sum of all
+        snapshot.closing = Object.keys(snapshot).filter(k => k !== 'date').reduce((s: number, k: string) => s + (snapshot[k] || 0), 0);
+        snapshots.push(snapshot);
+      }
+
+      // Monthly burn = average expense over last 3 months
+      const recentMonths = monthDates.slice(-3);
+      if (recentMonths.length >= 2) {
+        const row = db.prepare(`
+          SELECT COALESCE(SUM(li.debit) - SUM(li.credit), 0) as total_expense
+          FROM line_items li
+          INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+            AND je.status = 'posted' AND je.company_id IN (${placeholders})
+            AND je.date >= ? AND je.date <= ?
+          INNER JOIN accounts a ON a.id = li.account_id
+          WHERE a.odoo_type IN ('expense', 'expense_direct_cost')
+        `).get(...group.company_ids, recentMonths[0].slice(0, 7) + '-01', recentMonths[recentMonths.length - 1]) as any;
+        const avgBurn = (row?.total_expense || 0) / recentMonths.length;
+        const lastClosing = snapshots[snapshots.length - 1]?.closing || 0;
+        const runway = avgBurn > 0 ? Math.round(lastClosing / avgBurn) : null;
+
+        result.push({
+          group: group.name,
+          company_ids: group.company_ids,
+          snapshots,
+          monthly_burn: avgBurn,
+          available_balance: lastClosing,
+          runway_months: runway,
+        });
+      } else {
+        result.push({
+          group: group.name,
+          company_ids: group.company_ids,
+          snapshots,
+          monthly_burn: 0,
+          available_balance: snapshots[snapshots.length - 1]?.closing || 0,
+          runway_months: null,
+        });
+      }
+    }
+
+    // Add subtotals
+    for (const group of ENTITY_GROUPS) {
+      if (!group.is_subtotal || !group.subtotal_groups) continue;
+
+      const childResults = result.filter(r => group.subtotal_groups!.includes(r.group));
+      if (childResults.length === 0) continue;
+
+      const snapshots = monthDates.map((date, i) => {
+        const snapshot: any = { date };
+        for (const cat of categories) {
+          snapshot[cat.key] = childResults.reduce((s: number, cr: any) => s + (cr.snapshots[i]?.[cat.key] || 0), 0);
+        }
+        snapshot.closing = Object.keys(snapshot).filter(k => k !== 'date').reduce((s: number, k: string) => s + (snapshot[k] || 0), 0);
+        return snapshot;
+      });
+
+      const totalBurn = childResults.reduce((s: number, cr: any) => s + (cr.monthly_burn || 0), 0);
+      const lastClosing = snapshots[snapshots.length - 1]?.closing || 0;
+
+      result.push({
+        group: group.name,
+        company_ids: [],
+        is_subtotal: true,
+        snapshots,
+        monthly_burn: totalBurn,
+        available_balance: lastClosing,
+        runway_months: totalBurn > 0 ? Math.round(lastClosing / totalBurn) : null,
+      });
+    }
+
+    res.json({ months: monthDates, categories, groups: result });
+  });
+
+  // ====== Bank Account Detail ======
+  router.get('/bank-accounts', (req, res) => {
+    const priorDate = req.query.prior_date as string || (() => {
+      const d = new Date(); d.setDate(d.getDate() - 7);
+      return d.toISOString().slice(0, 10);
+    })();
+
+    const rows = db.prepare(`
+      SELECT
+        a.code, a.name, a.odoo_type,
+        je.company_name,
+        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as current_balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type = 'asset_cash'
+      GROUP BY a.code, a.name, a.odoo_type, je.company_name
+      HAVING ABS(current_balance) > 0.01
+      ORDER BY je.company_name, a.code
+    `).all() as any[];
+
+    // Get prior balances
+    const priorRows = db.prepare(`
+      SELECT
+        a.code, a.name,
+        je.company_name,
+        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted' AND je.date <= ?
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type = 'asset_cash'
+      GROUP BY a.code, a.name, je.company_name
+      HAVING ABS(balance) > 0.01
+    `).all(priorDate) as any[];
+
+    const priorMap: Record<string, number> = {};
+    for (const r of priorRows) priorMap[r.company_name + '|' + r.code] = r.balance;
+
+    // Map to entity groups
+    const companyToGroup: Record<string, string> = {};
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal) continue;
+      for (const cid of g.company_ids) {
+        // Find company name from data
+        const match = rows.find((r: any) => {
+          const companyRow = db.prepare('SELECT company_name FROM journal_entries WHERE company_id = ? LIMIT 1').get(cid) as any;
+          return companyRow?.company_name === r.company_name;
+        });
+        if (match) companyToGroup[match.company_name] = g.name;
+      }
+    }
+    // Fallback: map by company name lookup
+    const companyMap = db.prepare('SELECT DISTINCT company_id, company_name FROM journal_entries WHERE company_id IS NOT NULL').all() as any[];
+    for (const c of companyMap) {
+      for (const g of ENTITY_GROUPS) {
+        if (g.is_subtotal) continue;
+        if (g.company_ids.includes(c.company_id)) {
+          companyToGroup[c.company_name] = g.name;
+          break;
+        }
+      }
+    }
+
+    const accounts = rows.map((r: any) => {
+      const key = r.company_name + '|' + r.code;
+      const prior = priorMap[key] || 0;
+      const change = r.current_balance - prior;
+      const changePct = prior !== 0 ? ((change / Math.abs(prior)) * 100) : 0;
+      return {
+        entity_group: companyToGroup[r.company_name] || 'Other',
+        company_name: r.company_name,
+        code: r.code,
+        name: r.name,
+        current_balance: r.current_balance,
+        prior_balance: prior,
+        change,
+        change_pct: changePct,
+      };
+    });
+
+    // Group by entity group
+    const byGroup: Record<string, any[]> = {};
+    for (const a of accounts) {
+      if (!byGroup[a.entity_group]) byGroup[a.entity_group] = [];
+      byGroup[a.entity_group].push(a);
+    }
+
+    const groups = Object.entries(byGroup).map(([name, accs]) => ({
+      name,
+      accounts: accs,
+      total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
+      total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
+    }));
+
+    groups.sort((a, b) => Math.abs(b.total_current) - Math.abs(a.total_current));
+
+    res.json({ prior_date: priorDate, groups });
+  });
+
   return router;
 }
