@@ -446,7 +446,10 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Multi-company balance sheet summary (all companies side by side)
-  router.get('/balance-sheet-all', (_req, res) => {
+  router.get('/balance-sheet-all', (req, res) => {
+    const asOfDate = (req.query.as_of_date as string) || '2026-02-28';
+    const bsDateFilter = `AND je.date <= '${asOfDate.replace(/[^0-9-]/g, '')}'`;
+
     const companies = db.prepare(`
       SELECT DISTINCT company_id, company_name
       FROM journal_entries
@@ -470,7 +473,7 @@ export function dashboardRoutes(db: Database.Database): Router {
           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
         FROM accounts a
         INNER JOIN line_items li ON li.account_id = a.id
-          AND li.journal_entry_id IN (SELECT id FROM journal_entries WHERE status = 'posted' AND company_id = ?)
+          AND li.journal_entry_id IN (SELECT id FROM journal_entries WHERE status = 'posted' AND company_id = ? ${bsDateFilter})
         WHERE a.is_active = 1 AND a.odoo_type IN (${odooTypes.map(() => '?').join(',')})
         GROUP BY a.odoo_type
       `).all(company.company_id, ...odooTypes) as any[];
