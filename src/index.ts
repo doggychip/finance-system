@@ -48,7 +48,9 @@ const staticOpts = { etag: false, lastModified: false, setHeaders: (res: any) =>
 app.use(express.static(publicDir, staticOpts));
 app.use(express.static(devPublicDir, staticOpts));
 
-const db = initDb();
+// Use persistent volume path in production, local file in dev
+const dbPath = process.env.DB_PATH || 'finance.db';
+const db = initDb(dbPath);
 seedXterioFoundation(db);
 
 app.use('/api/accounts', accountRoutes(db));
