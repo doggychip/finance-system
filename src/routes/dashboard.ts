@@ -126,35 +126,41 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Cash & bank account balances — categorized
-  router.get('/cash-balances', (_req, res) => {
+  router.get('/cash-balances', (req, res) => {
+    const requestedDate = (req.query.as_of_date as string) || '';
+
+    // Find best snapshot
+    const snap = db.prepare(
+      requestedDate
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+
+    if (!snap?.snapshot_date) {
+      return res.json({ cash: { accounts: [], total: 0 }, receivable: { accounts: [], total: 0 }, overdrawn: { accounts: [], total: 0 }, overworld: { accounts: [], total: 0 }, reach: { accounts: [], total: 0 }, grand_total: 0, snapshot_date: null });
+    }
+
     const rows = db.prepare(`
-      SELECT
-        a.id, a.name, a.code, a.odoo_type,
-        COALESCE(SUM(li.debit), 0) as total_debits,
-        COALESCE(SUM(li.credit), 0) as total_credits,
-        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-      FROM accounts a
-      LEFT JOIN line_items li ON li.account_id = a.id
-        AND li.journal_entry_id IN (SELECT id FROM journal_entries WHERE status = 'posted')
-      WHERE a.is_active = 1
-        AND (a.odoo_type IN ('asset_cash', 'asset_current', 'asset_receivable')
-             OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')
-      GROUP BY a.id
-      HAVING balance != 0
+      SELECT company_id, company_name, account_code as code, account_name as name, account_type as odoo_type, balance
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type IN ('asset_cash', 'asset_receivable')
+      AND ABS(balance) > 0.01
       ORDER BY balance DESC
-    `).all() as any[];
+    `).all(snap.snapshot_date) as any[];
 
-    // Overworld: codes starting with 10W or specific codes
-    const overworldCodes = new Set(['100030', '100031', '100032']);
-    const isOverworld = (r: any) => r.code.startsWith('10W') || overworldCodes.has(r.code);
+    // Map companies to entity groups
+    const companyToGroup: Record<number, string> = {};
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal || g.is_manual) continue;
+      for (const cid of g.company_ids) companyToGroup[cid] = g.name;
+    }
 
-    // Reach Labs: specific codes
-    const reachCodes = new Set(['100180', '100190']);
-    const isReach = (r: any) => reachCodes.has(r.code);
+    // Categorize by entity group
+    const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
+    const isOW = (r: any) => owGroups.has(companyToGroup[r.company_id] || '');
 
-    const overworld = rows.filter(isOverworld);
-    const reach = rows.filter(isReach);
-    const remaining = rows.filter(r => !isOverworld(r) && !isReach(r));
+    const owRows = rows.filter(isOW);
+    const remaining = rows.filter(r => !isOW(r));
 
     const overdrawn = remaining.filter(r => r.balance < 0);
     const receivable = remaining.filter(r => r.balance > 0 && r.odoo_type === 'asset_receivable');
@@ -162,13 +168,19 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     const sum = (arr: any[]) => arr.reduce((s: number, r: any) => s + r.balance, 0);
 
+    // Split OW into overworld and reach
+    const overworld = owRows.filter(r => ['OW'].includes(companyToGroup[r.company_id] || ''));
+    const reach = owRows.filter(r => companyToGroup[r.company_id] === 'Reach');
+    const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
+
     res.json({
       cash: { accounts: cash, total: sum(cash) },
       receivable: { accounts: receivable, total: sum(receivable) },
       overdrawn: { accounts: overdrawn, total: sum(overdrawn) },
-      overworld: { accounts: overworld, total: sum(overworld) },
+      overworld: { accounts: [...overworld, ...otherOW], total: sum(overworld) + sum(otherOW) },
       reach: { accounts: reach, total: sum(reach) },
       grand_total: sum(remaining),
+      snapshot_date: snap.snapshot_date,
     });
   });
 
