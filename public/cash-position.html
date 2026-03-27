@@ -65,16 +65,20 @@
       { type: 'entity', key: 'CS', label: 'CS', companies: ['SHADOWCAY', 'SHADOWCAY W3', 'CHAOYING', 'DIREWOLF', 'COS GAMES', 'COS GAMES W3'] },
 
       { type: 'parent', name: 'Palios' },
-      { type: 'entity', key: 'Palios', label: 'Palios', companies: ['QUANTUMMIND SOLUTIONS HK', 'PLAY ALGORITHM (BVI)', 'BJ TUDONG', 'PALIO W3'] },
+      { type: 'entity', key: 'Palios', label: 'Palios', companies: ['PALIO W3', 'BJ TUDONG'] },
+
+      { type: 'parent', name: 'Quantummind' },
+      { type: 'entity', key: 'QUANTUMMIND', label: 'Quantummind', companies: ['QUANTUMMIND SOLUTIONS HK'] },
 
       { type: 'parent', name: 'Holdings' },
       { type: 'entity', key: 'LHOLDINGS', label: 'Holdings', companies: ['LHOLDINGS', 'LHOLDINGS W3'] },
 
-      { type: 'parent', name: 'Overworld & Reach' },
+      { type: 'parent', name: 'Overworld Inc' },
       { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
       { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
       { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
-      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'] },
+      { type: 'entity', key: 'Keystone', label: 'Keystone Foundation', companies: ['PLAY ALGORITHM (BVI)'] },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'] },
     ];
 
     function fmt(n) {
