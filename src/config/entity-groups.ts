@@ -19,9 +19,9 @@ export const ENTITY_GROUPS: EntityGroup[] = [
   { name: 'LHOLDINGS', company_ids: [19, 20] },
   { name: 'QUANTUMMIND', company_ids: [8] },
 
-  { name: 'Non OW Total', company_ids: [], is_subtotal: true, subtotal_groups: ['Xterio Total', 'AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'] },
+  { name: 'Lholding Total', company_ids: [], is_subtotal: true, subtotal_groups: ['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'] },
 
-  { name: 'Lholding Total', company_ids: [], is_subtotal: true, subtotal_groups: ['Non OW Total'] },
+  { name: 'Non OW Total', company_ids: [], is_subtotal: true, subtotal_groups: ['Xterio Total', 'Lholding Total'] },
 
   { name: 'OW', company_ids: [15, 16] },
   { name: 'Reach', company_ids: [30] },
