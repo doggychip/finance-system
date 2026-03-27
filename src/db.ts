@@ -119,6 +119,22 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_manual_entity_period ON manual_balances(entity, period);
+
+    CREATE TABLE IF NOT EXISTS account_balances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      company_name TEXT NOT NULL,
+      account_odoo_id INTEGER NOT NULL,
+      account_code TEXT NOT NULL,
+      account_name TEXT NOT NULL,
+      account_type TEXT NOT NULL,
+      balance REAL DEFAULT 0,
+      snapshot_date TEXT NOT NULL,
+      synced_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(company_id, account_odoo_id, snapshot_date)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ab_company_snapshot ON account_balances(company_id, snapshot_date);
+    CREATE INDEX IF NOT EXISTS idx_ab_snapshot ON account_balances(snapshot_date);
   `);
 
   return db;

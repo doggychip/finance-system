@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
+import { syncBalances } from '../odoo/sync-balances';
+import { createOdooClient } from '../odoo/client';
 import {
   runFullSync,
   runAccountSync,
@@ -112,6 +114,19 @@ export function syncRoutes(db: Database.Database): Router {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('[sync/test] Error:', message);
       res.status(500).json({ status: 'error', error: message });
+    }
+  });
+
+  // Sync account balances using Odoo's current_balance (authoritative)
+  router.post('/balances', async (_req, res) => {
+    try {
+      const odoo = createOdooClient();
+      await odoo.authenticate();
+      const result = await syncBalances(odoo, db);
+      res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
     }
   });
 

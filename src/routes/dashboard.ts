@@ -643,11 +643,134 @@ export function dashboardRoutes(db: Database.Database): Router {
 
   // Consolidated balance sheet with entity groupings
   router.get('/consolidated-bs', (req, res) => {
-    const asOfDate = (req.query.as_of_date as string) || '2026-02-28';
-    const dateFilter = `AND je.date <= '${asOfDate.replace(/[^0-9-]/g, '')}'`;
+    // Use Odoo's current_balance from account_balances table (authoritative)
+    // Falls back to JE computation if no balance snapshot exists
+    const snapshotDate = (req.query.as_of_date as string) || '';
 
-    // Step 1: Compute raw balances for non-subtotal groups using ONE query per group
+    // Find latest snapshot date
+    const latestSnap = db.prepare(
+      snapshotDate
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(...(snapshotDate ? [snapshotDate] : [])) as any;
+
+    const useBalanceTable = !!latestSnap?.snapshot_date;
+    const snapDate = latestSnap?.snapshot_date || '';
+
+    if (useBalanceTable) {
+      console.log(`[consolidated-bs] Using account_balances snapshot: ${snapDate}`);
+    } else {
+      console.log('[consolidated-bs] No balance snapshot found, falling back to JE computation');
+    }
+
+    // Step 1: Compute raw balances for non-subtotal groups
     const groupBalances: Record<string, Record<string, number>> = {};
+
+    if (useBalanceTable) {
+      // === USE ODOO'S AUTHORITATIVE current_balance ===
+      for (const group of ENTITY_GROUPS) {
+        if (group.is_subtotal) continue;
+
+        // Handle manual entities (e.g. Xterio Foundation)
+        if (group.is_manual) {
+          const latestPeriod = db.prepare(`
+            SELECT period, SUM(amount_usd) as total_usd
+            FROM manual_balances WHERE entity = ?
+            GROUP BY period ORDER BY period DESC LIMIT 1
+          `).get(group.name) as any;
+          const balances: Record<string, number> = {};
+          balances['BANK_CASH'] = latestPeriod?.total_usd || 0;
+          for (const line of BS_LINES) {
+            if (line.computed_from) continue;
+            if (!(line.code in balances)) balances[line.code] = 0;
+          }
+          for (let pass = 0; pass < 10; pass++) {
+            let resolved = 0;
+            for (const line of BS_LINES) {
+              if (!line.computed_from) continue;
+              if (line.code in balances) continue;
+              if (!line.computed_from.every((c: string) => c in balances)) continue;
+              balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
+              resolved++;
+            }
+            if (resolved === 0) break;
+          }
+          groupBalances[group.name] = balances;
+          continue;
+        }
+
+        if (group.company_ids.length === 0) continue;
+
+        // Query account_balances for this group's companies
+        const placeholders = group.company_ids.map(() => '?').join(',');
+        const rows = db.prepare(`
+          SELECT account_code as code, account_type, SUM(balance) as balance
+          FROM account_balances
+          WHERE company_id IN (${placeholders}) AND snapshot_date = ?
+          GROUP BY account_code, account_type
+        `).all(...group.company_ids, snapDate) as any[];
+
+        // Build lookup by account_type and by code
+        const byType: Record<string, number> = {};
+        const byCode: Record<string, number> = {};
+        for (const r of rows) {
+          byType[r.account_type] = (byType[r.account_type] || 0) + r.balance;
+          byCode[r.code] = (byCode[r.code] || 0) + r.balance;
+        }
+
+        // Map BS_LINES leaf nodes
+        const currentYear = new Date().getFullYear().toString();
+        const balances: Record<string, number> = {};
+        for (const line of BS_LINES) {
+          if (line.computed_from) continue;
+          if (line.odoo_types) {
+            // For current_balance, no need for date_filter — Odoo already computes it
+            // But we need to handle the P&L split differently
+            // current_balance already includes all-time for equity, and current P&L
+            if (line.date_filter === 'current_year' || line.date_filter === 'prior_years') {
+              // For P&L split, use the total from Odoo (it's already correct)
+              // Odoo's equity type includes retained earnings
+              // Odoo's income/expense types include current P&L
+              balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byType[t] || 0), 0);
+            } else {
+              balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byType[t] || 0), 0);
+            }
+          } else if (line.account_codes) {
+            balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
+          }
+        }
+
+        // Resolve computed lines
+        for (let pass = 0; pass < 10; pass++) {
+          let resolved = 0;
+          for (const line of BS_LINES) {
+            if (!line.computed_from) continue;
+            if (line.code in balances) continue;
+            if (!line.computed_from.every((c: string) => c in balances)) continue;
+            balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
+            resolved++;
+          }
+          if (resolved === 0) break;
+        }
+
+        groupBalances[group.name] = balances;
+      }
+
+      // Compute subtotals
+      for (const group of ENTITY_GROUPS) {
+        if (!group.is_subtotal || !group.subtotal_groups) continue;
+        const balances: Record<string, number> = {};
+        for (const line of BS_LINES) {
+          balances[line.code] = group.subtotal_groups.reduce((sum: number, gname: string) => {
+            return sum + (groupBalances[gname]?.[line.code] || 0);
+          }, 0);
+        }
+        groupBalances[group.name] = balances;
+      }
+    } else {
+    // JE computation fallback (when no balance snapshot exists)
+    const asOfDate = snapshotDate || '2099-12-31';
+    const dateFilter = `AND je.date <= '${asOfDate.replace(/[^0-9-]/g, '')}'`;
 
     for (const group of ENTITY_GROUPS) {
       if (group.is_subtotal) continue;
@@ -795,26 +918,38 @@ export function dashboardRoutes(db: Database.Database): Router {
 
       groupBalances[group.name] = balances;
     }
+    } // end of else (JE computation fallback)
 
     // Step 3: Compute IC elimination
     // Intercompany accounts (303xxx) should net to zero in consolidation
-    // Get total IC balance across all companies for elimination
-    const allCompanyIds = ENTITY_GROUPS.filter(g => !g.is_subtotal).flatMap(g => g.company_ids);
-    const icPlaceholders = allCompanyIds.map(() => '?').join(',');
-
-    const icBalances = db.prepare(`
-      SELECT a.odoo_type,
-        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.company_id IN (${icPlaceholders}) ${dateFilter}
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.code LIKE '303%'
-      GROUP BY a.odoo_type
-    `).all(...allCompanyIds) as any[];
+    const allCompanyIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
 
     const icByType: Record<string, number> = {};
-    for (const row of icBalances) icByType[row.odoo_type] = row.balance;
+
+    if (useBalanceTable) {
+      // Use account_balances for IC elimination
+      const icPlaceholders = allCompanyIds.map(() => '?').join(',');
+      const icRows = db.prepare(`
+        SELECT account_type, SUM(balance) as balance
+        FROM account_balances
+        WHERE company_id IN (${icPlaceholders}) AND snapshot_date = ? AND account_code LIKE '303%'
+        GROUP BY account_type
+      `).all(...allCompanyIds, snapDate) as any[];
+      for (const row of icRows) icByType[row.account_type] = row.balance;
+    } else {
+      const icPlaceholders = allCompanyIds.map(() => '?').join(',');
+      const icBalances = db.prepare(`
+        SELECT a.odoo_type,
+          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id IN (${icPlaceholders})
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE a.code LIKE '303%'
+        GROUP BY a.odoo_type
+      `).all(...allCompanyIds) as any[];
+      for (const row of icBalances) icByType[row.odoo_type] = row.balance;
+    }
 
     // Build IC elimination balances — negate IC amounts per odoo_type
     const icElimination: Record<string, number> = {};
