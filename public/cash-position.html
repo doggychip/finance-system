@@ -16,37 +16,36 @@
     .nav a.active { background: var(--accent); color: white; }
     .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
     .btn:hover { background: var(--border); }
-
     .scroll-wrap { overflow-x: auto; padding: 16px; }
-    .section { margin-bottom: 32px; }
-    .section h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; padding-left: 4px; }
 
-    table { border-collapse: collapse; width: max-content; min-width: 100%; }
-    th, td { padding: 4px 10px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; }
-    thead th { background: #1a365d; color: white; font-weight: 700; font-size: 10px; text-align: center; padding: 8px 10px; position: sticky; top: 0; z-index: 2; }
-    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 200px; font-weight: 500; }
-    .val { text-align: right; font-variant-numeric: tabular-nums; }
-    .val.pos { color: var(--text); }
-    .val.neg { color: var(--red); }
-    .val.zero { color: var(--text-dim); }
-    .total-row td { font-weight: 700; background: rgba(34,197,94,0.06); border-top: 2px solid var(--border); }
-    .total-row .row-label { background: rgba(34,197,94,0.06); font-weight: 700; }
-    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.06); }
-    .subtotal-row .row-label { background: rgba(99,102,241,0.06); }
-    .runway-row td { background: rgba(234,179,8,0.06); font-weight: 600; }
-    .runway-row .row-label { background: rgba(234,179,8,0.06); }
-    .section-header td { background: var(--surface2); font-weight: 700; font-size: 12px; }
+    /* Parent group header */
+    .parent-group { margin-bottom: 32px; }
+    .parent-header { font-size: 16px; font-weight: 700; padding: 10px 0; border-bottom: 2px solid var(--accent); margin-bottom: 16px; color: var(--accent); }
 
-    /* Bank account detail */
+    /* Entity group card */
     .group-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
-    .group-header { padding: 12px 16px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+    .group-header { padding: 10px 16px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; }
     .group-header .total { font-variant-numeric: tabular-nums; }
-    .acct-table { width: 100%; }
-    .acct-table th { background: var(--surface); text-align: left; font-size: 10px; }
-    .acct-table td { font-size: 11px; }
+
+    /* Account table */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 4px 10px; font-size: 10px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 4px 10px; font-size: 11px; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: var(--surface2); }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .pos { color: var(--text); }
+    .neg { color: var(--red); }
+    .zero { color: var(--text-dim); }
     .change-pos { color: var(--green); }
     .change-neg { color: var(--red); }
-    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); font-size: 14px; }
+    .type-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; }
+    .type-cash { background: rgba(34,197,94,0.12); color: var(--green); }
+    .type-crypto { background: rgba(139,92,246,0.12); color: #8b5cf6; }
+
+    /* Subtotal row */
+    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.06); border-top: 2px solid var(--border); }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 300px; color: var(--text-dim); font-size: 14px; }
   </style>
 </head>
 <body>
@@ -55,29 +54,58 @@
     <div class="nav">
       <a href="/">Overview</a>
       <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
       <a href="/consolidated-bs.html">Consolidated</a>
       <a href="/reports.html">Reports</a>
-      <a href="/ic-recon.html">IC Recon</a>
       <a href="/cash-position.html" class="active">Cash Position</a>
     </div>
     <button class="btn" onclick="loadAll()">Refresh</button>
   </div>
 
   <div class="scroll-wrap">
-    <!-- Cash Composition Over Time -->
-    <div class="section">
-      <h2>Entity Group Cash Composition (Monthly Snapshots)</h2>
-      <div id="compositionContent"><div class="loading">Loading...</div></div>
-    </div>
-
-    <!-- Bank Account Detail -->
-    <div class="section">
-      <h2>Bank Account Detail (Current vs Prior Week)</h2>
-      <div id="bankContent"><div class="loading">Loading...</div></div>
-    </div>
+    <div id="content"><div class="loading">Loading cash positions...</div></div>
   </div>
 
   <script>
+    // Parent groupings matching the spreadsheet
+    var PARENT_GROUPS = [
+      {
+        name: 'Libeccio Wholly Owned (Xterio)',
+        entities: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation'],
+        subtotal: 'Xterio Total'
+      },
+      {
+        name: 'AOD (Gamephilos)',
+        entities: ['AOD'],
+        subtotal: null
+      },
+      {
+        name: 'CS (Shadowcay)',
+        entities: ['CS'],
+        subtotal: null
+      },
+      {
+        name: 'Palios',
+        entities: ['Palios'],
+        subtotal: null
+      },
+      {
+        name: 'Holdings',
+        entities: ['LHOLDINGS'],
+        subtotal: null
+      },
+      {
+        name: 'Quantummind',
+        entities: ['QUANTUMMIND'],
+        subtotal: null
+      },
+      {
+        name: 'Overworld & Reach',
+        entities: ['OW', 'Reach', 'Rough house', 'Keystone'],
+        subtotal: 'OW & Reach Total'
+      },
+    ];
+
     function fmt(n) {
       if (n == null || isNaN(n)) return '-';
       if (Math.abs(n) < 0.5) return '-';
@@ -88,126 +116,119 @@
       if (n == null || isNaN(n) || !isFinite(n)) return '-';
       return n.toFixed(1) + '%';
     }
-    function valCls(n) {
-      if (Math.abs(n) < 0.5) return 'val zero';
-      return n < 0 ? 'val neg' : 'val pos';
-    }
+    function valCls(n) { return Math.abs(n) < 0.5 ? 'val zero' : n < 0 ? 'val neg' : 'val pos'; }
 
-    async function loadComposition() {
-      var el = document.getElementById('compositionContent');
-      try {
-        var data = await (await fetch('/api/dashboard/cash-position?months=10')).json();
-        if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
+    function renderGroup(name, accounts, total, priorTotal) {
+      var change = total - priorTotal;
+      var changePct = priorTotal !== 0 ? (change / Math.abs(priorTotal) * 100) : 0;
+      var changeCls = change >= 0 ? 'change-pos' : 'change-neg';
 
-        var months = data.months;
-        var cats = data.categories;
+      var html = '<div class="group-card">';
+      html += '<div class="group-header"><span>' + name + '</span>';
+      html += '<span class="total">' + fmt(total) + ' <span class="' + changeCls + '" style="font-size:11px">(' + fmtPct(changePct) + ')</span></span></div>';
 
-        // Build one table per entity group
-        var html = '';
+      html += '<table><thead><tr>';
+      html += '<th>Company</th><th>Code</th><th>Account</th><th>Type</th>';
+      html += '<th class="val">Balance (USD)</th><th class="val">Prior</th>';
+      html += '<th class="val">Change</th><th class="val">%</th>';
+      html += '</tr></thead><tbody>';
 
-        for (var g of data.groups) {
-          html += '<table style="margin-bottom:24px">';
+      accounts.forEach(function(a) {
+        var chg = a.change;
+        var chgCls = chg >= 0.5 ? 'change-pos' : chg <= -0.5 ? 'change-neg' : 'zero';
+        var typeCls = a.asset_type === 'Crypto' ? 'type-crypto' : 'type-cash';
+        html += '<tr>';
+        html += '<td style="color:var(--text-dim)">' + a.company_name + '</td>';
+        html += '<td style="color:var(--text-dim)">' + a.code + '</td>';
+        html += '<td>' + a.name + '</td>';
+        html += '<td><span class="type-badge ' + typeCls + '">' + a.asset_type + '</span></td>';
+        html += '<td class="' + valCls(a.current_balance) + '">' + fmt(a.current_balance) + '</td>';
+        html += '<td class="' + valCls(a.prior_balance) + '">' + fmt(a.prior_balance) + '</td>';
+        html += '<td class="val ' + chgCls + '">' + fmt(chg) + '</td>';
+        html += '<td class="val ' + chgCls + '">' + fmtPct(a.change_pct) + '</td>';
+        html += '</tr>';
+      });
 
-          // Header
-          html += '<thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">' + g.group + '</th>';
-          months.forEach(function(m) {
-            html += '<th>' + m.slice(0, 7) + '</th>';
-          });
-          html += '</tr></thead><tbody>';
-
-          // Category rows
-          cats.forEach(function(cat) {
-            html += '<tr><td class="row-label">' + cat.label + '</td>';
-            g.snapshots.forEach(function(snap) {
-              var v = snap[cat.key] || 0;
-              html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>';
-            });
-            html += '</tr>';
-          });
-
-          // Closing balance row
-          html += '<tr class="total-row"><td class="row-label"><strong>Closing Balance</strong></td>';
-          var lastClosing = 0;
-          g.snapshots.forEach(function(snap) {
-            lastClosing = snap.closing || 0;
-            html += '<td class="' + valCls(lastClosing) + '">' + fmt(lastClosing) + '</td>';
-          });
-          html += '</tr>';
-
-          // Month-over-month change
-          html += '<tr class="subtotal-row"><td class="row-label">MoM Change</td>';
-          for (var i = 0; i < g.snapshots.length; i++) {
-            if (i === 0) { html += '<td class="val zero">-</td>'; continue; }
-            var change = (g.snapshots[i].closing || 0) - (g.snapshots[i-1].closing || 0);
-            html += '<td class="' + valCls(change) + '">' + fmt(change) + '</td>';
-          }
-          html += '</tr>';
-
-          html += '</tbody></table>';
-
-          // Runway info
-          html += '<div style="margin-bottom:24px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;display:inline-flex;gap:24px;font-size:12px">';
-          html += '<span><strong>Available Balance:</strong> ' + fmt(g.available_balance) + '</span>';
-          html += '<span><strong>Monthly Burn:</strong> ' + fmt(g.monthly_burn) + '</span>';
-          html += '<span><strong>Runway:</strong> ' + (g.runway_months != null ? g.runway_months + ' months' : 'N/A') + '</span>';
-          html += '</div>';
-        }
-
-        el.innerHTML = html;
-      } catch (err) {
-        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
-      }
-    }
-
-    async function loadBankAccounts() {
-      var el = document.getElementById('bankContent');
-      try {
-        var data = await (await fetch('/api/dashboard/bank-accounts')).json();
-        if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
-
-        var html = '';
-        data.groups.forEach(function(group) {
-          var totalChange = group.total_current - group.total_prior;
-          var totalChangePct = group.total_prior !== 0 ? ((totalChange / Math.abs(group.total_prior)) * 100) : 0;
-
-          html += '<div class="group-card">';
-          html += '<div class="group-header"><span>' + group.name + '</span><span class="total">';
-          html += 'Current: ' + fmt(group.total_current);
-          html += '  |  Prior: ' + fmt(group.total_prior);
-          html += '  |  <span class="' + (totalChange >= 0 ? 'change-pos' : 'change-neg') + '">' + fmt(totalChange) + ' (' + fmtPct(totalChangePct) + ')</span>';
-          html += '</span></div>';
-
-          html += '<table class="acct-table"><thead><tr>';
-          html += '<th>Company</th><th>Code</th><th>Account</th>';
-          html += '<th class="text-right">Current</th><th class="text-right">Prior (' + data.prior_date + ')</th>';
-          html += '<th class="text-right">Change</th><th class="text-right">%</th>';
-          html += '</tr></thead><tbody>';
-
-          group.accounts.forEach(function(a) {
-            html += '<tr>';
-            html += '<td style="color:var(--text-dim)">' + a.company_name + '</td>';
-            html += '<td style="color:var(--text-dim)">' + a.code + '</td>';
-            html += '<td>' + a.name + '</td>';
-            html += '<td class="' + valCls(a.current_balance) + '">' + fmt(a.current_balance) + '</td>';
-            html += '<td class="' + valCls(a.prior_balance) + '">' + fmt(a.prior_balance) + '</td>';
-            var chgCls = a.change >= 0 ? 'change-pos' : 'change-neg';
-            html += '<td class="val ' + chgCls + '">' + fmt(a.change) + '</td>';
-            html += '<td class="val ' + chgCls + '">' + fmtPct(a.change_pct) + '</td>';
-            html += '</tr>';
-          });
-
-          html += '</tbody></table></div>';
-        });
-
-        el.innerHTML = html;
-      } catch (err) {
-        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
-      }
+      html += '</tbody></table></div>';
+      return html;
     }
 
     async function loadAll() {
-      await Promise.all([loadComposition(), loadBankAccounts()]);
+      var el = document.getElementById('content');
+      try {
+        var data = await (await fetch('/api/dashboard/bank-accounts?as_of_date=2026-02-28&prior_date=2026-02-04')).json();
+        if (!data.groups || !data.groups.length) {
+          el.innerHTML = '<div class="loading">No data. Sync balances first.</div>';
+          return;
+        }
+
+        // Build lookup by entity name
+        var byEntity = {};
+        data.groups.forEach(function(g) { byEntity[g.name] = g; });
+
+        var html = '';
+        var grandTotal = 0;
+        var grandPrior = 0;
+
+        PARENT_GROUPS.forEach(function(pg) {
+          html += '<div class="parent-group">';
+          html += '<div class="parent-header">' + pg.name + '</div>';
+
+          var parentTotal = 0;
+          var parentPrior = 0;
+
+          pg.entities.forEach(function(entityName) {
+            var g = byEntity[entityName];
+            if (!g) {
+              // Manual entity (e.g., Xterio Foundation)
+              html += '<div class="group-card"><div class="group-header"><span>' + entityName + '</span><span class="total" style="color:var(--text-dim)">Manual entry</span></div></div>';
+              return;
+            }
+            html += renderGroup(entityName, g.accounts, g.total_current, g.total_prior);
+            parentTotal += g.total_current;
+            parentPrior += g.total_prior;
+          });
+
+          // Parent subtotal
+          if (pg.entities.length > 1 || pg.subtotal) {
+            var pChange = parentTotal - parentPrior;
+            var pPct = parentPrior !== 0 ? (pChange / Math.abs(parentPrior) * 100) : 0;
+            var pCls = pChange >= 0 ? 'change-pos' : 'change-neg';
+            html += '<table><tbody><tr class="subtotal-row">';
+            html += '<td colspan="4"><strong>' + (pg.subtotal || pg.name) + ' Total</strong></td>';
+            html += '<td class="' + valCls(parentTotal) + '">' + fmt(parentTotal) + '</td>';
+            html += '<td class="' + valCls(parentPrior) + '">' + fmt(parentPrior) + '</td>';
+            html += '<td class="val ' + pCls + '">' + fmt(pChange) + '</td>';
+            html += '<td class="val ' + pCls + '">' + fmtPct(pPct) + '</td>';
+            html += '</tr></tbody></table>';
+          }
+
+          grandTotal += parentTotal;
+          grandPrior += parentPrior;
+          html += '</div>';
+        });
+
+        // Grand total
+        var gChange = grandTotal - grandPrior;
+        var gPct = grandPrior !== 0 ? (gChange / Math.abs(grandPrior) * 100) : 0;
+        var gCls = gChange >= 0 ? 'change-pos' : 'change-neg';
+        html += '<div class="parent-group"><div class="parent-header" style="border-color:var(--yellow);color:var(--yellow)">Grand Total</div>';
+        html += '<table><tbody><tr class="subtotal-row" style="font-size:14px">';
+        html += '<td colspan="4"><strong>All Entities</strong></td>';
+        html += '<td class="' + valCls(grandTotal) + '">' + fmt(grandTotal) + '</td>';
+        html += '<td class="' + valCls(grandPrior) + '">' + fmt(grandPrior) + '</td>';
+        html += '<td class="val ' + gCls + '">' + fmt(gChange) + '</td>';
+        html += '<td class="val ' + gCls + '">' + fmtPct(gPct) + '</td>';
+        html += '</tr></tbody></table></div>';
+
+        html += '<div style="padding:8px;color:var(--text-dim);font-size:11px">Snapshot: ' + data.snapshot_date + ' | Prior: ' + data.prior_date + '</div>';
+
+        el.innerHTML = html;
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
     }
+
     loadAll();
   </script>
 </body>
