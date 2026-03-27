@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reconciliation — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; font-size: 12px; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex-wrap: wrap; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .controls { padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .controls label { font-size: 12px; color: var(--text-dim); }
+    .controls select, .controls input { padding: 5px 8px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+    .scroll-wrap { overflow-x: auto; padding: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 5px 10px; border: 1px solid var(--border); font-size: 11px; white-space: nowrap; }
+    thead th { background: #1a365d; color: white; font-weight: 700; text-align: center; position: sticky; top: 0; z-index: 2; }
+    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 220px; font-weight: 500; }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .match { background: rgba(34,197,94,0.08); }
+    .mismatch { background: rgba(239,68,68,0.08); }
+    .diff-pos { color: var(--green); }
+    .diff-neg { color: var(--red); }
+    .diff-zero { color: var(--text-dim); }
+    .section td { background: var(--surface2); font-weight: 700; }
+    .section .row-label { background: var(--surface2); }
+    .summary { padding: 16px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .sum-card .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
+    .sum-card .value { font-size: 22px; font-weight: 700; }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 300px; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Reconciliation Report</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/ic-recon.html">IC Recon</a>
+      <a href="/reconciliation.html" class="active">Reconciliation</a>
+    </div>
+  </div>
+  <div class="controls">
+    <label>As of:</label>
+    <input type="date" id="asOfDate" value="2026-02-28">
+    <label>Entity:</label>
+    <select id="entitySelect"></select>
+    <button class="btn primary" onclick="loadData()">Compare</button>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="scroll-wrap">
+    <div id="content"><div class="loading">Select an entity and click Compare</div></div>
+  </div>
+
+  <script>
+    // Spreadsheet reference data (as at 28.02.2026)
+    // Format: { entity: { account_code: value, ... } }
+    var SPREADSHEET = {
+      'LTECH, LTECH W3': {
+        '_ASSETS': 1929938, '_CURRENT_ASSETS': 1244551,
+        '_BANK_CASH': 960834, '_CASH': 703043, '_DIGITAL_TOKEN': 257791,
+        '_RECEIVABLES': 283718, '107010': 271679, '101000': 0, '101010': 12039,
+        '_PREPAYMENTS': 0, '102000': 0,
+        '_FIXED_ASSETS': 0, '_NON_CURRENT': 685387, '107030': 0, '200000': 0, '202000': 685387,
+        '_LIABILITIES': -596318, '_TOTAL_CURRENT_LIAB': -2198657, '_CURRENT_LIAB': -2198657,
+        '_CURRENT_LIAB_RELATED': -3130465,
+        '303010': 1786698, '303011': -1397318, '303040': 893337, '303041': -4300376,
+        '303050': -773, '303051': 0, '303180': 2076, '303181': 0,
+        '303170': 0, '303171': 0, '303060': -51513, '303061': -2278,
+        '303160': -35717, '303070': -12501, '303071': -8000,
+        '303080': 0, '303081': 25901, '303090': 0, '303091': 0,
+        '303110': -30000, '303120': 0, '303150': 0,
+        '303020': 0, '303021': -893337, '_CURRENT_LIAB_NON_RELATED': 835000,
+        '303100': 1000000, '303031': -165000,
+        '_CURRENT_LIAB_OTHER': 96808, '301000': 100000, '300000': 0, '302010': -3192,
+        '_PAYABLES': 0, '300030': 0,
+        '_NON_CURRENT_LIAB': 1602339, '300040': 0, '303030': 1602338,
+        '_EQUITY': 2526257, '_ACCUMULATE_PL': 2526256, '_CURRENT_YEAR_PL': -121654, '_SHARE_CAPITALS': 1,
+        '_LIAB_EQUITY': 1929938,
+      },
+      'XLABS, XLAB W3': {
+        '_ASSETS': 6997, '_BANK_CASH': 6997, '_LIABILITIES': 1954659,
+        '_CURRENT_LIAB_RELATED': 4761633,
+        '303020': -893337, '303021': 4300376,
+        '_NON_CURRENT_LIAB': -2806974, '303030': -2806974,
+        '_EQUITY': -1947662, '_ACCUMULATE_PL': -1947662, '_CURRENT_YEAR_PL': -95516,
+        '_LIAB_EQUITY': 6997,
+      },
+      'PRIVILEGE HK': {
+        '_ASSETS': 17305, '_BANK_CASH': 17305, '_LIABILITIES': 30000,
+        '_CURRENT_LIAB_RELATED': 30000, '303020': 30000,
+        '_EQUITY': -12695, '_CURRENT_YEAR_PL': 17292,
+        '_LIAB_EQUITY': 17305,
+      },
+      'AOD': {
+        '_ASSETS': 478669, '_BANK_CASH': 412183, '_RECEIVABLES': 66486,
+        '_LIABILITIES': -2183072, '_CURRENT_LIAB_RELATED': -2183166,
+        '_EQUITY': 2661741, '_ACCUMULATE_PL': -4788259, '_CURRENT_YEAR_PL': 24937,
+        '_LIAB_EQUITY': 478669,
+      },
+      'CS': {
+        '_ASSETS': 9681, '_BANK_CASH': 9410,
+        '_LIABILITIES': 5385299, '_CURRENT_LIAB_RELATED': 1845841,
+        '_EQUITY': -5375619, '_ACCUMULATE_PL': -7078034, '_CURRENT_YEAR_PL': -7502,
+        '_LIAB_EQUITY': 9681,
+      },
+      'Palios': {
+        '_ASSETS': 120328, '_BANK_CASH': 20328, '_NON_CURRENT': 100000,
+        '_LIABILITIES': -264700, '_CURRENT_LIAB_RELATED': -281854,
+        '_EQUITY': 385028, '_ACCUMULATE_PL': 384749, '_CURRENT_YEAR_PL': -27271,
+        '_LIAB_EQUITY': 120328,
+      },
+      'LHOLDINGS': {
+        '_ASSETS': 7785077, '_BANK_CASH': 7635076, '_NON_CURRENT': 150002,
+        '_LIABILITIES': 4553231, '_CURRENT_LIAB_RELATED': 3580744,
+        '_PAYABLES': 972485, '300030': 972485,
+        '_EQUITY': 3231847, '_ACCUMULATE_PL': -1268154, '_CURRENT_YEAR_PL': -212625,
+        '_LIAB_EQUITY': 7785077,
+      },
+      'QUANTUMMIND': {
+        '_ASSETS': 14328, '_BANK_CASH': 871,
+        '_LIABILITIES': 82297, '_CURRENT_LIAB_RELATED': 82297,
+        '_EQUITY': -67969, '_ACCUMULATE_PL': -67970, '_CURRENT_YEAR_PL': -6922,
+        '_LIAB_EQUITY': 14328,
+      },
+      'OW': {
+        '_ASSETS': 4073918, '_BANK_CASH': 4073918,
+        '_LIABILITIES': -7464052, '_CURRENT_LIAB_RELATED': -7464052,
+        '_EQUITY': 11537970, '_ACCUMULATE_PL': 381965, '_CURRENT_YEAR_PL': 270549,
+        '_LIAB_EQUITY': 4073918,
+      },
+      'Reach': {
+        '_ASSETS': 908480, '_BANK_CASH': 182812, '_FIXED_ASSETS': 725668,
+        '_LIABILITIES': -1602523, '_RECEIVABLES': 0,
+        '_EQUITY': -1302602, '_ACCUMULATE_PL': -1302602, '_CURRENT_YEAR_PL': -270549,
+        '_LIAB_EQUITY': 908480,
+      },
+      'Rough house': {
+        '_ASSETS': 20489159, '_BANK_CASH': 133797, '_FIXED_ASSETS': 18946758,
+        '_RECEIVABLES': 1342376,
+        '_LIABILITIES': 1602523,
+        '_EQUITY': 18886636, '_ACCUMULATE_PL': -12679000, '_CURRENT_YEAR_PL': -1319,
+        '_LIAB_EQUITY': 20489159,
+      },
+    };
+
+    // Account line definitions for comparison
+    var LINES = [
+      { code: '_ASSETS', label: 'ASSETS', section: true },
+      { code: '_CURRENT_ASSETS', label: 'Current Assets', indent: 1 },
+      { code: '_BANK_CASH', label: 'Bank and Cash Accounts', indent: 1, odoo_types: ['asset_cash'] },
+      { code: '_RECEIVABLES', label: 'Receivables', indent: 1, odoo_types: ['asset_receivable'] },
+      { code: '107010', label: '107010 GST Control', indent: 2, account_code: '107010' },
+      { code: '101000', label: '101000 Accounts Receivable', indent: 2, account_code: '101000' },
+      { code: '101010', label: '101010 Other Receivable', indent: 2, account_code: '101010' },
+      { code: '_PREPAYMENTS', label: 'Prepayments', indent: 1, odoo_types: ['asset_prepayments'] },
+      { code: '_FIXED_ASSETS', label: 'Plus Fixed Assets', indent: 1, odoo_types: ['asset_fixed'] },
+      { code: '_NON_CURRENT', label: 'Plus Non-current Assets', indent: 1, odoo_types: ['asset_non_current'] },
+      { code: '202000', label: '202000 Deposits', indent: 2, account_code: '202000' },
+      { code: '_LIABILITIES', label: 'LIABILITIES', section: true },
+      { code: '_CURRENT_LIAB_RELATED', label: 'Current Liab - Related', indent: 1, odoo_types: ['liability_current', 'liability_credit_card'] },
+      { code: '303010', label: '303010 Due to/from Holding', indent: 2, account_code: '303010' },
+      { code: '303011', label: '303011 Due to/from Holding W3', indent: 2, account_code: '303011' },
+      { code: '303040', label: '303040 Due to/from Xterlabs', indent: 2, account_code: '303040' },
+      { code: '303041', label: '303041 Due to/from Xterlabs W3', indent: 2, account_code: '303041' },
+      { code: '303050', label: '303050 Due to/from Overworld', indent: 2, account_code: '303050' },
+      { code: '303030', label: '303030 Due to/from Xterio Fdn', indent: 2, account_code: '303030' },
+      { code: '303100', label: '303100 Due to/from FunPlus', indent: 2, account_code: '303100' },
+      { code: '303031', label: '303031 Due to/from Xterio', indent: 2, account_code: '303031' },
+      { code: '_CURRENT_LIAB_OTHER', label: 'Current Liab - Other', indent: 1 },
+      { code: '301000', label: '301000 Accrued Expenses', indent: 2, account_code: '301000' },
+      { code: '302010', label: '302010 Deferred Revenue', indent: 2, account_code: '302010' },
+      { code: '_PAYABLES', label: 'Payables', indent: 1, odoo_types: ['liability_payable'] },
+      { code: '300030', label: '300030 Trade Payables', indent: 2, account_code: '300030' },
+      { code: '_NON_CURRENT_LIAB', label: 'Plus Non-current Liab', indent: 1, odoo_types: ['liability_non_current'] },
+      { code: '300040', label: '300040 Other Payables', indent: 2, account_code: '300040' },
+      { code: '_EQUITY', label: 'EQUITY', section: true },
+      { code: '_ACCUMULATE_PL', label: 'Accumulate P/L', indent: 1 },
+      { code: '_CURRENT_YEAR_PL', label: 'Current Year Earnings', indent: 1 },
+      { code: '_SHARE_CAPITALS', label: 'Share Capitals', indent: 1, account_code: '310000' },
+      { code: '_LIAB_EQUITY', label: 'LIABILITIES + EQUITY', section: true },
+    ];
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(Math.round(n)).toLocaleString('en-US');
+      return n < 0 ? '(' + s + ')' : s;
+    }
+
+    // Load entity options
+    var entities = Object.keys(SPREADSHEET);
+    var sel = document.getElementById('entitySelect');
+    entities.forEach(function(e) {
+      var opt = document.createElement('option');
+      opt.value = e; opt.textContent = e;
+      sel.appendChild(opt);
+    });
+
+    async function loadData() {
+      var entity = document.getElementById('entitySelect').value;
+      var asOf = document.getElementById('asOfDate').value;
+      var ssData = SPREADSHEET[entity] || {};
+      var el = document.getElementById('content');
+
+      // Fetch Odoo data for this entity
+      var res = await fetch('/api/dashboard/consolidated-bs?as_of_date=' + asOf);
+      var bsData = await res.json();
+
+      // Find entity column
+      var colIdx = bsData.columns.findIndex(function(c) { return c.name === entity; });
+      if (colIdx === -1) {
+        el.innerHTML = '<div class="loading">Entity not found in consolidated BS</div>';
+        return;
+      }
+
+      var odooValues = {};
+      bsData.rows.forEach(function(row) {
+        odooValues[row.code] = row.values[colIdx];
+      });
+
+      // Map our BS codes to spreadsheet codes
+      var codeMap = {
+        'ASSETS': '_ASSETS', 'CURRENT_ASSETS': '_CURRENT_ASSETS',
+        'BANK_CASH': '_BANK_CASH', 'RECEIVABLES_TOTAL': '_RECEIVABLES',
+        'PREPAYMENTS_TOTAL': '_PREPAYMENTS', 'FIXED_ASSETS': '_FIXED_ASSETS',
+        'NON_CURRENT_ASSETS': '_NON_CURRENT',
+        'LIABILITIES': '_LIABILITIES', 'TOTAL_CURRENT_LIAB': '_TOTAL_CURRENT_LIAB',
+        'CURRENT_LIAB_RELATED': '_CURRENT_LIAB_RELATED',
+        'CURRENT_LIAB_NON_RELATED': '_CURRENT_LIAB_NON_RELATED',
+        'CURRENT_LIAB_OTHER': '_CURRENT_LIAB_OTHER',
+        'PAYABLES_TOTAL': '_PAYABLES', 'NON_CURRENT_LIAB': '_NON_CURRENT_LIAB',
+        'EQUITY': '_EQUITY', 'ACCUMULATE_PL': '_ACCUMULATE_PL',
+        'CURRENT_YEAR_PL': '_CURRENT_YEAR_PL', 'SHARE_CAPITALS': '_SHARE_CAPITALS',
+        'LIAB_EQUITY': '_LIAB_EQUITY',
+        'A_107010': '107010', 'A_101000': '101000', 'A_101010': '101010',
+        'A_102000': '102000', 'A_107030_OTHER': '107030', 'A_200000': '200000', 'A_202000': '202000',
+        'A_303100': '303100', 'A_303031': '303031', 'A_301000': '301000', 'A_300000': '300000',
+        'A_302010': '302010', 'A_300030': '300030', 'A_300040': '300040', 'A_303030': '303030',
+      };
+
+      // Build comparison table
+      var totalMatch = 0, totalMismatch = 0, totalDiff = 0;
+      var html = '<table><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">' + entity + '</th>';
+      html += '<th>Spreadsheet</th><th>Odoo (Dashboard)</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
+
+      bsData.rows.forEach(function(row) {
+        if (row.code === 'CHECK') return;
+        var ssCode = codeMap[row.code] || row.code;
+        var ssVal = ssData[ssCode];
+        var odooVal = row.values[colIdx];
+
+        var hasSS = ssVal !== undefined && ssVal !== null;
+        var diff = hasSS ? odooVal - ssVal : null;
+        var isMatch = hasSS && Math.abs(diff) < 100;
+        var isMismatch = hasSS && Math.abs(diff) >= 100;
+
+        if (isMismatch) { totalMismatch++; totalDiff += Math.abs(diff); }
+        if (isMatch) totalMatch++;
+
+        var rowCls = '';
+        if (row.is_section) rowCls = 'section';
+        var cellCls = isMatch ? 'match' : (isMismatch ? 'mismatch' : '');
+        var diffCls = diff > 0.5 ? 'diff-pos' : diff < -0.5 ? 'diff-neg' : 'diff-zero';
+        var indent = '  '.repeat(row.indent || 0);
+
+        html += '<tr class="' + rowCls + '">';
+        html += '<td class="row-label">' + indent + row.label + '</td>';
+        html += '<td class="val ' + cellCls + '">' + (hasSS ? fmt(ssVal) : '<span style="color:var(--text-dim)">n/a</span>') + '</td>';
+        html += '<td class="val ' + cellCls + '">' + fmt(odooVal) + '</td>';
+        html += '<td class="val ' + diffCls + '">' + (diff !== null ? fmt(diff) : '-') + '</td>';
+        html += '<td style="text-align:center">' + (isMatch ? '<span style="color:var(--green)">OK</span>' : (isMismatch ? '<span style="color:var(--red)">DIFF</span>' : '')) + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      el.innerHTML = html;
+
+      // Summary
+      document.getElementById('summary').innerHTML =
+        '<div class="sum-card"><div class="label">Matched Lines</div><div class="value" style="color:var(--green)">' + totalMatch + '</div></div>' +
+        '<div class="sum-card"><div class="label">Mismatched Lines</div><div class="value" style="color:var(--red)">' + totalMismatch + '</div></div>' +
+        '<div class="sum-card"><div class="label">Total Abs Difference</div><div class="value">' + fmt(totalDiff) + '</div></div>' +
+        '<div class="sum-card"><div class="label">As of Date</div><div class="value" style="font-size:16px">' + asOf + '</div></div>';
+    }
+  </script>
+</body>
+</html>
