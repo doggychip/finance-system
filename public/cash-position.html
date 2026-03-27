@@ -57,6 +57,7 @@
     <select id="priorDate"></select>
     <button class="btn-apply" onclick="loadAll()">Apply</button>
   </div>
+  <script src="/odoo-links.js"></script>
   <div class="container">
     <div id="content"><div class="loading">Loading...</div></div>
   </div>
@@ -104,8 +105,13 @@
     function row(label, cur, prior, cls) {
       var chg = cur - prior;
       var pct = prior !== 0 ? (chg / Math.abs(prior) * 100) : 0;
-      return '<tr class="' + (cls || '') + '"><td>' + label + '</td>' +
-        '<td class="' + valCls(cur) + '">' + fmt(cur) + '</td>' +
+      var labelHtml = '<td>' + label + '</td>';
+      // Make company rows clickable to Odoo bank accounts
+      if (cls === 'company-row') {
+        labelHtml = '<td style="cursor:pointer;text-decoration:underline dotted" onclick="window.open(odooUrl(\'bank-accounts\'),\'_blank\')">' + label + '</td>';
+      }
+      return '<tr class="' + (cls || '') + '">' + labelHtml +
+        '<td class="' + valCls(cur) + '" style="cursor:pointer" onclick="window.open(odooUrl(\'bank-accounts\'),\'_blank\')">' + fmt(cur) + '</td>' +
         '<td class="' + valCls(prior) + '">' + fmt(prior) + '</td>' +
         '<td class="' + chgCls(chg) + '">' + fmt(chg) + '</td>' +
         '<td class="' + chgCls(chg) + '">' + fmtPct(pct) + '</td></tr>';

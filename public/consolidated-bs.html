@@ -112,6 +112,7 @@
       <button class="btn" onclick="loadData()">Apply</button>
     </div>
   </div>
+  <script src="/odoo-links.js"></script>
 
   <div class="scroll-container">
     <div id="content"><div class="loading">Loading consolidated balance sheet...</div></div>
@@ -171,7 +172,21 @@
           if (row.code === 'CHECK') rowCls = 'check-row';
 
           html += '<tr class="' + rowCls + '">';
-          html += '<td class="row-label">' + row.label + '</td>';
+          // Make account-code rows clickable to Odoo
+          var acctCode = row.code.replace('A_', '');
+          var isAcctRow = /^\d{6}/.test(acctCode);
+          if (isAcctRow) {
+            html += '<td class="row-label" style="cursor:pointer;text-decoration:underline dotted" onclick="window.open(odooUrl(\'journal-items\',{account:\'' + acctCode + '\'}),\'_blank\')">' + row.label + '</td>';
+          } else if (row.is_section) {
+            var reportType = row.code === 'ASSETS' ? 'balance-sheet' : row.code === 'LIABILITIES' ? 'balance-sheet' : row.code === 'EQUITY' ? 'balance-sheet' : null;
+            if (reportType) {
+              html += '<td class="row-label" style="cursor:pointer" onclick="window.open(odooUrl(\'' + reportType + '\'),\'_blank\')">' + row.label + '</td>';
+            } else {
+              html += '<td class="row-label">' + row.label + '</td>';
+            }
+          } else {
+            html += '<td class="row-label">' + row.label + '</td>';
+          }
 
           row.values.forEach(function(val, i) {
             var col = data.columns[i];
