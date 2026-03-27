@@ -471,10 +471,11 @@ export function dashboardRoutes(db: Database.Database): Router {
         SELECT
           a.odoo_type,
           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-        FROM accounts a
-        INNER JOIN line_items li ON li.account_id = a.id
-          AND li.journal_entry_id IN (SELECT id FROM journal_entries WHERE status = 'posted' AND company_id = ? ${bsDateFilter})
-        WHERE a.is_active = 1 AND a.odoo_type IN (${odooTypes.map(() => '?').join(',')})
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+          AND je.status = 'posted' AND je.company_id = ? ${bsDateFilter}
+        INNER JOIN accounts a ON a.id = li.account_id
+          AND a.is_active = 1 AND a.odoo_type IN (${odooTypes.map(() => '?').join(',')})
         GROUP BY a.odoo_type
       `).all(company.company_id, ...odooTypes) as any[];
 
