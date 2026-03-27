@@ -758,6 +758,11 @@ export function dashboardRoutes(db: Database.Database): Router {
             }
           } else if (line.account_codes) {
             balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
+          } else if (line.account_codes_prefix) {
+            const prefix = line.account_codes_prefix;
+            balances[line.code] = Object.entries(byCode).reduce((s: number, [code, bal]) => {
+              return code.startsWith(prefix) ? s + bal : s;
+            }, 0);
           }
         }
 
@@ -905,6 +910,12 @@ export function dashboardRoutes(db: Database.Database): Router {
           }
         } else if (line.account_codes) {
           balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
+        } else if (line.account_codes_prefix) {
+          // Sum all account codes starting with this prefix
+          const prefix = line.account_codes_prefix;
+          balances[line.code] = Object.entries(byCode).reduce((s: number, [code, bal]) => {
+            return code.startsWith(prefix) ? s + bal : s;
+          }, 0);
         }
       }
 

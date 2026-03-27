@@ -41,6 +41,7 @@ export interface BSLineItem {
   is_section?: boolean;
   odoo_types?: string[];
   account_codes?: string[];
+  account_codes_prefix?: string;
   computed_from?: string[];
   date_filter?: 'current_year' | 'prior_years';
 }
@@ -54,6 +55,8 @@ export const BS_LINES: BSLineItem[] = [
   { code: 'CURRENT_ASSETS', label: 'Current Assets', indent: 1, is_total: true, odoo_types: ['asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments'] },
 
   { code: 'BANK_CASH', label: 'Bank and Cash Accounts', indent: 1, odoo_types: ['asset_cash'] },
+  { code: 'CASH', label: 'Cash', indent: 2, account_codes_prefix: '100' },
+  { code: 'DIGITAL_TOKEN', label: 'Digital Token', indent: 2, account_codes_prefix: '10W' },
 
   { code: 'RECEIVABLES', label: 'Receivables', indent: 1, odoo_types: ['asset_receivable'] },
   { code: 'A_107010', label: '107010 GST Control', indent: 2, account_codes: ['107010'] },
