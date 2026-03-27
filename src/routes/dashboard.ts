@@ -447,40 +447,41 @@ export function dashboardRoutes(db: Database.Database): Router {
 
   // Multi-company balance sheet summary (all companies side by side)
   router.get('/balance-sheet-all', (req, res) => {
-    const asOfDate = (req.query.as_of_date as string) || '2026-02-28';
-    const bsDateFilter = `AND je.date <= '${asOfDate.replace(/[^0-9-]/g, '')}'`;
+    const requestedDate = (req.query.as_of_date as string) || '';
 
+    // Find closest snapshot
+    const latestSnap = db.prepare(
+      requestedDate
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+
+    const snapDate = latestSnap?.snapshot_date;
+
+    if (!snapDate) {
+      return res.json([]);
+    }
+
+    // Get all companies from snapshot
     const companies = db.prepare(`
       SELECT DISTINCT company_id, company_name
-      FROM journal_entries
-      WHERE company_id IS NOT NULL AND company_name != ''
+      FROM account_balances WHERE snapshot_date = ?
       ORDER BY company_name
-    `).all() as any[];
-
-    const odooTypes = [
-      'asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments',
-      'asset_fixed', 'asset_non_current',
-      'liability_payable', 'liability_current', 'liability_credit_card', 'liability_non_current',
-      'equity', 'equity_unaffected',
-    ];
+    `).all(snapDate) as any[];
 
     const result: any[] = [];
+    const plTypes = ['income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation'];
 
     for (const company of companies) {
       const rows = db.prepare(`
-        SELECT
-          a.odoo_type,
-          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-        FROM line_items li
-        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id = ? ${bsDateFilter}
-        INNER JOIN accounts a ON a.id = li.account_id
-          AND a.is_active = 1 AND a.odoo_type IN (${odooTypes.map(() => '?').join(',')})
-        GROUP BY a.odoo_type
-      `).all(company.company_id, ...odooTypes) as any[];
+        SELECT account_type, SUM(balance) as balance
+        FROM account_balances
+        WHERE company_id = ? AND snapshot_date = ?
+        GROUP BY account_type
+      `).all(company.company_id, snapDate) as any[];
 
       const byType: Record<string, number> = {};
-      for (const r of rows) byType[r.odoo_type] = r.balance;
+      for (const r of rows) byType[r.account_type] = r.balance;
 
       const bankCash = byType['asset_cash'] || 0;
       const receivable = byType['asset_receivable'] || 0;
@@ -495,12 +496,13 @@ export function dashboardRoutes(db: Database.Database): Router {
 
       const equity = byType['equity'] || 0;
       const equityUnaffected = byType['equity_unaffected'] || 0;
+      const pl = plTypes.reduce((s, t) => s + (byType[t] || 0), 0);
 
       const totalCurrentAssets = bankCash + receivable + currentAssets + prepayments;
       const totalAssets = totalCurrentAssets + fixedAssets + nonCurrentAssets;
       const totalCurrentLiabilities = currentLiab + payable;
       const totalLiabilities = totalCurrentLiabilities + nonCurrentLiab;
-      const totalEquity = equity + equityUnaffected;
+      const totalEquity = equity + equityUnaffected + pl;
 
       result.push({
         company_id: company.company_id,
@@ -523,8 +525,8 @@ export function dashboardRoutes(db: Database.Database): Router {
           total: totalLiabilities,
         },
         equity: {
-          equity,
-          equity_unaffected: equityUnaffected,
+          equity: totalEquity,
+          equity_unaffected: 0,
           total: totalEquity,
         },
         liabilities_plus_equity: totalLiabilities + totalEquity,
