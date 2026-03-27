@@ -1460,5 +1460,16 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+  // List available balance snapshots
+  router.get('/snapshots', (_req, res) => {
+    const snaps = db.prepare(`
+      SELECT DISTINCT snapshot_date, COUNT(*) as account_count
+      FROM account_balances
+      GROUP BY snapshot_date
+      ORDER BY snapshot_date DESC
+    `).all();
+    res.json(snaps);
+  });
+
   return router;
 }
