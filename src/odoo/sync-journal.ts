@@ -57,8 +57,8 @@ export async function syncJournalEntries(
   const deleteLineItems = db.prepare('DELETE FROM line_items WHERE journal_entry_id = ?');
 
   const insertLineItem = db.prepare(`
-    INSERT OR REPLACE INTO line_items (id, odoo_id, journal_entry_id, account_id, debit, credit, description)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO line_items (id, odoo_id, journal_entry_id, account_id, debit, credit, amount_currency, currency, description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   let offset = options.offset || 0;
@@ -84,7 +84,7 @@ export async function syncJournalEntries(
     const allLines = await odoo.searchRead(
       'account.move.line',
       [['move_id', 'in', entryOdooIds]],
-      ['id', 'name', 'account_id', 'debit', 'credit', 'move_id'],
+      ['id', 'name', 'account_id', 'debit', 'credit', 'amount_currency', 'currency_id', 'move_id'],
       { order: 'id asc' }
     );
 
@@ -143,6 +143,9 @@ export async function syncJournalEntries(
             const localAccount = getAccountByOdooId.get(accountRef[0]) as { id: string };
             const debit = (line.debit as number) || 0;
             const credit = (line.credit as number) || 0;
+            const amountCurrency = (line.amount_currency as number) || 0;
+            const currencyRef = line.currency_id as [number, string] | false;
+            const currency = currencyRef ? currencyRef[1] : '';
             const lineName = (line.name as string | false) || '';
 
             if (debit === 0 && credit === 0) continue;
@@ -154,6 +157,8 @@ export async function syncJournalEntries(
               localAccount.id,
               debit,
               credit,
+              amountCurrency,
+              currency,
               lineName
             );
           }

@@ -96,7 +96,7 @@ export const BS_LINES: BSLineItem[] = [
   { code: 'EQUITY', label: 'EQUITY', indent: 0, is_section: true, computed_from: ['ACCUMULATE_PL', 'CURRENT_YEAR_PL', 'SHARE_CAPITALS'] },
 
   { code: 'ACCUMULATE_PL', label: 'Accumulate P/L', indent: 1, odoo_types: ['equity'], date_filter: 'prior_years' },
-  { code: 'CURRENT_YEAR_PL', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['income', 'income_other', 'expense', 'expense_direct_cost', 'equity_unaffected'], date_filter: 'current_year' },
+  { code: 'CURRENT_YEAR_PL', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation', 'equity_unaffected'], date_filter: 'current_year' },
   { code: 'SHARE_CAPITALS', label: 'Share Capitals', indent: 1, account_codes: ['310000'] },
 
   // ===== TOTALS =====

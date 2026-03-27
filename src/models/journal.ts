@@ -33,5 +33,7 @@ export interface LineItem {
   account_id: string;
   debit: number;
   credit: number;
+  amount_currency: number;
+  currency: string;
   description: string;
 }

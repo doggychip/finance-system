@@ -43,6 +43,8 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       account_id TEXT NOT NULL REFERENCES accounts(id),
       debit REAL DEFAULT 0,
       credit REAL DEFAULT 0,
+      amount_currency REAL DEFAULT 0,
+      currency TEXT DEFAULT '',
       description TEXT DEFAULT '',
       CHECK(debit >= 0 AND credit >= 0),
       CHECK(NOT (debit > 0 AND credit > 0))
