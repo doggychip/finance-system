@@ -692,6 +692,8 @@ export function dashboardRoutes(db: Database.Database): Router {
             'ASSETS': 5942149,
             'CURRENT_ASSETS': 5942149,
             'BANK_CASH': 5942149,
+            'CASH': 5942149,
+            'DIGITAL_TOKEN': 0,
             'RECEIVABLES': 0,
             'A_107010': 0, 'A_101000': 0, 'A_101010': 0,
             'CURRENT_ASSETS_OTHER': 0,
