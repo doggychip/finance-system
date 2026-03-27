@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { syncBalances } from '../odoo/sync-balances';
+import { syncHistoricalBalances } from '../odoo/sync-historical-balances';
 import { createOdooClient } from '../odoo/client';
 import {
   runFullSync,
@@ -123,6 +124,23 @@ export function syncRoutes(db: Database.Database): Router {
       const odoo = createOdooClient();
       await odoo.authenticate();
       const result = await syncBalances(odoo, db);
+      res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Sync historical balances for a specific date using Odoo's read_group
+  router.post('/balances/historical', async (req, res) => {
+    try {
+      const asOfDate = req.body.as_of_date;
+      if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
+        return res.status(400).json({ error: 'as_of_date required (YYYY-MM-DD)' });
+      }
+      const odoo = createOdooClient();
+      await odoo.authenticate();
+      const result = await syncHistoricalBalances(odoo, db, asOfDate);
       res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
