@@ -364,19 +364,14 @@
       if (!data.length) return;
 
       charts.balTime = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
           labels: data.map(r => r.period),
           datasets: [{
             label: 'Cash Balance',
             data: data.map(r => r.balance),
-            borderColor: '#22c55e',
-            backgroundColor: 'rgba(34,197,94,0.08)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: currentPeriod === 'monthly' ? 5 : currentPeriod === 'weekly' ? 3 : 1,
-            pointBackgroundColor: '#22c55e',
-            borderWidth: 2,
+            backgroundColor: data.map(r => r.balance >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.6)'),
+            borderRadius: 3,
           }]
         },
         options: {
