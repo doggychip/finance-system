@@ -41,10 +41,12 @@ if (authUser && authPass) {
 app.use(express.json());
 
 // Serve dashboard — check dist/public (production) and public/ (dev)
+// Disable caching for HTML files
 const publicDir = path.join(__dirname, 'public');
 const devPublicDir = path.join(process.cwd(), 'public');
-app.use(express.static(publicDir));
-app.use(express.static(devPublicDir));
+const staticOpts = { etag: false, lastModified: false, setHeaders: (res: any) => { res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); res.setHeader('Pragma', 'no-cache'); } };
+app.use(express.static(publicDir, staticOpts));
+app.use(express.static(devPublicDir, staticOpts));
 
 const db = initDb();
 seedXterioFoundation(db);
