@@ -1254,6 +1254,7 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     if (snap?.snapshot_date) {
       // Use account_balances
+      // Get ALL cash accounts from both current and prior snapshots
       const currentRows = db.prepare(`
         SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
         FROM account_balances
@@ -1262,13 +1263,20 @@ export function dashboardRoutes(db: Database.Database): Router {
       `).all(snap.snapshot_date) as any[];
 
       const priorRows = priorSnap?.snapshot_date ? db.prepare(`
-        SELECT company_id, account_code as code, balance
+        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
         FROM account_balances
-        WHERE snapshot_date = ? AND account_type = 'asset_cash'
+        WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
       `).all(priorSnap.snapshot_date) as any[] : [];
 
-      const priorMap: Record<string, number> = {};
-      for (const r of priorRows) priorMap[r.company_id + '|' + r.code] = r.balance;
+      // Build maps for both snapshots
+      const currentMap: Record<string, any> = {};
+      for (const r of currentRows) currentMap[r.company_id + '|' + r.code] = r;
+
+      const priorMap: Record<string, any> = {};
+      for (const r of priorRows) priorMap[r.company_id + '|' + r.code] = r;
+
+      // Merge: all accounts from both snapshots
+      const allKeys = new Set([...Object.keys(currentMap), ...Object.keys(priorMap)]);
 
       // Map to entity groups
       const companyToGroup: Record<number, string> = {};
@@ -1277,22 +1285,27 @@ export function dashboardRoutes(db: Database.Database): Router {
         for (const cid of g.company_ids) companyToGroup[cid] = g.name;
       }
 
-      const accounts = currentRows.map((r: any) => {
-        const key = r.company_id + '|' + r.code;
-        const prior = priorMap[key] || 0;
-        const change = r.balance - prior;
-        const changePct = prior !== 0 ? ((change / Math.abs(prior)) * 100) : 0;
-        return {
-          entity_group: companyToGroup[r.company_id] || 'Other',
-          company_name: r.company_name,
-          code: r.code,
-          name: r.name,
-          current_balance: r.balance,
-          prior_balance: prior,
+      const accounts: any[] = [];
+      for (const key of allKeys) {
+        const cur = currentMap[key];
+        const pri = priorMap[key];
+        const row = cur || pri;
+        const currentBal = cur?.balance || 0;
+        const priorBal = pri?.balance || 0;
+        const change = currentBal - priorBal;
+        const changePct = priorBal !== 0 ? ((change / Math.abs(priorBal)) * 100) : 0;
+
+        accounts.push({
+          entity_group: companyToGroup[row.company_id] || 'Other',
+          company_name: row.company_name,
+          code: row.code,
+          name: row.name,
+          current_balance: currentBal,
+          prior_balance: priorBal,
           change, change_pct: changePct,
-          asset_type: r.code.startsWith('10W') ? 'Crypto' : 'Cash',
-        };
-      });
+          asset_type: row.code.startsWith('10W') ? 'Crypto' : 'Cash',
+        });
+      }
 
       const byGroup: Record<string, any[]> = {};
       for (const a of accounts) {
