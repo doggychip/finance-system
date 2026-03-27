@@ -137,7 +137,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     if (!snap?.snapshot_date) {
-      return res.json({ cash: { accounts: [], total: 0 }, receivable: { accounts: [], total: 0 }, overdrawn: { accounts: [], total: 0 }, overworld: { accounts: [], total: 0 }, reach: { accounts: [], total: 0 }, grand_total: 0, snapshot_date: null });
+      return res.json({ cash: { accounts: [], total: 0 }, receivable: { accounts: [], total: 0 }, overdrawn: { accounts: [], total: 0 }, overworld: { accounts: [], total: 0 }, reach: { accounts: [], total: 0 }, grand_total: 0, non_ow_total: 0, snapshot_date: null });
     }
 
     const rows = db.prepare(`
@@ -155,10 +155,14 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const cid of g.company_ids) companyToGroup[cid] = g.name;
     }
 
-    // Categorize by entity group
+    // Non-OW entity groups (for the hero total)
+    const nonOWGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
+
+    const isNonOW = (r: any) => nonOWGroups.has(companyToGroup[r.company_id] || '');
     const isOW = (r: any) => owGroups.has(companyToGroup[r.company_id] || '');
 
+    const nonOWRows = rows.filter(r => isNonOW(r) && r.odoo_type === 'asset_cash');
     const owRows = rows.filter(isOW);
     const remaining = rows.filter(r => !isOW(r));
 
@@ -168,10 +172,13 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     const sum = (arr: any[]) => arr.reduce((s: number, r: any) => s + r.balance, 0);
 
-    // Split OW into overworld and reach
     const overworld = owRows.filter(r => ['OW'].includes(companyToGroup[r.company_id] || ''));
     const reach = owRows.filter(r => companyToGroup[r.company_id] === 'Reach');
     const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
+
+    // Non-OW Total cash = Odoo entities + Xterio Foundation manual (5,942,149)
+    const xterioFoundationCash = 5942149;
+    const nonOWCash = sum(nonOWRows) + xterioFoundationCash;
 
     res.json({
       cash: { accounts: cash, total: sum(cash) },
@@ -180,6 +187,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       overworld: { accounts: [...overworld, ...otherOW], total: sum(overworld) + sum(otherOW) },
       reach: { accounts: reach, total: sum(reach) },
       grand_total: sum(remaining),
+      non_ow_total: nonOWCash,
       snapshot_date: snap.snapshot_date,
     });
   });

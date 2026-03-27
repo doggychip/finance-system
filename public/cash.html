@@ -130,7 +130,7 @@
   <div class="container">
     <!-- Hero -->
     <div class="hero">
-      <div class="label">Total Cash & Bank Balance</div>
+      <div class="label">Non-OW Total Cash Balance</div>
       <div class="total" id="heroTotal">--</div>
       <div class="sub" id="heroSub">Loading...</div>
     </div>
@@ -275,13 +275,13 @@
       const owAccs = data.overworld?.accounts || [];
       const reachAccs = data.reach?.accounts || [];
       const mainAccs = [...cashAccs, ...recvAccs, ...overAccs];
-      const grandTotal = data.grand_total || 0;
+      const nonOWTotal = data.non_ow_total || 0;
 
-      // Hero shows only main company cash (excludes Overworld & Reach)
+      // Hero shows Non-OW Total cash (incl. Xterio Foundation)
       const heroEl = document.getElementById('heroTotal');
-      heroEl.textContent = fmt(grandTotal);
-      heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
-      document.getElementById('heroSub').textContent = `Across ${mainAccs.length} account${mainAccs.length !== 1 ? 's' : ''} (excl. Overworld & Reach)`;
+      heroEl.textContent = fmt(nonOWTotal);
+      heroEl.className = 'total ' + (nonOWTotal >= 0 ? 'positive' : 'negative');
+      document.getElementById('heroSub').textContent = `Non-OW Total Cash (incl. Xterio Foundation) | ${data.snapshot_date || ''}`;
 
       document.getElementById('statCount').textContent = fmtNum(cashAccs.length);
       document.getElementById('statPositive').textContent = fmtNum(cashAccs.length + recvAccs.length);
