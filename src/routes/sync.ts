@@ -41,7 +41,7 @@ export function syncRoutes(db: Database.Database): Router {
 
   // Sync only journal entries
   router.post('/journal', async (req, res) => {
-    req.socket.setTimeout(300000); // 5 minutes
+    req.socket.setTimeout(900000); // 15 minutes
     try {
       const result = await runJournalSync(db, {
         dateFrom: req.body.date_from,
