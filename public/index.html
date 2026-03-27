@@ -39,6 +39,10 @@
       font-weight: 600;
       letter-spacing: -0.5px;
     }
+    .nav { display: flex; gap: 4px; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
     .header .sync-status {
       font-size: 13px;
       color: var(--text-dim);
@@ -205,16 +209,15 @@
 <body>
   <div class="header">
     <h1>Finance Dashboard</h1>
-    <div style="display:flex;gap:4px">
-      <a href="/" style="padding:6px 14px;border-radius:6px;background:var(--accent);color:white;text-decoration:none;font-size:13px">Overview</a>
-      <a href="/cash.html" style="padding:6px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:13px">Cash</a>
-      <a href="/balance-sheet.html" style="padding:6px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:13px">Balance Sheet</a>
-      <a href="/cash-flow.html" style="padding:6px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:13px">Cash Flow</a>
-      <a href="/consolidated-bs.html" style="padding:6px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:13px">Consolidated</a>
-      <a href="/reports.html" style="padding:6px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:13px">Reports</a>
-      <a href="/cash-position.html" style="padding:6px 14px;border-radius:6px;color:var(--text-dim);text-decoration:none;font-size:13px">Cash Position</a>
+    <div class="nav">
+      <a href="/" class="active">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
     </div>
-
     <div class="actions">
       <button class="btn" onclick="refreshData()">Refresh</button>
       <button class="btn primary" onclick="triggerSync()" id="syncBtn">Sync from Odoo</button>
