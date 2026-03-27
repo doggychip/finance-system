@@ -673,8 +673,10 @@ export function dashboardRoutes(db: Database.Database): Router {
 
         // Handle manual entities (e.g. Xterio Foundation)
         if (group.is_manual) {
-          // Xterio Foundation BS figures from spreadsheet (as at 28.02.2026)
-          const xterioBS: Record<string, number> = {
+          // Xterio Foundation — hardcoded from spreadsheet (as at 28.02.2026)
+          const balances: Record<string, number> = {
+            'ASSETS': 5942149,
+            'CURRENT_ASSETS': 5942149,
             'BANK_CASH': 5942149,
             'RECEIVABLES': 0,
             'A_107010': 0, 'A_101000': 0, 'A_101010': 0,
@@ -683,6 +685,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             'FIXED_ASSETS': 0,
             'NON_CURRENT_ASSETS': 0,
             'A_200000': 0, 'A_202000': 0,
+            'LIABILITIES': 1369636,
             'CURRENT_LIABILITIES': 165000,
             'A_303010': 0, 'A_303011': 0, 'A_303040': 0, 'A_303041': 0,
             'A_303050': 0, 'A_303100': 0, 'A_303031': 165000,
@@ -690,17 +693,11 @@ export function dashboardRoutes(db: Database.Database): Router {
             'PAYABLES': 0, 'A_300030': 0,
             'NON_CURRENT_LIABILITIES': 1204636,
             'A_300040': 0, 'A_300050': 0, 'A_303030': 1204636,
-            'EQUITY_RETAINED': -33889064 + 38452916,  // Accumulate P/L + Share Capitals
-            'CURRENT_YEAR_PL': 12831,
+            'EQUITY': 4563853,
+            'EQUITY_RETAINED': -33889064,
+            'CURRENT_YEAR_PL': 12831 + 38452916, // Current Year + Share Capitals (38,452,916)
+            'LIAB_EQUITY': 5933488,
           };
-
-          const balances: Record<string, number> = { ...xterioBS };
-          // Compute section totals for manual entity
-          balances['CURRENT_ASSETS'] = (balances['BANK_CASH'] || 0) + (balances['RECEIVABLES'] || 0) + (balances['CURRENT_ASSETS_OTHER'] || 0) + (balances['PREPAYMENTS'] || 0);
-          balances['ASSETS'] = (balances['CURRENT_ASSETS'] || 0) + (balances['FIXED_ASSETS'] || 0) + (balances['NON_CURRENT_ASSETS'] || 0);
-          balances['LIABILITIES'] = (balances['CURRENT_LIABILITIES'] || 0) + (balances['PAYABLES'] || 0) + (balances['NON_CURRENT_LIABILITIES'] || 0);
-          balances['EQUITY'] = (balances['EQUITY_RETAINED'] || 0) + (balances['CURRENT_YEAR_PL'] || 0);
-          balances['LIAB_EQUITY'] = (balances['LIABILITIES'] || 0) + (balances['EQUITY'] || 0);
           // Zero out any BS line not explicitly set
           for (const line of BS_LINES) {
             if (!(line.code in balances)) balances[line.code] = 0;
