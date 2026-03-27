@@ -695,21 +695,15 @@ export function dashboardRoutes(db: Database.Database): Router {
           };
 
           const balances: Record<string, number> = { ...xterioBS };
+          // Compute section totals for manual entity
+          balances['CURRENT_ASSETS'] = (balances['BANK_CASH'] || 0) + (balances['RECEIVABLES'] || 0) + (balances['CURRENT_ASSETS_OTHER'] || 0) + (balances['PREPAYMENTS'] || 0);
+          balances['ASSETS'] = (balances['CURRENT_ASSETS'] || 0) + (balances['FIXED_ASSETS'] || 0) + (balances['NON_CURRENT_ASSETS'] || 0);
+          balances['LIABILITIES'] = (balances['CURRENT_LIABILITIES'] || 0) + (balances['PAYABLES'] || 0) + (balances['NON_CURRENT_LIABILITIES'] || 0);
+          balances['EQUITY'] = (balances['EQUITY_RETAINED'] || 0) + (balances['CURRENT_YEAR_PL'] || 0);
+          balances['LIAB_EQUITY'] = (balances['LIABILITIES'] || 0) + (balances['EQUITY'] || 0);
           // Zero out any BS line not explicitly set
           for (const line of BS_LINES) {
-            if (line.computed_from) continue;
             if (!(line.code in balances)) balances[line.code] = 0;
-          }
-          for (let pass = 0; pass < 10; pass++) {
-            let resolved = 0;
-            for (const line of BS_LINES) {
-              if (!line.computed_from) continue;
-              if (line.code in balances) continue;
-              if (!line.computed_from.every((c: string) => c in balances)) continue;
-              balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
-              resolved++;
-            }
-            if (resolved === 0) break;
           }
           groupBalances[group.name] = balances;
           continue;
