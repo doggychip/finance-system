@@ -1235,10 +1235,83 @@ export function dashboardRoutes(db: Database.Database): Router {
 
   // ====== Bank Account Detail ======
   router.get('/bank-accounts', (req, res) => {
+    const requestedDate = (req.query.as_of_date as string) || '';
     const priorDate = req.query.prior_date as string || (() => {
       const d = new Date(); d.setDate(d.getDate() - 7);
       return d.toISOString().slice(0, 10);
     })();
+
+    // Use account_balances if available
+    const snap = db.prepare(
+      requestedDate
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+
+    const priorSnap = db.prepare(
+      `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(priorDate) as any;
+
+    if (snap?.snapshot_date) {
+      // Use account_balances
+      const currentRows = db.prepare(`
+        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
+        ORDER BY company_name, account_code
+      `).all(snap.snapshot_date) as any[];
+
+      const priorRows = priorSnap?.snapshot_date ? db.prepare(`
+        SELECT company_id, account_code as code, balance
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type = 'asset_cash'
+      `).all(priorSnap.snapshot_date) as any[] : [];
+
+      const priorMap: Record<string, number> = {};
+      for (const r of priorRows) priorMap[r.company_id + '|' + r.code] = r.balance;
+
+      // Map to entity groups
+      const companyToGroup: Record<number, string> = {};
+      for (const g of ENTITY_GROUPS) {
+        if (g.is_subtotal || g.is_manual) continue;
+        for (const cid of g.company_ids) companyToGroup[cid] = g.name;
+      }
+
+      const accounts = currentRows.map((r: any) => {
+        const key = r.company_id + '|' + r.code;
+        const prior = priorMap[key] || 0;
+        const change = r.balance - prior;
+        const changePct = prior !== 0 ? ((change / Math.abs(prior)) * 100) : 0;
+        return {
+          entity_group: companyToGroup[r.company_id] || 'Other',
+          company_name: r.company_name,
+          code: r.code,
+          name: r.name,
+          current_balance: r.balance,
+          prior_balance: prior,
+          change, change_pct: changePct,
+          asset_type: r.code.startsWith('10W') ? 'Crypto' : 'Cash',
+        };
+      });
+
+      const byGroup: Record<string, any[]> = {};
+      for (const a of accounts) {
+        if (!byGroup[a.entity_group]) byGroup[a.entity_group] = [];
+        byGroup[a.entity_group].push(a);
+      }
+
+      const groups = Object.entries(byGroup).map(([name, accs]) => ({
+        name,
+        accounts: accs,
+        total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
+        total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
+      }));
+
+      groups.sort((a, b) => Math.abs(b.total_current) - Math.abs(a.total_current));
+      return res.json({ snapshot_date: snap.snapshot_date, prior_date: priorSnap?.snapshot_date || priorDate, groups });
+    }
+
+    // Fallback to old JE-based computation
 
     const rows = db.prepare(`
       SELECT
