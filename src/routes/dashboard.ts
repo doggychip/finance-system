@@ -673,13 +673,29 @@ export function dashboardRoutes(db: Database.Database): Router {
 
         // Handle manual entities (e.g. Xterio Foundation)
         if (group.is_manual) {
-          const latestPeriod = db.prepare(`
-            SELECT period, SUM(amount_usd) as total_usd
-            FROM manual_balances WHERE entity = ?
-            GROUP BY period ORDER BY period DESC LIMIT 1
-          `).get(group.name) as any;
-          const balances: Record<string, number> = {};
-          balances['BANK_CASH'] = latestPeriod?.total_usd || 0;
+          // Xterio Foundation BS figures from spreadsheet (as at 28.02.2026)
+          const xterioBS: Record<string, number> = {
+            'BANK_CASH': 5942149,
+            'RECEIVABLES': 0,
+            'A_107010': 0, 'A_101000': 0, 'A_101010': 0,
+            'CURRENT_ASSETS_OTHER': 0,
+            'PREPAYMENTS': 0,
+            'FIXED_ASSETS': 0,
+            'NON_CURRENT_ASSETS': 0,
+            'A_200000': 0, 'A_202000': 0,
+            'CURRENT_LIABILITIES': 165000,
+            'A_303010': 0, 'A_303011': 0, 'A_303040': 0, 'A_303041': 0,
+            'A_303050': 0, 'A_303100': 0, 'A_303031': 165000,
+            'A_301000': 0, 'A_302010': 0,
+            'PAYABLES': 0, 'A_300030': 0,
+            'NON_CURRENT_LIABILITIES': 1204636,
+            'A_300040': 0, 'A_300050': 0, 'A_303030': 1204636,
+            'EQUITY_RETAINED': -33889064,
+            'CURRENT_YEAR_PL': 12831,
+          };
+
+          const balances: Record<string, number> = { ...xterioBS };
+          // Zero out any BS line not explicitly set
           for (const line of BS_LINES) {
             if (line.computed_from) continue;
             if (!(line.code in balances)) balances[line.code] = 0;
