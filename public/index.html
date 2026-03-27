@@ -231,6 +231,8 @@
     <div class="stats-grid" id="statsGrid">
       <div class="stat-card"><div class="label">Accounts</div><div class="value" id="statAccounts">--</div></div>
       <div class="stat-card"><div class="label">Journal Entries</div><div class="value" id="statEntries">--</div><div class="sub" id="statEntriesSub"></div></div>
+      <div class="stat-card"><div class="label">Non-OW Cash Balance</div><div class="value" style="color:var(--green)" id="statNonOWCash">--</div></div>
+      <div class="stat-card"><div class="label">Xterio Foundation Cash</div><div class="value" style="color:var(--cyan)" id="statXterioCash">--</div></div>
       <div class="stat-card"><div class="label">Total Assets</div><div class="value" id="statAssets">--</div></div>
       <div class="stat-card"><div class="label">Total Liabilities</div><div class="value" id="statLiabilities">--</div></div>
       <div class="stat-card"><div class="label">Net Income (YTD)</div><div class="value" id="statNetIncome">--</div></div>
@@ -310,14 +312,20 @@
     }
 
     async function loadStats() {
-      const [stats, balances] = await Promise.all([
+      const [stats, balances, cashData] = await Promise.all([
         fetchJSON('/api/dashboard/stats'),
         fetchJSON('/api/dashboard/balances'),
+        fetchJSON('/api/dashboard/cash-balances'),
       ]);
 
       document.getElementById('statAccounts').textContent = fmtNum(stats.accounts);
       document.getElementById('statEntries').textContent = fmtNum(stats.journal_entries);
       document.getElementById('statEntriesSub').textContent = `${fmtNum(stats.posted_entries)} posted`;
+
+      // Non-OW Cash and Xterio Foundation
+      const nonOWCash = cashData.non_ow_total || 0;
+      document.getElementById('statNonOWCash').textContent = fmt(nonOWCash);
+      document.getElementById('statXterioCash').textContent = fmt(5942149);
 
       const byType = {};
       for (const row of balances) byType[row.account_type] = row;
