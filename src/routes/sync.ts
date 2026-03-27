@@ -47,6 +47,7 @@ export function syncRoutes(db: Database.Database): Router {
         dateFrom: req.body.date_from,
         dateTo: req.body.date_to,
         limit: req.body.limit,
+        offset: req.body.offset,
       });
       res.json(result);
     } catch (err: unknown) {

@@ -70,7 +70,7 @@ export async function runAccountSync(db: Database.Database): Promise<AccountSync
   return result;
 }
 
-export async function runJournalSync(db: Database.Database, options: { dateFrom?: string; dateTo?: string; limit?: number } = {}): Promise<JournalSyncResult> {
+export async function runJournalSync(db: Database.Database, options: { dateFrom?: string; dateTo?: string; limit?: number; offset?: number } = {}): Promise<JournalSyncResult> {
   const odoo = createOdooClient();
   await odoo.authenticate();
   const result = await syncJournalEntries(odoo, db, options);
