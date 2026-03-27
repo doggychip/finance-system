@@ -6,7 +6,7 @@
   <title>Cash Position — Finance Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; font-size: 12px; }
     .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     .header h1 { font-size: 18px; font-weight: 600; }
@@ -16,21 +16,11 @@
     .nav a.active { background: var(--accent); color: white; }
     .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
     .btn:hover { background: var(--border); }
-    .scroll-wrap { overflow-x: auto; padding: 16px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
-    /* Parent group header */
-    .parent-group { margin-bottom: 32px; }
-    .parent-header { font-size: 16px; font-weight: 700; padding: 10px 0; border-bottom: 2px solid var(--accent); margin-bottom: 16px; color: var(--accent); }
-
-    /* Entity group card */
-    .group-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
-    .group-header { padding: 10px 16px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; }
-    .group-header .total { font-variant-numeric: tabular-nums; }
-
-    /* Account table */
     table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; padding: 4px 10px; font-size: 10px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
-    td { padding: 4px 10px; font-size: 11px; border-bottom: 1px solid var(--border); }
+    th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
     tr:hover td { background: var(--surface2); }
     .val { text-align: right; font-variant-numeric: tabular-nums; }
     .pos { color: var(--text); }
@@ -38,13 +28,13 @@
     .zero { color: var(--text-dim); }
     .change-pos { color: var(--green); }
     .change-neg { color: var(--red); }
-    .type-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; }
-    .type-cash { background: rgba(34,197,94,0.12); color: var(--green); }
-    .type-crypto { background: rgba(139,92,246,0.12); color: #8b5cf6; }
 
-    /* Subtotal row */
-    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.06); border-top: 2px solid var(--border); }
+    .parent-row td { background: #1a365d; color: white; font-weight: 700; font-size: 13px; padding: 10px 12px; }
+    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.08); border-top: 2px solid var(--border); }
+    .grand-row td { font-weight: 800; font-size: 14px; background: rgba(234,179,8,0.08); border-top: 3px solid var(--yellow); }
+    .entity-row td { padding-left: 24px; }
 
+    .info-bar { padding: 8px 12px; color: var(--text-dim); font-size: 11px; margin-top: 12px; }
     .loading { display: flex; align-items: center; justify-content: center; min-height: 300px; color: var(--text-dim); font-size: 14px; }
   </style>
 </head>
@@ -62,58 +52,40 @@
     <button class="btn" onclick="loadAll()">Refresh</button>
   </div>
 
-  <div class="scroll-wrap">
-    <div id="content"><div class="loading">Loading cash positions...</div></div>
+  <div class="container">
+    <div id="content"><div class="loading">Loading...</div></div>
   </div>
 
   <script>
-    // Parent groupings matching the spreadsheet
-    var PARENT_GROUPS = [
-      {
-        name: 'Libeccio Wholly Owned (Xterio)',
-        entities: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation'],
-        subtotal: 'Xterio Total'
-      },
-      {
-        name: 'AOD (Gamephilos)',
-        entities: ['AOD'],
-        subtotal: null
-      },
-      {
-        name: 'CS (Shadowcay)',
-        entities: ['CS'],
-        subtotal: null
-      },
-      {
-        name: 'Palios',
-        entities: ['Palios'],
-        subtotal: null
-      },
-      {
-        name: 'Holdings',
-        entities: ['LHOLDINGS'],
-        subtotal: null
-      },
-      {
-        name: 'Quantummind',
-        entities: ['QUANTUMMIND'],
-        subtotal: null
-      },
-      {
-        name: 'Overworld',
-        entities: ['OW'],
-        subtotal: null
-      },
-      {
-        name: 'Reach Labs',
-        entities: ['Reach'],
-        subtotal: null
-      },
-      {
-        name: 'Rough House',
-        entities: ['Rough house'],
-        subtotal: null
-      },
+    var LAYOUT = [
+      { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
+      { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech' },
+      { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs' },
+      { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK' },
+      { type: 'manual', label: 'Xterio Foundation', value: 5933488 },
+      { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], manualAdd: 5933488 },
+
+      { type: 'parent', name: 'AOD (Gamephilos)' },
+      { type: 'entity', key: 'AOD', label: 'AOD' },
+
+      { type: 'parent', name: 'CS (Shadowcay)' },
+      { type: 'entity', key: 'CS', label: 'CS' },
+
+      { type: 'parent', name: 'Palios' },
+      { type: 'entity', key: 'Palios', label: 'Palios' },
+
+      { type: 'parent', name: 'Holdings' },
+      { type: 'entity', key: 'LHOLDINGS', label: 'LHoldings' },
+
+      { type: 'parent', name: 'Quantummind' },
+      { type: 'entity', key: 'QUANTUMMIND', label: 'Quantummind' },
+
+      { type: 'parent', name: 'Overworld & Reach' },
+      { type: 'entity', key: 'OW', label: 'Overworld' },
+      { type: 'entity', key: 'Reach', label: 'Reach Labs' },
+      { type: 'entity', key: 'Rough house', label: 'Rough House' },
+      { type: 'entity', key: 'Keystone', label: 'Keystone' },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'] },
     ];
 
     function fmt(n) {
@@ -127,40 +99,17 @@
       return n.toFixed(1) + '%';
     }
     function valCls(n) { return Math.abs(n) < 0.5 ? 'val zero' : n < 0 ? 'val neg' : 'val pos'; }
+    function chgCls(n) { return n >= 0.5 ? 'val change-pos' : n <= -0.5 ? 'val change-neg' : 'val zero'; }
 
-    function renderGroup(name, accounts, total, priorTotal) {
-      var change = total - priorTotal;
-      var changePct = priorTotal !== 0 ? (change / Math.abs(priorTotal) * 100) : 0;
-      var changeCls = change >= 0 ? 'change-pos' : 'change-neg';
-
-      var html = '<div class="group-card">';
-      html += '<div class="group-header"><span>' + name + '</span>';
-      html += '<span class="total">' + fmt(total) + ' <span class="' + changeCls + '" style="font-size:11px">(' + fmtPct(changePct) + ')</span></span></div>';
-
-      html += '<table><thead><tr>';
-      html += '<th>Company</th><th>Code</th><th>Account</th><th>Type</th>';
-      html += '<th class="val">Balance (USD)</th><th class="val">Prior</th>';
-      html += '<th class="val">Change</th><th class="val">%</th>';
-      html += '</tr></thead><tbody>';
-
-      accounts.forEach(function(a) {
-        var chg = a.change;
-        var chgCls = chg >= 0.5 ? 'change-pos' : chg <= -0.5 ? 'change-neg' : 'zero';
-        var typeCls = a.asset_type === 'Crypto' ? 'type-crypto' : 'type-cash';
-        html += '<tr>';
-        html += '<td style="color:var(--text-dim)">' + a.company_name + '</td>';
-        html += '<td style="color:var(--text-dim)">' + a.code + '</td>';
-        html += '<td>' + a.name + '</td>';
-        html += '<td><span class="type-badge ' + typeCls + '">' + a.asset_type + '</span></td>';
-        html += '<td class="' + valCls(a.current_balance) + '">' + fmt(a.current_balance) + '</td>';
-        html += '<td class="' + valCls(a.prior_balance) + '">' + fmt(a.prior_balance) + '</td>';
-        html += '<td class="val ' + chgCls + '">' + fmt(chg) + '</td>';
-        html += '<td class="val ' + chgCls + '">' + fmtPct(a.change_pct) + '</td>';
-        html += '</tr>';
-      });
-
-      html += '</tbody></table></div>';
-      return html;
+    function entityRow(label, cur, prior, cls) {
+      var chg = cur - prior;
+      var pct = prior !== 0 ? (chg / Math.abs(prior) * 100) : 0;
+      return '<tr class="' + (cls || 'entity-row') + '">' +
+        '<td>' + label + '</td>' +
+        '<td class="' + valCls(cur) + '">' + fmt(cur) + '</td>' +
+        '<td class="' + valCls(prior) + '">' + fmt(prior) + '</td>' +
+        '<td class="' + chgCls(chg) + '">' + fmt(chg) + '</td>' +
+        '<td class="' + chgCls(chg) + '">' + fmtPct(pct) + '</td></tr>';
     }
 
     async function loadAll() {
@@ -172,66 +121,39 @@
           return;
         }
 
-        // Build lookup by entity name
         var byEntity = {};
         data.groups.forEach(function(g) { byEntity[g.name] = g; });
 
-        var html = '';
-        var grandTotal = 0;
-        var grandPrior = 0;
+        var html = '<table><thead><tr><th>Entity</th><th class="val">Balance (USD)</th><th class="val">Prior Week</th><th class="val">Change</th><th class="val">%</th></tr></thead><tbody>';
 
-        PARENT_GROUPS.forEach(function(pg) {
-          html += '<div class="parent-group">';
-          html += '<div class="parent-header">' + pg.name + '</div>';
+        var grandTotal = 0, grandPrior = 0;
 
-          var parentTotal = 0;
-          var parentPrior = 0;
-
-          pg.entities.forEach(function(entityName) {
-            var g = byEntity[entityName];
-            if (!g) {
-              // Manual entity (e.g., Xterio Foundation)
-              html += '<div class="group-card"><div class="group-header"><span>' + entityName + '</span><span class="total" style="color:var(--text-dim)">Manual entry</span></div></div>';
-              return;
-            }
-            html += renderGroup(entityName, g.accounts, g.total_current, g.total_prior);
-            parentTotal += g.total_current;
-            parentPrior += g.total_prior;
-          });
-
-          // Parent subtotal
-          if (pg.entities.length > 1 || pg.subtotal) {
-            var pChange = parentTotal - parentPrior;
-            var pPct = parentPrior !== 0 ? (pChange / Math.abs(parentPrior) * 100) : 0;
-            var pCls = pChange >= 0 ? 'change-pos' : 'change-neg';
-            html += '<table><tbody><tr class="subtotal-row">';
-            html += '<td colspan="4"><strong>' + (pg.subtotal || pg.name) + ' Total</strong></td>';
-            html += '<td class="' + valCls(parentTotal) + '">' + fmt(parentTotal) + '</td>';
-            html += '<td class="' + valCls(parentPrior) + '">' + fmt(parentPrior) + '</td>';
-            html += '<td class="val ' + pCls + '">' + fmt(pChange) + '</td>';
-            html += '<td class="val ' + pCls + '">' + fmtPct(pPct) + '</td>';
-            html += '</tr></tbody></table>';
+        LAYOUT.forEach(function(item) {
+          if (item.type === 'parent') {
+            html += '<tr class="parent-row"><td colspan="5">' + item.name + '</td></tr>';
+          } else if (item.type === 'entity') {
+            var g = byEntity[item.key];
+            var cur = g ? g.total_current : 0;
+            var prior = g ? g.total_prior : 0;
+            html += entityRow(item.label, cur, prior);
+            grandTotal += cur;
+            grandPrior += prior;
+          } else if (item.type === 'manual') {
+            html += entityRow(item.label, item.value, item.value);
+          } else if (item.type === 'subtotal') {
+            var cur = (item.manualAdd || 0);
+            var prior = (item.manualAdd || 0);
+            (item.keys || []).forEach(function(k) {
+              var g = byEntity[k];
+              if (g) { cur += g.total_current; prior += g.total_prior; }
+            });
+            html += entityRow(item.label, cur, prior, 'subtotal-row');
           }
-
-          grandTotal += parentTotal;
-          grandPrior += parentPrior;
-          html += '</div>';
         });
 
-        // Grand total
-        var gChange = grandTotal - grandPrior;
-        var gPct = grandPrior !== 0 ? (gChange / Math.abs(grandPrior) * 100) : 0;
-        var gCls = gChange >= 0 ? 'change-pos' : 'change-neg';
-        html += '<div class="parent-group"><div class="parent-header" style="border-color:var(--yellow);color:var(--yellow)">Grand Total</div>';
-        html += '<table><tbody><tr class="subtotal-row" style="font-size:14px">';
-        html += '<td colspan="4"><strong>All Entities</strong></td>';
-        html += '<td class="' + valCls(grandTotal) + '">' + fmt(grandTotal) + '</td>';
-        html += '<td class="' + valCls(grandPrior) + '">' + fmt(grandPrior) + '</td>';
-        html += '<td class="val ' + gCls + '">' + fmt(gChange) + '</td>';
-        html += '<td class="val ' + gCls + '">' + fmtPct(gPct) + '</td>';
-        html += '</tr></tbody></table></div>';
-
-        html += '<div style="padding:8px;color:var(--text-dim);font-size:11px">Snapshot: ' + data.snapshot_date + ' | Prior: ' + data.prior_date + '</div>';
+        html += entityRow('Grand Total', grandTotal, grandPrior, 'grand-row');
+        html += '</tbody></table>';
+        html += '<div class="info-bar">Snapshot: ' + data.snapshot_date + ' | Prior: ' + data.prior_date + '</div>';
 
         el.innerHTML = html;
       } catch (err) {
