@@ -143,7 +143,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const rows = db.prepare(`
       SELECT company_id, company_name, account_code as code, account_name as name, account_type as odoo_type, balance
       FROM account_balances
-      WHERE snapshot_date = ? AND account_type = 'asset_cash'
+      WHERE snapshot_date = ? AND (account_type = 'asset_cash' OR (account_type = 'asset_receivable' AND company_id IN (15, 16, 30, 31, 28)))
       AND ABS(balance) > 0.01
       ORDER BY balance DESC
     `).all(snap.snapshot_date) as any[];
