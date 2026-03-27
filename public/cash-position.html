@@ -17,24 +17,18 @@
     .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
     .btn:hover { background: var(--border); }
     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-
     table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
-    td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    th { text-align: left; padding: 6px 12px; font-size: 10px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 5px 12px; font-size: 12px; border-bottom: 1px solid var(--border); }
     tr:hover td { background: var(--surface2); }
     .val { text-align: right; font-variant-numeric: tabular-nums; }
-    .pos { color: var(--text); }
-    .neg { color: var(--red); }
-    .zero { color: var(--text-dim); }
-    .change-pos { color: var(--green); }
-    .change-neg { color: var(--red); }
-
+    .pos { color: var(--text); } .neg { color: var(--red); } .zero { color: var(--text-dim); }
+    .change-pos { color: var(--green); } .change-neg { color: var(--red); }
     .parent-row td { background: #1a365d; color: white; font-weight: 700; font-size: 13px; padding: 10px 12px; }
-    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.08); border-top: 2px solid var(--border); }
-    .grand-row td { font-weight: 800; font-size: 14px; background: rgba(234,179,8,0.08); border-top: 3px solid var(--yellow); }
-    .entity-row td { padding-left: 24px; }
-
-    .info-bar { padding: 8px 12px; color: var(--text-dim); font-size: 11px; margin-top: 12px; }
+    .company-row td { padding-left: 24px; }
+    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.08); border-top: 2px solid var(--border); padding-left: 12px; }
+    .grand-row td { font-weight: 800; font-size: 13px; background: rgba(234,179,8,0.08); border-top: 3px solid var(--yellow); }
+    .date-label { font-size: 11px; color: var(--text-dim); padding: 8px 0; }
     .loading { display: flex; align-items: center; justify-content: center; min-height: 300px; color: var(--text-dim); font-size: 14px; }
   </style>
 </head>
@@ -51,41 +45,36 @@
     </div>
     <button class="btn" onclick="loadAll()">Refresh</button>
   </div>
-
   <div class="container">
     <div id="content"><div class="loading">Loading...</div></div>
   </div>
-
   <script>
+    // Entity group layout with individual companies
     var LAYOUT = [
       { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
-      { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech' },
-      { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs' },
-      { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK' },
+      { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
+      { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs', companies: ['XLABS', 'XLABS W3'] },
+      { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK', companies: ['PRIVILEGE HK'] },
       { type: 'manual', label: 'Xterio Foundation', value: 5933488 },
       { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], manualAdd: 5933488 },
 
-      { type: 'parent', name: 'AOD (Gamephilos)' },
-      { type: 'entity', key: 'AOD', label: 'AOD' },
+      { type: 'parent', name: 'Gamephilos' },
+      { type: 'entity', key: 'AOD', label: 'AOD', companies: ['GAMEPHILOS', 'GAMEPHILOS W3', 'MAOFAN', 'DIFANHA'] },
 
-      { type: 'parent', name: 'CS (Shadowcay)' },
-      { type: 'entity', key: 'CS', label: 'CS' },
+      { type: 'parent', name: 'CS' },
+      { type: 'entity', key: 'CS', label: 'CS', companies: ['SHADOWCAY', 'SHADOWCAY W3', 'CHAOYING', 'DIREWOLF', 'COS GAMES', 'COS GAMES W3'] },
 
       { type: 'parent', name: 'Palios' },
-      { type: 'entity', key: 'Palios', label: 'Palios' },
+      { type: 'entity', key: 'Palios', label: 'Palios', companies: ['QUANTUMMIND SOLUTIONS HK', 'PLAY ALGORITHM (BVI)', 'BJ TUDONG', 'PALIO W3'] },
 
       { type: 'parent', name: 'Holdings' },
-      { type: 'entity', key: 'LHOLDINGS', label: 'LHoldings' },
-
-      { type: 'parent', name: 'Quantummind' },
-      { type: 'entity', key: 'QUANTUMMIND', label: 'Quantummind' },
+      { type: 'entity', key: 'LHOLDINGS', label: 'Holdings', companies: ['LHOLDINGS', 'LHOLDINGS W3'] },
 
       { type: 'parent', name: 'Overworld & Reach' },
-      { type: 'entity', key: 'OW', label: 'Overworld' },
-      { type: 'entity', key: 'Reach', label: 'Reach Labs' },
-      { type: 'entity', key: 'Rough house', label: 'Rough House' },
-      { type: 'entity', key: 'Keystone', label: 'Keystone' },
-      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'] },
+      { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
+      { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
+      { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'] },
     ];
 
     function fmt(n) {
@@ -94,18 +83,14 @@
       var s = Math.abs(Math.round(n)).toLocaleString('en-US');
       return n < 0 ? '(' + s + ')' : s;
     }
-    function fmtPct(n) {
-      if (n == null || isNaN(n) || !isFinite(n)) return '-';
-      return n.toFixed(1) + '%';
-    }
+    function fmtPct(n) { return (n == null || isNaN(n) || !isFinite(n)) ? '-' : n.toFixed(1) + '%'; }
     function valCls(n) { return Math.abs(n) < 0.5 ? 'val zero' : n < 0 ? 'val neg' : 'val pos'; }
     function chgCls(n) { return n >= 0.5 ? 'val change-pos' : n <= -0.5 ? 'val change-neg' : 'val zero'; }
 
-    function entityRow(label, cur, prior, cls) {
+    function row(label, cur, prior, cls) {
       var chg = cur - prior;
       var pct = prior !== 0 ? (chg / Math.abs(prior) * 100) : 0;
-      return '<tr class="' + (cls || 'entity-row') + '">' +
-        '<td>' + label + '</td>' +
+      return '<tr class="' + (cls || '') + '"><td>' + label + '</td>' +
         '<td class="' + valCls(cur) + '">' + fmt(cur) + '</td>' +
         '<td class="' + valCls(prior) + '">' + fmt(prior) + '</td>' +
         '<td class="' + chgCls(chg) + '">' + fmt(chg) + '</td>' +
@@ -116,51 +101,71 @@
       var el = document.getElementById('content');
       try {
         var data = await (await fetch('/api/dashboard/bank-accounts?as_of_date=2026-02-28&prior_date=2026-02-04')).json();
-        if (!data.groups || !data.groups.length) {
-          el.innerHTML = '<div class="loading">No data. Sync balances first.</div>';
-          return;
-        }
+        if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
 
+        // Build lookup: company_name -> { total_current, total_prior }
+        var byCompany = {};
         var byEntity = {};
-        data.groups.forEach(function(g) { byEntity[g.name] = g; });
+        data.groups.forEach(function(g) {
+          byEntity[g.name] = g;
+          g.accounts.forEach(function(a) {
+            if (!byCompany[a.company_name]) byCompany[a.company_name] = { current: 0, prior: 0 };
+            byCompany[a.company_name].current += a.current_balance;
+            byCompany[a.company_name].prior += a.prior_balance;
+          });
+        });
 
-        var html = '<table><thead><tr><th>Entity</th><th class="val">Balance (USD)</th><th class="val">Prior Week</th><th class="val">Change</th><th class="val">%</th></tr></thead><tbody>';
+        var html = '<div class="date-label">Cash Position as at <strong>' + data.snapshot_date + '</strong> | Prior: ' + data.prior_date + '</div>';
+        html += '<table><thead><tr><th>Entity / Company</th><th class="val">Balance (USD)</th><th class="val">Prior Week</th><th class="val">Change</th><th class="val">%</th></tr></thead><tbody>';
 
-        var grandTotal = 0, grandPrior = 0;
+        var grandCur = 0, grandPrior = 0;
 
         LAYOUT.forEach(function(item) {
           if (item.type === 'parent') {
             html += '<tr class="parent-row"><td colspan="5">' + item.name + '</td></tr>';
+
           } else if (item.type === 'entity') {
+            // Entity total row
             var g = byEntity[item.key];
-            var cur = g ? g.total_current : 0;
-            var prior = g ? g.total_prior : 0;
-            html += entityRow(item.label, cur, prior);
-            grandTotal += cur;
-            grandPrior += prior;
+            var eCur = g ? g.total_current : 0;
+            var ePrior = g ? g.total_prior : 0;
+            html += row(item.label, eCur, ePrior, 'subtotal-row');
+            grandCur += eCur;
+            grandPrior += ePrior;
+
+            // Individual company rows
+            if (item.companies) {
+              item.companies.forEach(function(cName) {
+                var c = byCompany[cName];
+                if (c && Math.abs(c.current) > 0.5) {
+                  html += row(cName, c.current, c.prior, 'company-row');
+                }
+              });
+            }
+
           } else if (item.type === 'manual') {
-            html += entityRow(item.label, item.value, item.value);
+            html += row(item.label, item.value, item.value, 'company-row');
+            grandCur += item.value;
+            grandPrior += item.value;
+
           } else if (item.type === 'subtotal') {
-            var cur = (item.manualAdd || 0);
-            var prior = (item.manualAdd || 0);
+            var cur = item.manualAdd || 0;
+            var prior = item.manualAdd || 0;
             (item.keys || []).forEach(function(k) {
               var g = byEntity[k];
               if (g) { cur += g.total_current; prior += g.total_prior; }
             });
-            html += entityRow(item.label, cur, prior, 'subtotal-row');
+            html += row(item.label, cur, prior, 'subtotal-row');
           }
         });
 
-        html += entityRow('Grand Total', grandTotal, grandPrior, 'grand-row');
+        html += row('Grand Total', grandCur, grandPrior, 'grand-row');
         html += '</tbody></table>';
-        html += '<div class="info-bar">Snapshot: ' + data.snapshot_date + ' | Prior: ' + data.prior_date + '</div>';
-
         el.innerHTML = html;
       } catch (err) {
         el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
       }
     }
-
     loadAll();
   </script>
 </body>
