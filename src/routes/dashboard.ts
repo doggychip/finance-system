@@ -176,9 +176,11 @@ export function dashboardRoutes(db: Database.Database): Router {
     const reach = owRows.filter(r => companyToGroup[r.company_id] === 'Reach');
     const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
 
-    // Non-OW Total cash = Odoo entities + Xterio Foundation manual (5,942,149)
+    // Non-OW Total "Cash" = bank accounts only (100xxx codes) + Xterio Foundation
+    // This excludes Digital Token (10Wxxx) — matches the "Cash" sub-line in consolidated BS
+    const nonOWBankCash = nonOWRows.filter((r: any) => r.code.startsWith('100')).reduce((s: number, r: any) => s + r.balance, 0);
     const xterioFoundationCash = 5942149;
-    const nonOWCash = sum(nonOWRows) + xterioFoundationCash;
+    const nonOWCash = nonOWBankCash + xterioFoundationCash;
 
     res.json({
       cash: { accounts: cash, total: sum(cash) },
