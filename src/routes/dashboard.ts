@@ -690,7 +690,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             'PAYABLES': 0, 'A_300030': 0,
             'NON_CURRENT_LIABILITIES': 1204636,
             'A_300040': 0, 'A_300050': 0, 'A_303030': 1204636,
-            'EQUITY_RETAINED': -33889064,
+            'EQUITY_RETAINED': -33889064 + 38452916,  // Accumulate P/L + Share Capitals
             'CURRENT_YEAR_PL': 12831,
           };
 
