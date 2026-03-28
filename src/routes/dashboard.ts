@@ -1525,11 +1525,19 @@ export function dashboardRoutes(db: Database.Database): Router {
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
     const xterioFoundationCash = 5942149;
 
-    // Current cash by entity group
+    // Current cash by entity group (ALL asset_cash for chart)
     const cashRows = db.prepare(`
       SELECT company_id, SUM(balance) as cash
       FROM account_balances
       WHERE snapshot_date = ? AND account_type = 'asset_cash'
+      GROUP BY company_id
+    `).all(currentSnap) as any[];
+
+    // Bank-only cash (100xxx codes) for Non-OW hero number
+    const bankCashRows = db.prepare(`
+      SELECT company_id, SUM(balance) as cash
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type = 'asset_cash' AND account_code LIKE '100%'
       GROUP BY company_id
     `).all(currentSnap) as any[];
 
@@ -1539,26 +1547,35 @@ export function dashboardRoutes(db: Database.Database): Router {
     for (const r of cashRows) {
       const group = companyToGroup[r.company_id] || 'Other';
       groupCash[group] = (groupCash[group] || 0) + r.cash;
-      if (nonOWGroups.has(group)) {
-        // Only bank accounts (we'd need code prefix but approximate here)
-        nonOWCashBank += r.cash;
-      }
       if (owGroups.has(group)) owCash += r.cash;
+    }
+    for (const r of bankCashRows) {
+      const group = companyToGroup[r.company_id] || 'Other';
+      if (nonOWGroups.has(group)) nonOWCashBank += r.cash;
     }
 
     // Prior cash
     let priorNonOWCash = 0;
     let priorOWCash = 0;
     if (priorSnap) {
-      const priorRows = db.prepare(`
+      const priorBankRows = db.prepare(`
+        SELECT company_id, SUM(balance) as cash
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type = 'asset_cash' AND account_code LIKE '100%'
+        GROUP BY company_id
+      `).all(priorSnap) as any[];
+      for (const r of priorBankRows) {
+        const group = companyToGroup[r.company_id] || 'Other';
+        if (nonOWGroups.has(group)) priorNonOWCash += r.cash;
+      }
+      const priorOWRows = db.prepare(`
         SELECT company_id, SUM(balance) as cash
         FROM account_balances
         WHERE snapshot_date = ? AND account_type = 'asset_cash'
         GROUP BY company_id
       `).all(priorSnap) as any[];
-      for (const r of priorRows) {
+      for (const r of priorOWRows) {
         const group = companyToGroup[r.company_id] || 'Other';
-        if (nonOWGroups.has(group)) priorNonOWCash += r.cash;
         if (owGroups.has(group)) priorOWCash += r.cash;
       }
     }
