@@ -67,6 +67,7 @@
     .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
   </style>
   <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
 </head>
 <body>
   <div class="header">
@@ -83,19 +84,8 @@
     </div>
   </div>
 
-  <!-- Login -->
-  <div id="loginView" class="container">
-    <div class="login-box">
-      <h2>Login</h2>
-      <select id="loginUser"></select>
-      <input type="password" id="loginPass" placeholder="Password" value="finance123">
-      <button onclick="login()">Login</button>
-      <div id="loginError" style="color:var(--red);font-size:12px;margin-top:8px"></div>
-    </div>
-  </div>
-
   <!-- Main -->
-  <div id="mainView" class="container" style="display:none">
+  <div id="mainView" class="container">
     <div class="stats" id="statsRow"></div>
 
     <div class="controls">
@@ -171,32 +161,24 @@
   </div>
 
   <script>
-    var currentUser = null;
+    var currentUser = getUser();
     var users = [];
 
     function today() { return new Date().toISOString().slice(0,10); }
 
     async function loadUsers() {
       users = await (await fetch('/api/tasks/users')).json();
-      var sel = document.getElementById('loginUser');
       var filter = document.getElementById('filterUser');
       var assign = document.getElementById('taskAssign');
-      sel.innerHTML = users.map(function(u) { return '<option value="' + u.username + '">' + u.display_name + '</option>'; }).join('');
       filter.innerHTML = '<option value="">All Users</option>' + users.map(function(u) { return '<option value="' + u.id + '">' + u.display_name + '</option>'; }).join('');
       assign.innerHTML = users.map(function(u) { return '<option value="' + u.id + '">' + u.display_name + '</option>'; }).join('');
     }
 
-    async function login() {
-      var username = document.getElementById('loginUser').value;
-      var password = document.getElementById('loginPass').value;
-      var res = await fetch('/api/tasks/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-      if (!res.ok) { document.getElementById('loginError').textContent = 'Invalid credentials'; return; }
-      currentUser = await res.json();
-      document.getElementById('loginView').style.display = 'none';
-      document.getElementById('mainView').style.display = 'block';
+    function initTasks() {
+      currentUser = getUser();
+      if (!currentUser) return;
       loadTasks();
       loadSummary();
-      // Show user management for admins
       if (currentUser.role === 'admin') {
         document.getElementById('userMgmt').style.display = 'block';
         loadUserList();
@@ -335,7 +317,7 @@
       loadTasks(); loadSummary();
     }
 
-    loadUsers();
+    loadUsers().then(function() { initTasks(); });
   </script>
 <script src="/chat-widget.js"></script>
 </body>

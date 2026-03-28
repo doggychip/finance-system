@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 48px 40px; width: 400px; text-align: center; }
+    .login-box h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .login-box p { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
+    .login-box label { display: block; text-align: left; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; margin-top: 14px; }
+    .login-box select, .login-box input { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 14px; }
+    .login-box select:focus, .login-box input:focus { outline: none; border-color: var(--accent); }
+    .login-box button { width: 100%; padding: 14px; border-radius: 8px; border: none; background: var(--accent); color: white; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 24px; }
+    .login-box button:hover { opacity: 0.9; }
+    .error { color: var(--red); font-size: 12px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h1>Finance Dashboard</h1>
+    <p>Sign in to continue</p>
+    <label>User</label>
+    <select id="loginUser"></select>
+    <label>Password</label>
+    <input type="password" id="loginPass" placeholder="Enter password">
+    <button onclick="login()">Sign In</button>
+    <div class="error" id="loginError"></div>
+  </div>
+
+  <script>
+    // If already logged in, redirect
+    try {
+      var u = JSON.parse(localStorage.getItem('finance_user'));
+      if (u && u.id) window.location.href = '/';
+    } catch(e) {}
+
+    async function loadUsers() {
+      var users = await (await fetch('/api/tasks/users')).json();
+      var sel = document.getElementById('loginUser');
+      sel.innerHTML = users.map(function(u) {
+        return '<option value="' + u.username + '">' + u.display_name + ' (' + u.username + ')</option>';
+      }).join('');
+    }
+
+    async function login() {
+      var username = document.getElementById('loginUser').value;
+      var password = document.getElementById('loginPass').value;
+      if (!password) { document.getElementById('loginError').textContent = 'Enter password'; return; }
+
+      var res = await fetch('/api/tasks/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password })
+      });
+
+      if (!res.ok) {
+        document.getElementById('loginError').textContent = 'Invalid credentials';
+        return;
+      }
+
+      var user = await res.json();
+      localStorage.setItem('finance_user', JSON.stringify(user));
+      window.location.href = '/';
+    }
+
+    document.getElementById('loginPass').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') login();
+    });
+
+    loadUsers();
+  </script>
+</body>
+</html>
