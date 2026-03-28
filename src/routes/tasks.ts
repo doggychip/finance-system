@@ -18,6 +18,40 @@ export function taskRoutes(db: Database.Database): Router {
     res.json(users);
   });
 
+  // Add user
+  router.post('/users', (req, res) => {
+    const { username, password, display_name, role } = req.body;
+    if (!username || !password || !display_name) return res.status(400).json({ error: 'Username, password, and display name required' });
+    try {
+      db.prepare('INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)').run(username, password, display_name, role || 'finance');
+      const user = db.prepare('SELECT id, username, display_name, role FROM users WHERE username = ?').get(username);
+      res.status(201).json(user);
+    } catch (e: any) {
+      res.status(400).json({ error: 'Username already exists' });
+    }
+  });
+
+  // Update user (change password or display name)
+  router.patch('/users/:id', (req, res) => {
+    const id = parseInt(req.params.id);
+    const { password, display_name } = req.body;
+    const updates: string[] = [];
+    const values: any[] = [];
+    if (password) { updates.push('password = ?'); values.push(password); }
+    if (display_name) { updates.push('display_name = ?'); values.push(display_name); }
+    if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    values.push(id);
+    db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    const user = db.prepare('SELECT id, username, display_name, role FROM users WHERE id = ?').get(id);
+    res.json(user);
+  });
+
+  // Delete user
+  router.delete('/users/:id', (req, res) => {
+    db.prepare('DELETE FROM users WHERE id = ?').run(parseInt(req.params.id));
+    res.json({ ok: true });
+  });
+
   // List tasks
   router.get('/tasks', (req, res) => {
     const userId = req.query.user_id as string | undefined;

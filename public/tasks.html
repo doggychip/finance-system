@@ -109,6 +109,22 @@
     </div>
 
     <ul class="task-list" id="taskList"></ul>
+
+    <!-- User Management (admin only) -->
+    <div id="userMgmt" style="display:none;margin-top:32px">
+      <h2 style="font-size:16px;margin-bottom:14px;border-top:1px solid var(--border);padding-top:20px">User Management</h2>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <input id="newUsername" placeholder="Username" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px">
+        <input id="newDisplayName" placeholder="Display Name" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px">
+        <input id="newPassword" placeholder="Password" type="password" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px">
+        <select id="newRole" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px">
+          <option value="finance">Finance</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button class="btn btn-add" onclick="addUser()">Add User</button>
+      </div>
+      <ul class="task-list" id="userList"></ul>
+    </div>
   </div>
 
   <!-- New/Edit Task Modal -->
@@ -178,6 +194,48 @@
       document.getElementById('mainView').style.display = 'block';
       loadTasks();
       loadSummary();
+      // Show user management for admins
+      if (currentUser.role === 'admin') {
+        document.getElementById('userMgmt').style.display = 'block';
+        loadUserList();
+      }
+    }
+
+    async function loadUserList() {
+      var list = document.getElementById('userList');
+      list.innerHTML = users.map(function(u) {
+        return '<li class="task-item"><div class="task-body"><div class="task-title">' + u.display_name + '</div><div class="task-meta"><span>@' + u.username + '</span><span>' + u.role + '</span></div></div><div class="task-actions"><button onclick="resetPassword(' + u.id + ')" title="Reset Password">🔑</button><button onclick="deleteUser(' + u.id + ')" title="Delete">🗑️</button></div></li>';
+      }).join('');
+    }
+
+    async function addUser() {
+      var username = document.getElementById('newUsername').value.trim();
+      var displayName = document.getElementById('newDisplayName').value.trim();
+      var password = document.getElementById('newPassword').value;
+      var role = document.getElementById('newRole').value;
+      if (!username || !displayName || !password) return alert('Fill in all fields');
+      var res = await fetch('/api/tasks/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: username, display_name: displayName, password: password, role: role }) });
+      if (!res.ok) { var err = await res.json(); alert(err.error || 'Failed'); return; }
+      document.getElementById('newUsername').value = '';
+      document.getElementById('newDisplayName').value = '';
+      document.getElementById('newPassword').value = '';
+      await loadUsers();
+      loadUserList();
+    }
+
+    async function resetPassword(id) {
+      var newPass = prompt('Enter new password:');
+      if (!newPass) return;
+      await fetch('/api/tasks/users/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: newPass }) });
+      alert('Password updated');
+    }
+
+    async function deleteUser(id) {
+      if (id === currentUser.id) return alert('Cannot delete yourself');
+      if (!confirm('Delete this user?')) return;
+      await fetch('/api/tasks/users/' + id, { method: 'DELETE' });
+      await loadUsers();
+      loadUserList();
     }
 
     async function loadSummary() {
