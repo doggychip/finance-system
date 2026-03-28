@@ -1,28 +1,29 @@
-// Floating AI Chat Widget
+// AI Chat Sidebar Widget
 (function() {
-  // Create styles
   var style = document.createElement('style');
   style.textContent = `
-    #chat-toggle { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: #6366f1; border: none; color: white; font-size: 24px; cursor: pointer; box-shadow: 0 4px 20px rgba(99,102,241,0.4); z-index: 9999; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-    #chat-toggle:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(99,102,241,0.6); }
-    #chat-panel { position: fixed; bottom: 90px; right: 24px; width: 420px; max-height: 560px; background: #1a1d27; border: 1px solid #2e3344; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); z-index: 9998; display: none; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
-    #chat-panel.open { display: flex; }
-    #chat-header { padding: 14px 18px; background: #232734; border-bottom: 1px solid #2e3344; display: flex; justify-content: space-between; align-items: center; }
-    #chat-header h3 { font-size: 14px; font-weight: 600; color: #e4e6ef; margin: 0; }
-    #chat-header button { background: none; border: none; color: #8b8fa3; cursor: pointer; font-size: 18px; padding: 4px; }
-    #chat-messages { flex: 1; overflow-y: auto; padding: 14px 18px; min-height: 300px; max-height: 400px; }
-    .chat-msg { margin-bottom: 14px; }
+    #chat-toggle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); width: 32px; height: 80px; border-radius: 8px 0 0 8px; background: #6366f1; border: none; color: white; font-size: 16px; cursor: pointer; z-index: 9998; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-weight: 600; font-size: 11px; letter-spacing: 1px; box-shadow: -2px 0 10px rgba(99,102,241,0.3); }
+    #chat-toggle:hover { width: 36px; background: #5558e6; }
+    #chat-toggle.open { display: none; }
+    #chat-sidebar { position: fixed; top: 0; right: -400px; width: 400px; height: 100vh; background: #1a1d27; border-left: 1px solid #2e3344; z-index: 9999; display: flex; flex-direction: column; transition: right 0.3s ease; box-shadow: -4px 0 20px rgba(0,0,0,0.4); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+    #chat-sidebar.open { right: 0; }
+    #chat-sidebar-header { padding: 16px 20px; background: #232734; border-bottom: 1px solid #2e3344; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    #chat-sidebar-header h3 { font-size: 15px; font-weight: 600; color: #e4e6ef; margin: 0; }
+    #chat-sidebar-header button { background: none; border: 1px solid #2e3344; border-radius: 6px; color: #8b8fa3; cursor: pointer; font-size: 18px; padding: 4px 10px; }
+    #chat-sidebar-header button:hover { background: #2e3344; color: #e4e6ef; }
+    #chat-messages { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .chat-msg { margin-bottom: 16px; }
     .chat-msg.user { text-align: right; }
-    .chat-msg .bubble { display: inline-block; max-width: 85%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; text-align: left; white-space: pre-wrap; }
+    .chat-msg .bubble { display: inline-block; max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; text-align: left; white-space: pre-wrap; word-wrap: break-word; }
     .chat-msg.user .bubble { background: #6366f1; color: white; border-bottom-right-radius: 4px; }
     .chat-msg.ai .bubble { background: #232734; color: #e4e6ef; border: 1px solid #2e3344; border-bottom-left-radius: 4px; }
     .chat-msg.ai .bubble strong { color: #22c55e; }
     .chat-msg .time { font-size: 10px; color: #8b8fa3; margin-top: 4px; }
-    #chat-input-wrap { padding: 12px 18px; border-top: 1px solid #2e3344; display: flex; gap: 8px; }
-    #chat-input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #2e3344; background: #0f1117; color: #e4e6ef; font-size: 13px; outline: none; }
+    #chat-input-wrap { padding: 14px 20px; border-top: 1px solid #2e3344; display: flex; gap: 8px; flex-shrink: 0; background: #1a1d27; }
+    #chat-input { flex: 1; padding: 12px 14px; border-radius: 8px; border: 1px solid #2e3344; background: #0f1117; color: #e4e6ef; font-size: 13px; outline: none; }
     #chat-input:focus { border-color: #6366f1; }
     #chat-input::placeholder { color: #8b8fa3; }
-    #chat-send { padding: 10px 18px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
+    #chat-send { padding: 12px 20px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
     #chat-send:hover { opacity: 0.9; }
     #chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
     .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #8b8fa3; margin: 0 2px; animation: bounce 1.4s infinite; }
@@ -32,40 +33,41 @@
   `;
   document.head.appendChild(style);
 
-  // Create toggle button
+  // Toggle tab
   var toggle = document.createElement('button');
   toggle.id = 'chat-toggle';
-  toggle.innerHTML = '💬';
+  toggle.textContent = 'AI';
   toggle.title = 'Ask AI about your finances';
   document.body.appendChild(toggle);
 
-  // Create chat panel
-  var panel = document.createElement('div');
-  panel.id = 'chat-panel';
-  panel.innerHTML = `
-    <div id="chat-header">
+  // Sidebar
+  var sidebar = document.createElement('div');
+  sidebar.id = 'chat-sidebar';
+  sidebar.innerHTML = `
+    <div id="chat-sidebar-header">
       <h3>AI Finance Assistant</h3>
-      <button onclick="document.getElementById('chat-panel').classList.remove('open')">&times;</button>
+      <button onclick="toggleChat()">&times;</button>
     </div>
     <div id="chat-messages">
-      <div class="chat-msg ai"><div class="bubble">Hi! I can answer questions about your financial data. Try asking:\n\n• "What's the total cash for each entity?"\n• "Compare LTECH vs OW assets"\n• "Which accounts are overdrawn?"\n• "What are the IC balances?"</div></div>
+      <div class="chat-msg ai"><div class="bubble">Hi! I can answer questions about your financial data. Try asking:\n\n• "What's the total cash for each entity?"\n• "Compare LTECH vs OW assets"\n• "Which accounts are overdrawn?"\n• "What are the IC balances?"\n• "What's our runway?"</div></div>
     </div>
     <div id="chat-input-wrap">
       <input id="chat-input" placeholder="Ask about your finances..." autocomplete="off">
       <button id="chat-send" onclick="sendChat()">Send</button>
     </div>
   `;
-  document.body.appendChild(panel);
+  document.body.appendChild(sidebar);
 
-  // Toggle
-  toggle.addEventListener('click', function() {
-    panel.classList.toggle('open');
-    if (panel.classList.contains('open')) {
+  window.toggleChat = function() {
+    sidebar.classList.toggle('open');
+    toggle.classList.toggle('open');
+    if (sidebar.classList.contains('open')) {
       document.getElementById('chat-input').focus();
     }
-  });
+  };
 
-  // Enter key
+  toggle.addEventListener('click', window.toggleChat);
+
   document.getElementById('chat-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
   });
@@ -78,12 +80,10 @@
     var messages = document.getElementById('chat-messages');
     var sendBtn = document.getElementById('chat-send');
 
-    // Add user message
     messages.innerHTML += '<div class="chat-msg user"><div class="bubble">' + escapeHtml(question) + '</div></div>';
     input.value = '';
     sendBtn.disabled = true;
 
-    // Add typing indicator
     messages.innerHTML += '<div class="chat-msg ai" id="typing"><div class="bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>';
     messages.scrollTop = messages.scrollHeight;
 
@@ -95,7 +95,6 @@
       });
       var data = await res.json();
 
-      // Remove typing indicator
       var typing = document.getElementById('typing');
       if (typing) typing.remove();
 
@@ -120,10 +119,8 @@
   }
 
   function formatAnswer(text) {
-    // Bold **text**
     text = escapeHtml(text);
     text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    // Currency highlighting
     text = text.replace(/\$[\d,]+(\.\d+)?/g, '<strong>$&</strong>');
     return text;
   }
