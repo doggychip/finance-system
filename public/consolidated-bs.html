@@ -109,7 +109,7 @@
     </div>
     <div class="actions" style="display:flex;gap:8px;align-items:center">
       <label style="font-size:12px;color:#8b8fa3">As of:</label>
-      <input type="date" id="asOfDate" value="2026-02-28" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
       <button class="btn" onclick="loadData()">Apply</button>
     </div>
   </div>
@@ -141,7 +141,7 @@
     async function loadData() {
       var el = document.getElementById('content');
       try {
-        var asOf = document.getElementById('asOfDate').value || '2026-02-28';
+        var asOf = document.getElementById('asOfDate').value || '';
         var res = await fetch('/api/dashboard/consolidated-bs?as_of_date=' + asOf);
         var data = await res.json();
 
