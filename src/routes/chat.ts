@@ -137,6 +137,40 @@ export function chatRoutes(db: Database.Database): Router {
         }
       }
 
+      // Historical cash balances across all snapshots
+      const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
+      context += `\nHistorical Cash Balances by Snapshot Date:\n`;
+      for (const s of allSnaps) {
+        const cashTotal = db.prepare(`
+          SELECT SUM(balance) as total FROM account_balances
+          WHERE snapshot_date = ? AND account_type = 'asset_cash'
+        `).get(s.snapshot_date) as any;
+        const bankOnly = db.prepare(`
+          SELECT SUM(balance) as total FROM account_balances
+          WHERE snapshot_date = ? AND account_type = 'asset_cash' AND account_code LIKE '100%'
+        `).get(s.snapshot_date) as any;
+        context += `  ${s.snapshot_date}: Total Cash=$${Math.round(cashTotal?.total || 0).toLocaleString()}, Bank Cash (100xxx)=$${Math.round(bankOnly?.total || 0).toLocaleString()}\n`;
+      }
+
+      // Historical cash by company for each snapshot
+      context += `\nCash by Company per Snapshot:\n`;
+      for (const s of allSnaps) {
+        const rows = db.prepare(`
+          SELECT company_name, SUM(balance) as cash
+          FROM account_balances
+          WHERE snapshot_date = ? AND account_type = 'asset_cash'
+          GROUP BY company_name
+          HAVING ABS(cash) > 1000
+          ORDER BY cash DESC
+        `).all(s.snapshot_date) as any[];
+        if (rows.length > 0) {
+          context += `  ${s.snapshot_date}:\n`;
+          for (const r of rows) {
+            context += `    ${r.company_name}: $${Math.round(r.cash).toLocaleString()}\n`;
+          }
+        }
+      }
+
       const messages = [
         {
           role: 'system',
