@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tasks — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+    /* Login */
+    .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 40px; max-width: 400px; margin: 80px auto; text-align: center; }
+    .login-box h2 { margin-bottom: 20px; }
+    .login-box input, .login-box select { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 14px; margin-bottom: 12px; }
+    .login-box button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--accent); color: white; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+    .stat .num { font-size: 28px; font-weight: 800; }
+    .stat .lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; margin-top: 4px; }
+
+    /* Controls */
+    .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .controls select { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; }
+    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+    .btn-add { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+
+    /* Task list */
+    .task-list { list-style: none; }
+    .task-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 14px; transition: all 0.15s; }
+    .task-item:hover { border-color: var(--accent); }
+    .task-item.done { opacity: 0.5; }
+    .task-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .task-check.checked { background: var(--green); border-color: var(--green); color: white; }
+    .task-body { flex: 1; }
+    .task-title { font-size: 14px; font-weight: 500; }
+    .task-item.done .task-title { text-decoration: line-through; color: var(--text-dim); }
+    .task-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; display: flex; gap: 12px; }
+    .task-actions { display: flex; gap: 6px; }
+    .task-actions button { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 4px; }
+    .task-actions button:hover { color: var(--text); }
+    .priority-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .priority-urgent { background: rgba(239,68,68,0.15); color: var(--red); }
+    .priority-high { background: rgba(249,115,22,0.15); color: #f97316; }
+    .priority-medium { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .priority-low { background: rgba(34,197,94,0.15); color: var(--green); }
+    .overdue { color: var(--red); font-weight: 600; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 460px; max-width: 90vw; }
+    .modal h2 { margin-bottom: 18px; font-size: 18px; }
+    .modal label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; margin-top: 12px; }
+    .modal input, .modal select, .modal textarea { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; }
+    .modal textarea { height: 60px; resize: vertical; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+  </style>
+  <script src="/odoo-links.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Tasks & Reminders</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
+      <a href="/tasks.html" class="active">Tasks</a>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <div id="loginView" class="container">
+    <div class="login-box">
+      <h2>Login</h2>
+      <select id="loginUser"></select>
+      <input type="password" id="loginPass" placeholder="Password" value="finance123">
+      <button onclick="login()">Login</button>
+      <div id="loginError" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="mainView" class="container" style="display:none">
+    <div class="stats" id="statsRow"></div>
+
+    <div class="controls">
+      <select id="filterStatus" onchange="loadTasks()">
+        <option value="">All Status</option>
+        <option value="todo">To Do</option>
+        <option value="in_progress">In Progress</option>
+        <option value="done">Done</option>
+      </select>
+      <select id="filterUser" onchange="loadTasks()"></select>
+      <div style="flex:1"></div>
+      <button class="btn btn-add" onclick="openModal()">+ New Task</button>
+    </div>
+
+    <ul class="task-list" id="taskList"></ul>
+  </div>
+
+  <!-- New/Edit Task Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2 id="modalTitle">New Task</h2>
+      <input type="hidden" id="editId">
+      <label>Title</label>
+      <input id="taskTitle" placeholder="e.g., Reconcile IC balances for March">
+      <label>Description</label>
+      <textarea id="taskDesc" placeholder="Details..."></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label>Due Date</label><input type="date" id="taskDue"></div>
+        <div><label>Priority</label>
+          <select id="taskPriority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label>Assign To</label><select id="taskAssign"></select></div>
+        <div><label>Category</label>
+          <select id="taskCategory">
+            <option value="general">General</option>
+            <option value="reconciliation">Reconciliation</option>
+            <option value="close">Month-End Close</option>
+            <option value="payment">Payment</option>
+            <option value="tax">Tax/GST</option>
+            <option value="audit">Audit</option>
+            <option value="reporting">Reporting</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-add" onclick="saveTask()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var currentUser = null;
+    var users = [];
+
+    function today() { return new Date().toISOString().slice(0,10); }
+
+    async function loadUsers() {
+      users = await (await fetch('/api/tasks/users')).json();
+      var sel = document.getElementById('loginUser');
+      var filter = document.getElementById('filterUser');
+      var assign = document.getElementById('taskAssign');
+      sel.innerHTML = users.map(function(u) { return '<option value="' + u.username + '">' + u.display_name + '</option>'; }).join('');
+      filter.innerHTML = '<option value="">All Users</option>' + users.map(function(u) { return '<option value="' + u.id + '">' + u.display_name + '</option>'; }).join('');
+      assign.innerHTML = users.map(function(u) { return '<option value="' + u.id + '">' + u.display_name + '</option>'; }).join('');
+    }
+
+    async function login() {
+      var username = document.getElementById('loginUser').value;
+      var password = document.getElementById('loginPass').value;
+      var res = await fetch('/api/tasks/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+      if (!res.ok) { document.getElementById('loginError').textContent = 'Invalid credentials'; return; }
+      currentUser = await res.json();
+      document.getElementById('loginView').style.display = 'none';
+      document.getElementById('mainView').style.display = 'block';
+      loadTasks();
+      loadSummary();
+    }
+
+    async function loadSummary() {
+      var data = await (await fetch('/api/tasks/summary?user_id=' + currentUser.id)).json();
+      document.getElementById('statsRow').innerHTML =
+        '<div class="stat"><div class="num" style="color:var(--yellow)">' + data.todo + '</div><div class="lbl">To Do</div></div>' +
+        '<div class="stat"><div class="num" style="color:var(--blue)">' + data.in_progress + '</div><div class="lbl">In Progress</div></div>' +
+        '<div class="stat"><div class="num" style="color:var(--green)">' + data.done + '</div><div class="lbl">Done</div></div>' +
+        '<div class="stat"><div class="num" style="color:var(--red)">' + data.overdue + '</div><div class="lbl">Overdue</div></div>' +
+        '<div class="stat"><div class="num">' + data.due_today + '</div><div class="lbl">Due Today</div></div>' +
+        '<div class="stat"><div class="num" style="color:var(--red)">' + data.urgent + '</div><div class="lbl">Urgent</div></div>';
+    }
+
+    async function loadTasks() {
+      var status = document.getElementById('filterStatus').value;
+      var userId = document.getElementById('filterUser').value;
+      var url = '/api/tasks/tasks?';
+      if (status) url += 'status=' + status + '&';
+      if (userId) url += 'user_id=' + userId;
+      var tasks = await (await fetch(url)).json();
+      var list = document.getElementById('taskList');
+      if (tasks.length === 0) { list.innerHTML = '<li style="text-align:center;padding:40px;color:var(--text-dim)">No tasks. Click "+ New Task" to create one.</li>'; return; }
+      list.innerHTML = tasks.map(function(t) {
+        var isDone = t.status === 'done';
+        var isOverdue = !isDone && t.due_date && t.due_date < today();
+        return '<li class="task-item ' + (isDone ? 'done' : '') + '">' +
+          '<div class="task-check ' + (isDone ? 'checked' : '') + '" onclick="toggleTask(' + t.id + ',\'' + (isDone ? 'todo' : 'done') + '\')">' + (isDone ? '✓' : '') + '</div>' +
+          '<div class="task-body">' +
+            '<div class="task-title">' + t.title + '</div>' +
+            '<div class="task-meta">' +
+              '<span class="priority-badge priority-' + t.priority + '">' + t.priority + '</span>' +
+              (t.due_date ? '<span class="' + (isOverdue ? 'overdue' : '') + '">Due: ' + t.due_date + (isOverdue ? ' ⚠️' : '') + '</span>' : '') +
+              '<span>' + (t.assigned_name || 'Unassigned') + '</span>' +
+              '<span>' + t.category + '</span>' +
+            '</div>' +
+            (t.description ? '<div style="font-size:12px;color:var(--text-dim);margin-top:4px">' + t.description + '</div>' : '') +
+          '</div>' +
+          '<div class="task-actions">' +
+            '<button onclick="editTask(' + t.id + ')" title="Edit">✏️</button>' +
+            '<button onclick="deleteTask(' + t.id + ')" title="Delete">🗑️</button>' +
+          '</div>' +
+        '</li>';
+      }).join('');
+    }
+
+    async function toggleTask(id, newStatus) {
+      await fetch('/api/tasks/tasks/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
+      loadTasks(); loadSummary();
+    }
+
+    async function deleteTask(id) {
+      if (!confirm('Delete this task?')) return;
+      await fetch('/api/tasks/tasks/' + id, { method: 'DELETE' });
+      loadTasks(); loadSummary();
+    }
+
+    function openModal(task) {
+      document.getElementById('modal').classList.add('open');
+      document.getElementById('modalTitle').textContent = task ? 'Edit Task' : 'New Task';
+      document.getElementById('editId').value = task ? task.id : '';
+      document.getElementById('taskTitle').value = task ? task.title : '';
+      document.getElementById('taskDesc').value = task ? (task.description || '') : '';
+      document.getElementById('taskDue').value = task ? (task.due_date || '') : '';
+      document.getElementById('taskPriority').value = task ? task.priority : 'medium';
+      document.getElementById('taskAssign').value = task ? (task.assigned_to || currentUser.id) : currentUser.id;
+      document.getElementById('taskCategory').value = task ? task.category : 'general';
+    }
+
+    function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+    async function editTask(id) {
+      var tasks = await (await fetch('/api/tasks/tasks')).json();
+      var task = tasks.find(function(t) { return t.id === id; });
+      if (task) openModal(task);
+    }
+
+    async function saveTask() {
+      var id = document.getElementById('editId').value;
+      var body = {
+        title: document.getElementById('taskTitle').value,
+        description: document.getElementById('taskDesc').value,
+        due_date: document.getElementById('taskDue').value || null,
+        priority: document.getElementById('taskPriority').value,
+        assigned_to: parseInt(document.getElementById('taskAssign').value),
+        category: document.getElementById('taskCategory').value,
+        created_by: currentUser.id,
+      };
+      if (!body.title) return alert('Title is required');
+      if (id) {
+        await fetch('/api/tasks/tasks/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } else {
+        await fetch('/api/tasks/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      closeModal();
+      loadTasks(); loadSummary();
+    }
+
+    loadUsers();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

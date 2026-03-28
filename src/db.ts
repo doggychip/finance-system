@@ -135,6 +135,39 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_ab_company_snapshot ON account_balances(company_id, snapshot_date);
     CREATE INDEX IF NOT EXISTS idx_ab_snapshot ON account_balances(snapshot_date);
+
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      role TEXT DEFAULT 'finance',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      due_date TEXT,
+      priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'urgent')),
+      status TEXT DEFAULT 'todo' CHECK(status IN ('todo', 'in_progress', 'done', 'cancelled')),
+      category TEXT DEFAULT 'general',
+      assigned_to INTEGER REFERENCES users(id),
+      created_by INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+
+    -- Seed default users if empty
+    INSERT OR IGNORE INTO users (username, password, display_name, role) VALUES
+      ('ryan', 'finance123', 'Ryan Cheung', 'admin'),
+      ('finance1', 'finance123', 'Finance Team 1', 'finance'),
+      ('finance2', 'finance123', 'Finance Team 2', 'finance');
   `);
 
   return db;
