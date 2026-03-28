@@ -1506,5 +1506,138 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(snaps);
   });
 
+  // Executive summary for CEO dashboard
+  router.get('/executive-summary', (_req, res) => {
+    // Find latest and prior snapshots
+    const snaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 2`).all() as any[];
+    const currentSnap = snaps[0]?.snapshot_date;
+    const priorSnap = snaps[1]?.snapshot_date;
+    if (!currentSnap) return res.json({});
+
+    // Company to group mapping
+    const companyToGroup: Record<number, string> = {};
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal || g.is_manual) continue;
+      for (const cid of g.company_ids) companyToGroup[cid] = g.name;
+    }
+
+    const nonOWGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
+    const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
+    const xterioFoundationCash = 5942149;
+
+    // Current cash by entity group
+    const cashRows = db.prepare(`
+      SELECT company_id, SUM(balance) as cash
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type = 'asset_cash'
+      GROUP BY company_id
+    `).all(currentSnap) as any[];
+
+    const groupCash: Record<string, number> = {};
+    let nonOWCashBank = 0;
+    let owCash = 0;
+    for (const r of cashRows) {
+      const group = companyToGroup[r.company_id] || 'Other';
+      groupCash[group] = (groupCash[group] || 0) + r.cash;
+      if (nonOWGroups.has(group)) {
+        // Only bank accounts (we'd need code prefix but approximate here)
+        nonOWCashBank += r.cash;
+      }
+      if (owGroups.has(group)) owCash += r.cash;
+    }
+
+    // Prior cash
+    let priorNonOWCash = 0;
+    let priorOWCash = 0;
+    if (priorSnap) {
+      const priorRows = db.prepare(`
+        SELECT company_id, SUM(balance) as cash
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type = 'asset_cash'
+        GROUP BY company_id
+      `).all(priorSnap) as any[];
+      for (const r of priorRows) {
+        const group = companyToGroup[r.company_id] || 'Other';
+        if (nonOWGroups.has(group)) priorNonOWCash += r.cash;
+        if (owGroups.has(group)) priorOWCash += r.cash;
+      }
+    }
+
+    // Monthly burn (from current snapshot — sum of expense types)
+    const burnRow = db.prepare(`
+      SELECT SUM(ABS(balance)) as burn FROM account_balances
+      WHERE snapshot_date = ? AND account_type IN ('expense', 'expense_direct_cost')
+    `).get(currentSnap) as any;
+    // Approximate monthly burn from all-time expenses / months of data
+    const entryDates = db.prepare(`SELECT MIN(date) as first, MAX(date) as last FROM journal_entries WHERE status = 'posted'`).get() as any;
+    let monthlyBurn = 0;
+    if (entryDates.first && entryDates.last) {
+      const firstDate = new Date(entryDates.first);
+      const lastDate = new Date(entryDates.last);
+      const months = Math.max(1, (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + lastDate.getMonth() - firstDate.getMonth());
+      monthlyBurn = (burnRow?.burn || 0) / months;
+    }
+
+    const nonOWTotal = nonOWCashBank + xterioFoundationCash;
+    const runway = monthlyBurn > 0 ? Math.round(nonOWTotal / monthlyBurn) : null;
+
+    // Overdrawn accounts (alerts)
+    const overdrawn = db.prepare(`
+      SELECT company_name, account_code, account_name, balance
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type = 'asset_cash' AND balance < -1000
+      ORDER BY balance ASC LIMIT 10
+    `).all(currentSnap) as any[];
+
+    // IC imbalances
+    const icImbalances = db.prepare(`
+      SELECT account_code, account_name, SUM(balance) as net
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_code LIKE '303%'
+      GROUP BY account_code, account_name
+      HAVING ABS(net) > 10000
+      ORDER BY ABS(net) DESC LIMIT 5
+    `).all(currentSnap) as any[];
+
+    // Cash by entity group for chart
+    const entityCash: any[] = [];
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal || g.is_manual) continue;
+      const cash = groupCash[g.name] || 0;
+      if (Math.abs(cash) > 100) {
+        entityCash.push({ name: g.name, cash });
+      }
+    }
+    entityCash.sort((a, b) => b.cash - a.cash);
+
+    // Cash trend from snapshots
+    const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
+    const cashTrend = allSnaps.map((s: any) => {
+      const row = db.prepare(`
+        SELECT SUM(CASE WHEN company_id IN (${Array.from(nonOWGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as non_ow,
+               SUM(CASE WHEN company_id IN (${Array.from(owGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as ow
+        FROM account_balances WHERE snapshot_date = ? AND account_type = 'asset_cash'
+      `).get(s.snapshot_date) as any;
+      return { date: s.snapshot_date, non_ow: (row?.non_ow || 0) + xterioFoundationCash, ow: row?.ow || 0 };
+    });
+
+    res.json({
+      snapshot_date: currentSnap,
+      prior_date: priorSnap,
+      non_ow_cash: nonOWTotal,
+      non_ow_cash_prior: priorNonOWCash + xterioFoundationCash,
+      ow_cash: owCash,
+      ow_cash_prior: priorOWCash,
+      monthly_burn: monthlyBurn,
+      runway_months: runway,
+      entity_cash: entityCash,
+      cash_trend: cashTrend,
+      alerts: {
+        overdrawn,
+        ic_imbalances: icImbalances,
+      },
+    });
+  });
+
   return router;
 }
