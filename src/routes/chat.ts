@@ -46,6 +46,7 @@ export function chatRoutes(db: Database.Database): Router {
   const router = Router();
 
   router.post('/ask', async (req, res) => {
+    console.log('[chat] Received question:', req.body?.question?.slice(0, 50));
     const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'DEEPSEEK_API_KEY not set' });
 
@@ -53,9 +54,11 @@ export function chatRoutes(db: Database.Database): Router {
     if (!question) return res.status(400).json({ error: 'No question provided' });
 
     try {
+      console.log('[chat] Building context...');
       // Get latest snapshot
       const snap = db.prepare('SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1').get() as any;
       const snapDate = snap?.snapshot_date || 'unknown';
+      console.log('[chat] Using snapshot:', snapDate);
 
       // Build financial context
       const companies = db.prepare(`
@@ -142,9 +145,12 @@ export function chatRoutes(db: Database.Database): Router {
         { role: 'user', content: question }
       ];
 
+      console.log('[chat] Calling DeepSeek API...');
       const answer = await queryDeepSeek(messages, apiKey);
+      console.log('[chat] Got response, length:', answer.length);
       res.json({ answer, snapshot_date: snapDate });
     } catch (err: any) {
+      console.error('[chat] Error:', err.message);
       res.status(500).json({ error: err.message || 'Unknown error' });
     }
   });
