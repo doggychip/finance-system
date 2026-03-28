@@ -1351,8 +1351,9 @@ export function dashboardRoutes(db: Database.Database): Router {
       const groups = Object.entries(byGroup).map(([name, accs]) => ({
         name,
         accounts: accs,
-        total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
-        total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
+        total_current: accs.filter((a: any) => a.code.startsWith('100')).reduce((s: number, a: any) => s + a.current_balance, 0),
+        total_prior: accs.filter((a: any) => a.code.startsWith('100')).reduce((s: number, a: any) => s + a.prior_balance, 0),
+        total_all: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
       }));
 
       groups.sort((a, b) => Math.abs(b.total_current) - Math.abs(a.total_current));
