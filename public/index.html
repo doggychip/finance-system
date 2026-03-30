@@ -115,22 +115,6 @@
       <div class="health-meta" id="healthMeta"></div>
     </div>
 
-    <!-- Alerts Section -->
-    <div class="grid-2" style="margin-bottom:24px">
-      <div class="card">
-        <h2>Overdrawn Accounts</h2>
-        <div id="overdrawnAlerts"><div class="loading">Loading...</div></div>
-      </div>
-      <div class="card">
-        <h2>IC Imbalances</h2>
-        <div id="icAlerts"><div class="loading">Loading...</div></div>
-      </div>
-    </div>
-    <div class="card" style="margin-bottom:24px">
-      <h2>Active Alerts</h2>
-      <div id="dbAlerts"><div class="loading">Loading...</div></div>
-    </div>
-
     <!-- Cash Overview -->
     <div class="cash-overview">
       <h2>Cash Overview</h2>
@@ -157,6 +141,12 @@
         </div>
       </div>
       <div class="cash-flow-chart"><canvas id="cashFlowChart"></canvas></div>
+    </div>
+
+    <!-- Key Alerts -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Key Alerts</h2>
+      <div id="dbAlerts"><div class="loading">Loading...</div></div>
     </div>
 
     <!-- Hero KPIs -->
@@ -285,28 +275,6 @@
               '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(pct,2) + '%;background:' + color + '"></div></div>' +
               '<div class="amount" style="color:' + (e.cash >= 0 ? 'var(--text)' : 'var(--red)') + '">' + fmtShort(e.cash) + '</div></div>';
           }).join('');
-        }
-
-        // Overdrawn alerts
-        var odEl = document.getElementById('overdrawnAlerts');
-        var overdrawn = data.alerts?.overdrawn || [];
-        if (overdrawn.length === 0) {
-          odEl.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">All Clear</span> No overdrawn accounts</span></li></ul>';
-        } else {
-          odEl.innerHTML = '<ul class="alert-list">' + overdrawn.map(function(a) {
-            return '<li class="alert-item"><span class="alert-label"><span class="badge danger">Overdrawn</span> ' + a.company_name + ' — ' + a.account_code + ' ' + a.account_name + '</span><span class="alert-value neg">' + fmt(a.balance) + '</span></li>';
-          }).join('') + '</ul>';
-        }
-
-        // IC imbalances
-        var icEl = document.getElementById('icAlerts');
-        var icImb = data.alerts?.ic_imbalances || [];
-        if (icImb.length === 0) {
-          icEl.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">Balanced</span> All IC accounts reconciled</span></li></ul>';
-        } else {
-          icEl.innerHTML = '<ul class="alert-list">' + icImb.map(function(a) {
-            return '<li class="alert-item"><span class="alert-label"><span class="badge warning">Imbalance</span> ' + a.account_code + ' ' + a.account_name + '</span><span class="alert-value warn">' + fmt(a.net) + '</span></li>';
-          }).join('') + '</ul>';
         }
 
         document.getElementById('snapInfo').textContent = 'Data as of ' + data.snapshot_date + (data.prior_date ? ' | Prior: ' + data.prior_date : '');
