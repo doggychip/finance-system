@@ -23,33 +23,13 @@
 
     .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 
-    /* Hero KPIs */
-    .hero-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-    @media (max-width: 1000px) { .hero-grid { grid-template-columns: 1fr 1fr; } }
-    .hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
-    .hero-card.main { background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--green); }
-    .hero-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 8px; }
-    .hero-card .value { font-size: 36px; font-weight: 800; letter-spacing: -1px; }
-    .hero-card.main .value { font-size: 42px; color: var(--green); }
-    .hero-card .change { font-size: 12px; margin-top: 6px; }
-    .hero-card .change.up { color: var(--green); }
-    .hero-card .change.down { color: var(--red); }
-    .hero-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-    .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
-    @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
-
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
-    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
-    .chart-box { position: relative; height: 260px; }
-
-    /* Entity cash bars */
-    .entity-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .entity-bar .name { font-size: 12px; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .entity-bar .bar-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-    .entity-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; min-width: 2px; }
-    .entity-bar .amount { font-size: 12px; font-weight: 600; width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+    /* Health bar */
+    .health-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+    .health-bar .label { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
+    .health-score { font-size: 16px; font-weight: 700; min-width: 50px; text-align: right; }
+    .health-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
 
     /* Alerts */
     .alert-list { list-style: none; }
@@ -65,17 +45,6 @@
     .badge.warning { background: rgba(234,179,8,0.15); color: var(--yellow); }
     .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
 
-    .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
-    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
-
-    /* Health bar */
-    .health-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
-    .health-bar .label { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
-    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
-    .health-score { font-size: 16px; font-weight: 700; min-width: 50px; text-align: right; }
-    .health-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
-
     /* Cash Overview */
     .cash-overview { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
     .cash-overview h2 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
@@ -86,6 +55,35 @@
     .cash-metric .cm-value { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
     .cash-metric .cm-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
     .cash-flow-chart { position: relative; height: 180px; }
+
+    /* Hero KPIs */
+    .hero-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1000px) { .hero-grid { grid-template-columns: 1fr 1fr; } }
+    .hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
+    .hero-card.main { background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--green); }
+    .hero-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 8px; }
+    .hero-card .value { font-size: 36px; font-weight: 800; letter-spacing: -1px; }
+    .hero-card.main .value { font-size: 42px; color: var(--green); }
+    .hero-card .change { font-size: 12px; margin-top: 6px; }
+    .hero-card .change.up { color: var(--green); }
+    .hero-card .change.down { color: var(--red); }
+    .hero-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+    .chart-box { position: relative; height: 260px; }
+
+    /* Entity cash bars */
+    .entity-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .entity-bar .name { font-size: 12px; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .entity-bar .bar-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .entity-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; min-width: 2px; }
+    .entity-bar .amount { font-size: 12px; font-weight: 600; width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -95,20 +93,15 @@
     <h1>Executive Dashboard</h1>
     <div class="nav">
       <a href="/" class="active">Overview</a>
-      <a href="/cash.html">Cash</a>
-      <a href="/balance-sheet.html">Balance Sheet</a>
-      <a href="/cash-flow.html">Cash Flow</a>
-      <a href="/consolidated-bs.html">Consolidated</a>
       <a href="/reports.html">Reports</a>
-      <a href="/cash-position.html">Cash Position</a>
-      <a href="/tasks.html">Tasks</a>
-      <a href="/kanban.html">Kanban</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/kanban.html">Tasks</a>
     </div>
     <div class="actions" style="display:flex;gap:8px;align-items:center">
       <label style="font-size:12px;color:#8b8fa3">As of:</label>
       <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
-      <button class="btn" onclick="loadAll()">Apply</button>
-      <button class="btn" onclick="loadAll()">Refresh</button>
+      <button class="btn" onclick="refreshData()">Apply</button>
+      <button class="btn" onclick="refreshData()">Refresh</button>
       <button class="btn primary" onclick="triggerSync()" id="syncBtn">Sync Odoo</button>
     </div>
   </div>
@@ -120,6 +113,22 @@
       <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
       <span class="health-score" id="healthScore">--</span>
       <div class="health-meta" id="healthMeta"></div>
+    </div>
+
+    <!-- Alerts Section -->
+    <div class="grid-2" style="margin-bottom:24px">
+      <div class="card">
+        <h2>Overdrawn Accounts</h2>
+        <div id="overdrawnAlerts"><div class="loading">Loading...</div></div>
+      </div>
+      <div class="card">
+        <h2>IC Imbalances</h2>
+        <div id="icAlerts"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:24px">
+      <h2>Active Alerts</h2>
+      <div id="dbAlerts"><div class="loading">Loading...</div></div>
     </div>
 
     <!-- Cash Overview -->
@@ -175,34 +184,22 @@
       </div>
     </div>
 
-    <!-- Cash Trend + Entity Breakdown -->
-    <div class="grid-3">
+    <!-- Revenue vs Expense + Monthly Volume -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Revenue vs Expenses</h2>
+        <div class="chart-box"><canvas id="revExpChart"></canvas></div>
+      </div>
       <div class="card">
         <h2>Cash Trend</h2>
         <div class="chart-box"><canvas id="trendChart"></canvas></div>
       </div>
-      <div class="card">
-        <h2>Cash by Entity</h2>
-        <div id="entityBars"><div class="loading">Loading...</div></div>
-      </div>
     </div>
 
-    <!-- Alerts -->
-    <div class="grid-2">
-      <div class="card">
-        <h2>Overdrawn Accounts</h2>
-        <div id="overdrawnAlerts"><div class="loading">Loading...</div></div>
-      </div>
-      <div class="card">
-        <h2>IC Imbalances</h2>
-        <div id="icAlerts"><div class="loading">Loading...</div></div>
-      </div>
-    </div>
-
-    <!-- Persistent Alerts from DB -->
+    <!-- Entity Breakdown -->
     <div class="card" style="margin-bottom:24px">
-      <h2>Active Alerts</h2>
-      <div id="dbAlerts"><div class="loading">Loading...</div></div>
+      <h2>Cash by Entity</h2>
+      <div id="entityBars"><div class="loading">Loading...</div></div>
     </div>
 
     <div class="snap-info" id="snapInfo"></div>
@@ -230,7 +227,6 @@
         var data = await (await fetch('/api/dashboard/executive-summary')).json();
         if (!data.snapshot_date) return;
 
-        // Hero cards
         document.getElementById('heroNonOW').textContent = fmt(data.non_ow_cash);
         var nonOWChg = data.non_ow_cash - data.non_ow_cash_prior;
         var nonOWPct = data.non_ow_cash_prior ? (nonOWChg / Math.abs(data.non_ow_cash_prior) * 100) : 0;
@@ -319,13 +315,45 @@
       }
     }
 
+    async function loadRevExpChart() {
+      try {
+        var now = new Date();
+        var from = (now.getFullYear() - 1) + now.toISOString().slice(4, 10);
+        var to = now.toISOString().slice(0, 10);
+        var data = await (await fetch('/api/reporting/revenue-expenses?period=monthly&date_from=' + from + '&date_to=' + to)).json();
+        if (!data.length) return;
+        if (charts.revExp) charts.revExp.destroy();
+        charts.revExp = new Chart(document.getElementById('revExpChart').getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: data.map(function(r) { return r.period; }),
+            datasets: [
+              { label: 'Revenue', data: data.map(function(r) { return r.total_revenue; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+              { label: 'Expenses', data: data.map(function(r) { return r.total_expenses; }), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 3 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+              x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 12 } },
+              y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } }
+            },
+            plugins: {
+              legend: { labels: { color: '#8b8fa3', font: { size: 11 } } },
+              tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + fmt(c.parsed.y); } } }
+            }
+          }
+        });
+      } catch (e) { console.error(e); }
+    }
+
     async function triggerSync() {
       var btn = document.getElementById('syncBtn');
       btn.disabled = true; btn.textContent = 'Syncing...';
       try {
         await fetch('/api/sync/accounts', { method: 'POST' });
         await fetch('/api/sync/balances', { method: 'POST' });
-        await loadAll();
+        await refreshData();
       } catch (e) { console.error(e); }
       btn.disabled = false; btn.textContent = 'Sync Odoo';
     }
@@ -341,11 +369,9 @@
         var position = results[1];
         var flow = results[2];
 
-        // Total Cash from grand_total
         var totalCash = balances.grand_total || 0;
         document.getElementById('coTotalCash').textContent = fmtShort(totalCash);
 
-        // Monthly Burn: sum monthly_burn across non-subtotal groups
         var totalBurn = 0;
         if (position.groups) {
           position.groups.forEach(function(g) {
@@ -354,7 +380,6 @@
         }
         document.getElementById('coBurn').textContent = totalBurn ? fmtShort(totalBurn) : '--';
 
-        // Runway = Total Cash / Monthly Burn
         var runwayEl = document.getElementById('coRunway');
         if (totalBurn > 0) {
           var runway = totalCash / totalBurn;
@@ -365,10 +390,9 @@
           runwayEl.style.color = 'var(--text-dim)';
         }
 
-        // Net Flow This Month: latest month's net_flow from cash-flow
         var netFlowEl = document.getElementById('coNetFlow');
         if (Array.isArray(flow) && flow.length > 0) {
-          var latest = flow[0]; // reverse-chron, first is latest
+          var latest = flow[0];
           var netFlow = latest.net_flow || 0;
           netFlowEl.textContent = fmtShort(netFlow);
           netFlowEl.style.color = netFlow >= 0 ? 'var(--green)' : 'var(--red)';
@@ -378,9 +402,8 @@
           netFlowEl.style.color = 'var(--text-dim)';
         }
 
-        // Bar chart: last 6 months inflows vs outflows
         if (Array.isArray(flow) && flow.length > 0) {
-          var last6 = flow.slice(0, 6).reverse(); // oldest-to-newest for chart
+          var last6 = flow.slice(0, 6).reverse();
           var ctx = document.getElementById('cashFlowChart').getContext('2d');
           if (charts.cashFlow) charts.cashFlow.destroy();
           charts.cashFlow = new Chart(ctx, {
@@ -441,11 +464,16 @@
       } catch(e) { console.error(e); }
     }
 
-    loadAll();
-    loadHealth();
-    loadDbAlerts();
-    loadCashSummary();
-    setInterval(function() { loadAll(); loadHealth(); loadDbAlerts(); loadCashSummary(); }, 5 * 60 * 1000);
+    function refreshData() {
+      loadAll();
+      loadHealth();
+      loadDbAlerts();
+      loadCashSummary();
+      loadRevExpChart();
+    }
+
+    refreshData();
+    setInterval(refreshData, 5 * 60 * 1000);
   </script>
 <script src="/chat-widget.js"></script>
 </body>

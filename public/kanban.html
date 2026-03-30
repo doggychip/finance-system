@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kanban Board — Finance Dashboard</title>
+  <title>Tasks — Finance Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
@@ -17,8 +17,35 @@
     .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; }
     .btn:hover { background: var(--border); }
 
+    /* Alerts section */
+    .alerts-section { padding: 12px 28px; }
+    .alerts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .alerts-row { grid-template-columns: 1fr; } }
+    .alert-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+    .alert-card h3 { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; }
+    .alert-list { list-style: none; }
+    .alert-item { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-label { flex: 1; }
+    .alert-value { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 80px; text-align: right; }
+    .alert-value.neg { color: var(--red); }
+    .alert-value.warn { color: var(--yellow); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .badge.danger { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge.warning { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+
+    /* Health bar */
+    .health-bar-wrapper { padding: 0 28px; margin-top: 12px; }
+    .health-bar-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
+    .health-label { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s, background 0.3s; }
+    .health-score { font-size: 14px; font-weight: 700; min-width: 50px; text-align: right; }
+    .health-details { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
+
     .board-container { padding: 24px; overflow-x: auto; }
-    .board { display: flex; gap: 16px; min-height: calc(100vh - 120px); }
+    .board { display: flex; gap: 16px; min-height: calc(100vh - 280px); }
     .column { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; min-width: 300px; flex: 1; display: flex; flex-direction: column; }
     .column-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
     .column-header h2 { font-size: 14px; font-weight: 600; }
@@ -39,35 +66,39 @@
     .priority-dot.low { background: var(--green); }
     .card-desc { font-size: 11px; color: var(--text-dim); margin-top: 6px; max-height: 40px; overflow: hidden; }
     .overdue-tag { background: rgba(239,68,68,0.15); color: var(--red); padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
-
-    /* Health bar */
-    .health-bar-wrapper { padding: 0 28px; margin-top: 12px; }
-    .health-bar-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
-    .health-label { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
-    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
-    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s, background 0.3s; }
-    .health-score { font-size: 14px; font-weight: 700; min-width: 50px; text-align: right; }
-    .health-details { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
 </head>
 <body>
   <div class="header">
-    <h1>Kanban Board</h1>
+    <h1>Tasks & Alerts</h1>
     <div class="nav">
       <a href="/">Overview</a>
-      <a href="/cash.html">Cash</a>
-      <a href="/balance-sheet.html">Balance Sheet</a>
-      <a href="/cash-flow.html">Cash Flow</a>
-      <a href="/consolidated-bs.html">Consolidated</a>
       <a href="/reports.html">Reports</a>
-      <a href="/cash-position.html">Cash Position</a>
-      <a href="/tasks.html">Tasks</a>
-      <a href="/kanban.html" class="active">Kanban</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/kanban.html" class="active">Tasks</a>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn" onclick="loadBoard()">Refresh</button>
+    </div>
+  </div>
+
+  <!-- Alerts Section -->
+  <div class="alerts-section">
+    <div class="alerts-row">
+      <div class="alert-card">
+        <h3>Overdrawn Accounts</h3>
+        <div id="overdrawnAlerts"><ul class="alert-list"><li class="alert-item"><span class="alert-label" style="color:var(--text-dim)">Loading...</span></li></ul></div>
+      </div>
+      <div class="alert-card">
+        <h3>IC Imbalances</h3>
+        <div id="icAlerts"><ul class="alert-list"><li class="alert-item"><span class="alert-label" style="color:var(--text-dim)">Loading...</span></li></ul></div>
+      </div>
+      <div class="alert-card">
+        <h3>Active Alerts</h3>
+        <div id="dbAlerts"><ul class="alert-list"><li class="alert-item"><span class="alert-label" style="color:var(--text-dim)">Loading...</span></li></ul></div>
+      </div>
     </div>
   </div>
 
@@ -103,6 +134,11 @@
 
   <script>
     function today() { return new Date().toISOString().slice(0,10); }
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '--';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
 
     function makeCard(t) {
       var isOverdue = t.status !== 'done' && t.status !== 'cancelled' && t.due_date && t.due_date < today();
@@ -175,6 +211,7 @@
       });
 
       loadHealth();
+      loadAlerts();
     }
 
     async function loadHealth() {
@@ -194,6 +231,45 @@
           (data.tasks.overdue > 0 ? '<span style="color:var(--red)">' + data.tasks.overdue + ' overdue</span>' : '') +
           (data.alerts.critical > 0 ? '<span style="color:var(--red)">' + data.alerts.critical + ' critical</span>' : '') +
           (data.alerts.open > 0 ? '<span>' + data.alerts.open + ' open alerts</span>' : '');
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadAlerts() {
+      try {
+        // Executive summary alerts
+        var data = await (await fetch('/api/dashboard/executive-summary')).json();
+
+        var odEl = document.getElementById('overdrawnAlerts');
+        var overdrawn = data.alerts?.overdrawn || [];
+        if (overdrawn.length === 0) {
+          odEl.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">All Clear</span> No overdrawn accounts</span></li></ul>';
+        } else {
+          odEl.innerHTML = '<ul class="alert-list">' + overdrawn.map(function(a) {
+            return '<li class="alert-item"><span class="alert-label"><span class="badge danger">Overdrawn</span> ' + a.company_name + ' — ' + a.account_code + '</span><span class="alert-value neg">' + fmt(a.balance) + '</span></li>';
+          }).join('') + '</ul>';
+        }
+
+        var icEl = document.getElementById('icAlerts');
+        var icImb = data.alerts?.ic_imbalances || [];
+        if (icImb.length === 0) {
+          icEl.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">Balanced</span> All IC reconciled</span></li></ul>';
+        } else {
+          icEl.innerHTML = '<ul class="alert-list">' + icImb.map(function(a) {
+            return '<li class="alert-item"><span class="alert-label"><span class="badge warning">Imbalance</span> ' + a.account_code + '</span><span class="alert-value warn">' + fmt(a.net) + '</span></li>';
+          }).join('') + '</ul>';
+        }
+
+        // DB alerts
+        var alerts = await (await fetch('/api/alerts-tasks/alerts?resolved=false')).json();
+        var dbEl = document.getElementById('dbAlerts');
+        if (!alerts.length) {
+          dbEl.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">All Clear</span> No active alerts</span></li></ul>';
+        } else {
+          dbEl.innerHTML = '<ul class="alert-list">' + alerts.map(function(a) {
+            var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
+            return '<li class="alert-item"><span class="alert-label"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span> ' + a.title + '</span></li>';
+          }).join('') + '</ul>';
+        }
       } catch (e) { console.error(e); }
     }
 
