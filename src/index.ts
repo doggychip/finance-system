@@ -11,6 +11,7 @@ import { dashboardRoutes } from './routes/dashboard';
 import { reportingRoutes } from './routes/reporting';
 import { chatRoutes } from './routes/chat';
 import { taskRoutes } from './routes/tasks';
+import { alertsTasksRoutes } from './routes/alerts-tasks';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
 import { seedXterioFoundation } from './data/xterio-seed';
 
@@ -64,6 +65,7 @@ app.use('/api/dashboard', dashboardRoutes(db));
 app.use('/api/reporting', reportingRoutes(db));
 app.use('/api/chat', chatRoutes(db));
 app.use('/api/tasks', taskRoutes(db));
+app.use('/api/alerts-tasks', alertsTasksRoutes(db));
 
 const PORT = process.env.PORT || 3000;
 app.listen(Number(PORT), '0.0.0.0', () => {

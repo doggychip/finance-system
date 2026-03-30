@@ -163,6 +163,24 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
 
+    CREATE TABLE IF NOT EXISTS alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      message TEXT DEFAULT '',
+      severity TEXT DEFAULT 'info' CHECK(severity IN ('info', 'warning', 'critical')),
+      category TEXT DEFAULT 'general',
+      entity TEXT DEFAULT '',
+      is_read INTEGER DEFAULT 0,
+      is_resolved INTEGER DEFAULT 0,
+      resolved_by INTEGER REFERENCES users(id),
+      resolved_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity);
+    CREATE INDEX IF NOT EXISTS idx_alerts_resolved ON alerts(is_resolved);
+    CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at);
+
     -- Seed default users if empty
     INSERT OR IGNORE INTO users (username, password, display_name, role) VALUES
       ('ryan', 'finance123', 'Ryan Cheung', 'admin'),

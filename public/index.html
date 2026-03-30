@@ -67,6 +67,14 @@
 
     .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
     .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+
+    /* Health bar */
+    .health-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+    .health-bar .label { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
+    .health-score { font-size: 16px; font-weight: 700; min-width: 50px; text-align: right; }
+    .health-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -83,6 +91,7 @@
       <a href="/reports.html">Reports</a>
       <a href="/cash-position.html">Cash Position</a>
       <a href="/tasks.html">Tasks</a>
+      <a href="/kanban.html">Kanban</a>
     </div>
     <div class="actions" style="display:flex;gap:8px;align-items:center">
       <label style="font-size:12px;color:#8b8fa3">As of:</label>
@@ -94,6 +103,14 @@
   </div>
 
   <div class="container">
+    <!-- Health Bar -->
+    <div class="health-bar">
+      <span class="label">System Health</span>
+      <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
+      <span class="health-score" id="healthScore">--</span>
+      <div class="health-meta" id="healthMeta"></div>
+    </div>
+
     <!-- Hero KPIs -->
     <div class="hero-grid">
       <div class="hero-card main">
@@ -141,6 +158,12 @@
         <h2>IC Imbalances</h2>
         <div id="icAlerts"><div class="loading">Loading...</div></div>
       </div>
+    </div>
+
+    <!-- Persistent Alerts from DB -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Active Alerts</h2>
+      <div id="dbAlerts"><div class="loading">Loading...</div></div>
     </div>
 
     <div class="snap-info" id="snapInfo"></div>
@@ -268,8 +291,43 @@
       btn.disabled = false; btn.textContent = 'Sync Odoo';
     }
 
+    async function loadHealth() {
+      try {
+        var data = await (await fetch('/api/alerts-tasks/health-status')).json();
+        var fill = document.getElementById('healthFill');
+        var score = document.getElementById('healthScore');
+        var meta = document.getElementById('healthMeta');
+        fill.style.width = data.score + '%';
+        fill.style.background = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        score.textContent = data.score + '%';
+        score.style.color = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        meta.innerHTML =
+          '<span>Tasks: ' + data.tasks.done + '/' + data.tasks.total + ' done</span>' +
+          (data.tasks.overdue > 0 ? '<span style="color:var(--red)">' + data.tasks.overdue + ' overdue</span>' : '') +
+          (data.alerts.critical > 0 ? '<span style="color:var(--red)">' + data.alerts.critical + ' critical</span>' : '') +
+          (data.alerts.open > 0 ? '<span>' + data.alerts.open + ' open alerts</span>' : '');
+      } catch(e) { console.error(e); }
+    }
+
+    async function loadDbAlerts() {
+      try {
+        var alerts = await (await fetch('/api/alerts-tasks/alerts?resolved=false')).json();
+        var el = document.getElementById('dbAlerts');
+        if (!alerts.length) {
+          el.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">All Clear</span> No active alerts</span></li></ul>';
+          return;
+        }
+        el.innerHTML = '<ul class="alert-list">' + alerts.map(function(a) {
+          var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
+          return '<li class="alert-item"><span class="alert-label"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span> ' + a.title + (a.entity ? ' — ' + a.entity : '') + '</span><span class="alert-value" style="color:var(--text-dim);font-size:11px">' + (a.message || '') + '</span></li>';
+        }).join('') + '</ul>';
+      } catch(e) { console.error(e); }
+    }
+
     loadAll();
-    setInterval(loadAll, 5 * 60 * 1000);
+    loadHealth();
+    loadDbAlerts();
+    setInterval(function() { loadAll(); loadHealth(); loadDbAlerts(); }, 5 * 60 * 1000);
   </script>
 <script src="/chat-widget.js"></script>
 </body>

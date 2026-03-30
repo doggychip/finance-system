@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Board — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+
+    .board-container { padding: 24px; overflow-x: auto; }
+    .board { display: flex; gap: 16px; min-height: calc(100vh - 120px); }
+    .column { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; min-width: 300px; flex: 1; display: flex; flex-direction: column; }
+    .column-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .column-header h2 { font-size: 14px; font-weight: 600; }
+    .column-count { background: var(--surface2); border-radius: 10px; padding: 2px 8px; font-size: 11px; color: var(--text-dim); }
+    .column-body { flex: 1; padding: 8px; min-height: 100px; }
+    .column-body.drag-over { background: rgba(99,102,241,0.08); border-radius: 0 0 10px 10px; }
+
+    .card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; cursor: grab; transition: all 0.15s; }
+    .card:hover { border-color: var(--accent); }
+    .card.dragging { opacity: 0.4; }
+    .card-title { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .card-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .card-meta span { font-size: 10px; color: var(--text-dim); }
+    .priority-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .priority-dot.urgent { background: var(--red); }
+    .priority-dot.high { background: #f97316; }
+    .priority-dot.medium { background: var(--yellow); }
+    .priority-dot.low { background: var(--green); }
+    .card-desc { font-size: 11px; color: var(--text-dim); margin-top: 6px; max-height: 40px; overflow: hidden; }
+    .overdue-tag { background: rgba(239,68,68,0.15); color: var(--red); padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+    /* Health bar */
+    .health-bar-wrapper { padding: 0 28px; margin-top: 12px; }
+    .health-bar-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
+    .health-label { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s, background 0.3s; }
+    .health-score { font-size: 14px; font-weight: 700; min-width: 50px; text-align: right; }
+    .health-details { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Kanban Board</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
+      <a href="/tasks.html">Tasks</a>
+      <a href="/kanban.html" class="active">Kanban</a>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn" onclick="loadBoard()">Refresh</button>
+    </div>
+  </div>
+
+  <div class="health-bar-wrapper">
+    <div class="health-bar-container">
+      <span class="health-label">System Health</span>
+      <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
+      <span class="health-score" id="healthScore">--</span>
+      <div class="health-details" id="healthDetails"></div>
+    </div>
+  </div>
+
+  <div class="board-container">
+    <div class="board">
+      <div class="column" data-status="todo">
+        <div class="column-header"><h2 style="color:var(--yellow)">To Do</h2><span class="column-count" id="countTodo">0</span></div>
+        <div class="column-body" id="colTodo"></div>
+      </div>
+      <div class="column" data-status="in_progress">
+        <div class="column-header"><h2 style="color:var(--blue)">In Progress</h2><span class="column-count" id="countInProgress">0</span></div>
+        <div class="column-body" id="colInProgress"></div>
+      </div>
+      <div class="column" data-status="done">
+        <div class="column-header"><h2 style="color:var(--green)">Done</h2><span class="column-count" id="countDone">0</span></div>
+        <div class="column-body" id="colDone"></div>
+      </div>
+      <div class="column" data-status="cancelled">
+        <div class="column-header"><h2 style="color:var(--text-dim)">Cancelled</h2><span class="column-count" id="countCancelled">0</span></div>
+        <div class="column-body" id="colCancelled"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function today() { return new Date().toISOString().slice(0,10); }
+
+    function makeCard(t) {
+      var isOverdue = t.status !== 'done' && t.status !== 'cancelled' && t.due_date && t.due_date < today();
+      var el = document.createElement('div');
+      el.className = 'card';
+      el.draggable = true;
+      el.dataset.id = t.id;
+      el.innerHTML =
+        '<div class="card-title">' + t.title + '</div>' +
+        (t.description ? '<div class="card-desc">' + t.description + '</div>' : '') +
+        '<div class="card-meta">' +
+          '<span class="priority-dot ' + t.priority + '"></span>' +
+          '<span>' + t.priority + '</span>' +
+          (t.due_date ? '<span>' + t.due_date + '</span>' : '') +
+          (isOverdue ? '<span class="overdue-tag">OVERDUE</span>' : '') +
+          '<span>' + (t.assigned_name || 'Unassigned') + '</span>' +
+        '</div>';
+
+      el.addEventListener('dragstart', function(e) {
+        el.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', t.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', function() { el.classList.remove('dragging'); });
+      return el;
+    }
+
+    function setupDropZones() {
+      document.querySelectorAll('.column-body').forEach(function(col) {
+        col.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          col.classList.add('drag-over');
+        });
+        col.addEventListener('dragleave', function() { col.classList.remove('drag-over'); });
+        col.addEventListener('drop', function(e) {
+          e.preventDefault();
+          col.classList.remove('drag-over');
+          var taskId = e.dataTransfer.getData('text/plain');
+          var newStatus = col.parentElement.dataset.status;
+          moveTask(parseInt(taskId), newStatus);
+        });
+      });
+    }
+
+    async function moveTask(id, newStatus) {
+      await fetch('/api/tasks/tasks/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      loadBoard();
+    }
+
+    async function loadBoard() {
+      var tasks = await (await fetch('/api/tasks/tasks')).json();
+
+      var groups = { todo: [], in_progress: [], done: [], cancelled: [] };
+      tasks.forEach(function(t) {
+        if (groups[t.status]) groups[t.status].push(t);
+      });
+
+      ['todo', 'in_progress', 'done', 'cancelled'].forEach(function(status) {
+        var colId = 'col' + status.split('_').map(function(w) { return w[0].toUpperCase() + w.slice(1); }).join('');
+        var countId = 'count' + status.split('_').map(function(w) { return w[0].toUpperCase() + w.slice(1); }).join('');
+        var col = document.getElementById(colId);
+        col.innerHTML = '';
+        document.getElementById(countId).textContent = groups[status].length;
+        groups[status].forEach(function(t) { col.appendChild(makeCard(t)); });
+      });
+
+      loadHealth();
+    }
+
+    async function loadHealth() {
+      try {
+        var data = await (await fetch('/api/alerts-tasks/health-status')).json();
+        var fill = document.getElementById('healthFill');
+        var score = document.getElementById('healthScore');
+        var details = document.getElementById('healthDetails');
+
+        fill.style.width = data.score + '%';
+        fill.style.background = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        score.textContent = data.score + '%';
+        score.style.color = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+
+        details.innerHTML =
+          '<span>Tasks: ' + data.tasks.done + '/' + data.tasks.total + ' done</span>' +
+          (data.tasks.overdue > 0 ? '<span style="color:var(--red)">' + data.tasks.overdue + ' overdue</span>' : '') +
+          (data.alerts.critical > 0 ? '<span style="color:var(--red)">' + data.alerts.critical + ' critical</span>' : '') +
+          (data.alerts.open > 0 ? '<span>' + data.alerts.open + ' open alerts</span>' : '');
+      } catch (e) { console.error(e); }
+    }
+
+    setupDropZones();
+    loadBoard();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>
