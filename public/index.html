@@ -118,21 +118,11 @@
     <!-- Cash Overview -->
     <div class="cash-overview">
       <h2>Cash Overview</h2>
-      <div class="cash-metrics">
+      <div class="cash-metrics" style="grid-template-columns: 1fr 1fr;">
         <div class="cash-metric">
           <div class="cm-label">Total Cash</div>
           <div class="cm-value" id="coTotalCash" style="color:var(--accent)">--</div>
-          <div class="cm-sub" id="coTotalCashSub">All entities combined</div>
-        </div>
-        <div class="cash-metric">
-          <div class="cm-label">Monthly Burn</div>
-          <div class="cm-value" id="coBurn" style="color:#f97316">--</div>
-          <div class="cm-sub">Avg across entities</div>
-        </div>
-        <div class="cash-metric">
-          <div class="cm-label">Runway</div>
-          <div class="cm-value" id="coRunway">--</div>
-          <div class="cm-sub" id="coRunwaySub">At current burn rate</div>
+          <div class="cm-sub" id="coBreakdown">All entities combined</div>
         </div>
         <div class="cash-metric">
           <div class="cm-label">Net Flow This Month</div>
@@ -330,33 +320,22 @@
       try {
         var results = await Promise.all([
           fetch('/api/dashboard/cash-balances').then(function(r) { return r.json(); }),
-          fetch('/api/dashboard/cash-position').then(function(r) { return r.json(); }),
           fetch('/api/dashboard/cash-flow').then(function(r) { return r.json(); })
         ]);
         var balances = results[0];
-        var position = results[1];
-        var flow = results[2];
+        var flow = results[1];
 
-        var totalCash = balances.grand_total || 0;
+        // Total Cash = all entities: cash + overdrawn + overworld + reach
+        var cashTotal = (balances.cash ? balances.cash.total : 0);
+        var overdrawnTotal = (balances.overdrawn ? balances.overdrawn.total : 0);
+        var owTotal = (balances.overworld ? balances.overworld.total : 0);
+        var reachTotal = (balances.reach ? balances.reach.total : 0);
+        var totalCash = cashTotal + overdrawnTotal + owTotal + reachTotal;
+        var nonOwTotal = balances.non_ow_total || 0;
+
         document.getElementById('coTotalCash').textContent = fmtShort(totalCash);
-
-        var totalBurn = 0;
-        if (position.groups) {
-          position.groups.forEach(function(g) {
-            if (!g.is_subtotal) totalBurn += (g.monthly_burn || 0);
-          });
-        }
-        document.getElementById('coBurn').textContent = totalBurn ? fmtShort(totalBurn) : '--';
-
-        var runwayEl = document.getElementById('coRunway');
-        if (totalBurn > 0) {
-          var runway = totalCash / totalBurn;
-          runwayEl.textContent = runway.toFixed(1) + ' mo';
-          runwayEl.style.color = runway > 6 ? 'var(--green)' : runway >= 3 ? 'var(--yellow)' : 'var(--red)';
-        } else {
-          runwayEl.textContent = 'N/A';
-          runwayEl.style.color = 'var(--text-dim)';
-        }
+        document.getElementById('coBreakdown').innerHTML =
+          'Non-OW: ' + fmtShort(nonOwTotal) + ' &nbsp;|&nbsp; OW: ' + fmtShort(owTotal) + ' &nbsp;|&nbsp; Reach: ' + fmtShort(reachTotal);
 
         var netFlowEl = document.getElementById('coNetFlow');
         if (Array.isArray(flow) && flow.length > 0) {
