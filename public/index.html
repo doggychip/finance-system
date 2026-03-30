@@ -75,6 +75,17 @@
     .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
     .health-score { font-size: 16px; font-weight: 700; min-width: 50px; text-align: right; }
     .health-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
+
+    /* Cash Overview */
+    .cash-overview { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .cash-overview h2 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+    .cash-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .cash-metrics { grid-template-columns: 1fr 1fr; } }
+    .cash-metric { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .cash-metric .cm-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
+    .cash-metric .cm-value { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+    .cash-metric .cm-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .cash-flow-chart { position: relative; height: 180px; }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -109,6 +120,34 @@
       <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
       <span class="health-score" id="healthScore">--</span>
       <div class="health-meta" id="healthMeta"></div>
+    </div>
+
+    <!-- Cash Overview -->
+    <div class="cash-overview">
+      <h2>Cash Overview</h2>
+      <div class="cash-metrics">
+        <div class="cash-metric">
+          <div class="cm-label">Total Cash</div>
+          <div class="cm-value" id="coTotalCash" style="color:var(--accent)">--</div>
+          <div class="cm-sub" id="coTotalCashSub">All entities combined</div>
+        </div>
+        <div class="cash-metric">
+          <div class="cm-label">Monthly Burn</div>
+          <div class="cm-value" id="coBurn" style="color:#f97316">--</div>
+          <div class="cm-sub">Avg across entities</div>
+        </div>
+        <div class="cash-metric">
+          <div class="cm-label">Runway</div>
+          <div class="cm-value" id="coRunway">--</div>
+          <div class="cm-sub" id="coRunwaySub">At current burn rate</div>
+        </div>
+        <div class="cash-metric">
+          <div class="cm-label">Net Flow This Month</div>
+          <div class="cm-value" id="coNetFlow">--</div>
+          <div class="cm-sub" id="coNetFlowSub">Inflows minus outflows</div>
+        </div>
+      </div>
+      <div class="cash-flow-chart"><canvas id="cashFlowChart"></canvas></div>
     </div>
 
     <!-- Hero KPIs -->
@@ -291,6 +330,84 @@
       btn.disabled = false; btn.textContent = 'Sync Odoo';
     }
 
+    async function loadCashSummary() {
+      try {
+        var results = await Promise.all([
+          fetch('/api/dashboard/cash-balances').then(function(r) { return r.json(); }),
+          fetch('/api/dashboard/cash-position').then(function(r) { return r.json(); }),
+          fetch('/api/dashboard/cash-flow').then(function(r) { return r.json(); })
+        ]);
+        var balances = results[0];
+        var position = results[1];
+        var flow = results[2];
+
+        // Total Cash from grand_total
+        var totalCash = balances.grand_total || 0;
+        document.getElementById('coTotalCash').textContent = fmtShort(totalCash);
+
+        // Monthly Burn: sum monthly_burn across non-subtotal groups
+        var totalBurn = 0;
+        if (position.groups) {
+          position.groups.forEach(function(g) {
+            if (!g.is_subtotal) totalBurn += (g.monthly_burn || 0);
+          });
+        }
+        document.getElementById('coBurn').textContent = totalBurn ? fmtShort(totalBurn) : '--';
+
+        // Runway = Total Cash / Monthly Burn
+        var runwayEl = document.getElementById('coRunway');
+        if (totalBurn > 0) {
+          var runway = totalCash / totalBurn;
+          runwayEl.textContent = runway.toFixed(1) + ' mo';
+          runwayEl.style.color = runway > 6 ? 'var(--green)' : runway >= 3 ? 'var(--yellow)' : 'var(--red)';
+        } else {
+          runwayEl.textContent = 'N/A';
+          runwayEl.style.color = 'var(--text-dim)';
+        }
+
+        // Net Flow This Month: latest month's net_flow from cash-flow
+        var netFlowEl = document.getElementById('coNetFlow');
+        if (Array.isArray(flow) && flow.length > 0) {
+          var latest = flow[0]; // reverse-chron, first is latest
+          var netFlow = latest.net_flow || 0;
+          netFlowEl.textContent = fmtShort(netFlow);
+          netFlowEl.style.color = netFlow >= 0 ? 'var(--green)' : 'var(--red)';
+          document.getElementById('coNetFlowSub').textContent = latest.month;
+        } else {
+          netFlowEl.textContent = '--';
+          netFlowEl.style.color = 'var(--text-dim)';
+        }
+
+        // Bar chart: last 6 months inflows vs outflows
+        if (Array.isArray(flow) && flow.length > 0) {
+          var last6 = flow.slice(0, 6).reverse(); // oldest-to-newest for chart
+          var ctx = document.getElementById('cashFlowChart').getContext('2d');
+          if (charts.cashFlow) charts.cashFlow.destroy();
+          charts.cashFlow = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: last6.map(function(r) { return r.month; }),
+              datasets: [
+                { label: 'Inflows', data: last6.map(function(r) { return r.inflows || 0; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
+                { label: 'Outflows', data: last6.map(function(r) { return Math.abs(r.outflows || 0); }), backgroundColor: 'rgba(239,68,68,0.5)', borderRadius: 4 }
+              ]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#8b8fa3', font: { size: 10 } } },
+                y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } }
+              },
+              plugins: {
+                legend: { labels: { color: '#8b8fa3', font: { size: 11 } } },
+                tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + fmt(c.parsed.y); } } }
+              }
+            }
+          });
+        }
+      } catch (e) { console.error('Cash summary error:', e); }
+    }
+
     async function loadHealth() {
       try {
         var data = await (await fetch('/api/alerts-tasks/health-status')).json();
@@ -327,7 +444,8 @@
     loadAll();
     loadHealth();
     loadDbAlerts();
-    setInterval(function() { loadAll(); loadHealth(); loadDbAlerts(); }, 5 * 60 * 1000);
+    loadCashSummary();
+    setInterval(function() { loadAll(); loadHealth(); loadDbAlerts(); loadCashSummary(); }, 5 * 60 * 1000);
   </script>
 <script src="/chat-widget.js"></script>
 </body>
