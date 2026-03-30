@@ -46,6 +46,38 @@ export function taskRoutes(db: Database.Database): Router {
     res.json(user);
   });
 
+  // Change password
+  router.patch('/users/:id/password', (req, res) => {
+    const id = parseInt(req.params.id);
+    const { current_password, new_password, requester_id } = req.body;
+    if (!new_password || new_password.length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters' });
+    }
+
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    // Check if requester is admin (can skip current_password)
+    let isAdmin = false;
+    if (requester_id) {
+      const requester = db.prepare('SELECT role FROM users WHERE id = ?').get(requester_id) as any;
+      if (requester && requester.role === 'admin') isAdmin = true;
+    }
+
+    if (!isAdmin) {
+      // Non-admin must provide correct current password
+      if (!current_password) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
+      if (target.password !== current_password) {
+        return res.status(403).json({ error: 'Current password is incorrect' });
+      }
+    }
+
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(new_password, id);
+    res.json({ ok: true, message: 'Password updated successfully' });
+  });
+
   // Delete user
   router.delete('/users/:id', (req, res) => {
     db.prepare('DELETE FROM users WHERE id = ?').run(parseInt(req.params.id));
