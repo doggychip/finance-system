@@ -63,11 +63,20 @@
     .box-header h3 { font-size: 14px; font-weight: 600; }
     .box-total { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .box-count { font-size: 12px; color: var(--text-dim); }
-    .cash-box .box-header { border-left: 3px solid var(--green); }
+    .cash-current-box .box-header { border-left: 3px solid var(--green); }
+    .cash-fixed-box .box-header { border-left: 3px solid #22d3ee; }
+    .crypto-hot-box .box-header { border-left: 3px solid var(--yellow); }
+    .crypto-cold-box .box-header { border-left: 3px solid var(--blue); }
+    .crypto-defi-box .box-header { border-left: 3px solid #a855f7; }
+    .crypto-other-box .box-header { border-left: 3px solid var(--text-dim); }
     .overworld-box .box-header { border-left: 3px solid var(--yellow); }
     .reach-box .box-header { border-left: 3px solid var(--cyan); }
     .receivable-box .box-header { border-left: 3px solid var(--blue); }
     .overdrawn-box .box-header { border-left: 3px solid var(--red); }
+    .collapsible .box-list { display: none; }
+    .collapsible.open .box-list { display: block; }
+    .box-header { cursor: pointer; }
+    .box-toggle { font-size: 10px; color: var(--text-dim); margin-left: 8px; }
     .box-list { max-height: 400px; overflow-y: auto; }
     .box-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
     .box-item:last-child { border-bottom: none; }
@@ -114,8 +123,10 @@
       <a href="/kanban.html">Tasks</a>
     </div>
     <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="cashAsOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadAll()">Apply</button>
       <button class="btn btn-export" onclick="exportExcel()">Export Excel</button>
-      <button class="btn" onclick="loadAll()">Refresh</button>
       <button class="btn primary" onclick="triggerSync()">Sync from Odoo</button>
     </div>
   </div>
@@ -123,7 +134,7 @@
   <div class="container">
     <!-- Hero -->
     <div class="hero">
-      <div class="label">Non-OW Total Cash Balance</div>
+      <div class="label">Total Assets (All Entities)</div>
       <div class="total" id="heroTotal">--</div>
       <div class="sub" id="heroSub">Loading...</div>
     </div>
@@ -160,15 +171,30 @@
       <div class="chart-container" style="height:400px"><canvas id="accountHistoryChart"></canvas></div>
     </div>
 
-    <!-- Category boxes -->
-    <div class="grid-3">
-      <div class="category-box cash-box"><div class="box-header"><div><h3>Cash & Bank</h3><div class="box-count" id="cashCount">--</div></div><div class="box-total text-green" id="cashTotal">--</div></div><div class="box-list" id="cashList"><div class="box-empty">Loading...</div></div></div>
-      <div class="category-box receivable-box"><div class="box-header"><div><h3>Receivables</h3><div class="box-count" id="receivableCount">--</div></div><div class="box-total" style="color:var(--blue)" id="receivableTotal">--</div></div><div class="box-list" id="receivableList"><div class="box-empty">Loading...</div></div></div>
-      <div class="category-box overdrawn-box"><div class="box-header"><div><h3>Overdrawn</h3><div class="box-count" id="overdrawnCount">--</div></div><div class="box-total text-red" id="overdrawnTotal">--</div></div><div class="box-list" id="overdrawnList"><div class="box-empty">Loading...</div></div></div>
+    <!-- Category boxes: Cash (Bank) -->
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--green)">Cash (Bank)</div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="category-box cash-current-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>活期 Current<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashCurrentCount">--</div></div><div class="box-total text-green" id="cashCurrentTotal">--</div></div><div class="box-list" id="cashCurrentList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box cash-fixed-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>定期 Fixed Deposit<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashFixedCount">--</div></div><div class="box-total" style="color:#22d3ee" id="cashFixedTotal">--</div></div><div class="box-list" id="cashFixedList"><div class="box-empty">Loading...</div></div></div>
     </div>
-    <div class="grid-2">
-      <div class="category-box overworld-box"><div class="box-header"><div><h3>Overworld</h3><div class="box-count" id="overworldCount">--</div></div><div class="box-total" style="color:var(--yellow)" id="overworldTotal">--</div></div><div class="box-list" id="overworldList"><div class="box-empty">Loading...</div></div></div>
-      <div class="category-box reach-box"><div class="box-header"><div><h3>Reach Labs</h3><div class="box-count" id="reachCount">--</div></div><div class="box-total" style="color:var(--cyan)" id="reachTotal">--</div></div><div class="box-list" id="reachList"><div class="box-empty">Loading...</div></div></div>
+
+    <!-- Category boxes: Crypto -->
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--cyan)">Crypto (On-chain)</div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="category-box crypto-hot-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Hot Wallets<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoHotCount">--</div></div><div class="box-total" style="color:var(--yellow)" id="cryptoHotTotal">--</div></div><div class="box-list" id="cryptoHotList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box crypto-cold-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Cold Wallets<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoColdCount">--</div></div><div class="box-total" style="color:var(--blue)" id="cryptoColdTotal">--</div></div><div class="box-list" id="cryptoColdList"><div class="box-empty">Loading...</div></div></div>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="category-box crypto-defi-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>DeFi<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoDefiCount">--</div></div><div class="box-total" style="color:#a855f7" id="cryptoDefiTotal">--</div></div><div class="box-list" id="cryptoDefiList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box crypto-other-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Other Crypto<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoOtherCount">--</div></div><div class="box-total" style="color:var(--text-dim)" id="cryptoOtherTotal">--</div></div><div class="box-list" id="cryptoOtherList"><div class="box-empty">Loading...</div></div></div>
+    </div>
+
+    <!-- Category boxes: OW / Reach / Overdrawn -->
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--text-dim)">Other</div>
+    <div class="grid-3" style="margin-bottom:16px">
+      <div class="category-box overworld-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Overworld<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="overworldCount">--</div></div><div class="box-total" style="color:var(--yellow)" id="overworldTotal">--</div></div><div class="box-list" id="overworldList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box reach-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Reach Labs<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="reachCount">--</div></div><div class="box-total" style="color:var(--cyan)" id="reachTotal">--</div></div><div class="box-list" id="reachList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box overdrawn-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Overdrawn<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="overdrawnCount">--</div></div><div class="box-total text-red" id="overdrawnTotal">--</div></div><div class="box-list" id="overdrawnList"><div class="box-empty">Loading...</div></div></div>
     </div>
 
     <!-- Cash Position / Bank Accounts Section -->
@@ -226,38 +252,62 @@
       loadTimeCharts();
     });
 
+    function getCashAsOfParam() {
+      var d = document.getElementById('cashAsOfDate').value;
+      return d ? '?as_of_date=' + d : '';
+    }
+
     async function loadCashBalances() {
-      var data = await (await fetch('/api/dashboard/cash-balances')).json();
-      var cashAccs = data.cash?.accounts || [];
-      var recvAccs = data.receivable?.accounts || [];
+      var data = await (await fetch('/api/dashboard/cash-balances' + getCashAsOfParam())).json();
+
+      // Use new split fields
+      var cashCurrentAccs = data.cash_current?.accounts || [];
+      var cashFixedAccs = data.cash_fixed?.accounts || [];
+      var cryptoHotAccs = data.crypto_hot?.accounts || [];
+      var cryptoColdAccs = data.crypto_cold?.accounts || [];
+      var cryptoDefiAccs = data.crypto_defi?.accounts || [];
+      var cryptoOtherAccs = data.crypto_other?.accounts || [];
       var overAccs = data.overdrawn?.accounts || [];
       var owAccs = data.overworld?.accounts || [];
       var reachAccs = data.reach?.accounts || [];
-      var mainAccs = [].concat(cashAccs, recvAccs, overAccs);
-      var nonOWTotal = data.non_ow_total || 0;
 
-      exportAccounts = [].concat(cashAccs, recvAccs, overAccs, owAccs, reachAccs).map(function(a) {
-        return { Code: a.code, Name: a.name, 'Company': a.company_name, Balance: a.balance };
+      var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
+      var totalBank = data.total_cash || 0;
+      var totalCrypto = data.total_crypto || 0;
+      var grandTotal = totalBank + totalCrypto + (data.overworld?.total || 0) + (data.reach?.total || 0) + (data.overdrawn?.total || 0);
+
+      exportAccounts = allAccs.map(function(a) {
+        return { Code: a.code, Name: a.name, Company: a.company_name, Balance: a.balance };
       });
 
       var heroEl = document.getElementById('heroTotal');
-      heroEl.textContent = fmt(nonOWTotal);
-      heroEl.className = 'total ' + (nonOWTotal >= 0 ? 'positive' : 'negative');
-      document.getElementById('heroSub').textContent = 'Non-OW Total Cash (incl. Xterio Foundation) | ' + (data.snapshot_date || '');
+      heroEl.textContent = fmt(grandTotal);
+      heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
+      document.getElementById('heroSub').textContent =
+        'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
+        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0) +
+        ' | ' + (data.snapshot_date || '');
 
-      document.getElementById('statCount').textContent = fmtNum(cashAccs.length);
-      document.getElementById('statPositive').textContent = fmtNum(cashAccs.length + recvAccs.length);
+      var positiveCount = cashCurrentAccs.length + cashFixedAccs.length + cryptoHotAccs.length + cryptoColdAccs.length + cryptoDefiAccs.length + cryptoOtherAccs.length;
+      document.getElementById('statCount').textContent = fmtNum(positiveCount);
+      document.getElementById('statPositive').textContent = fmtNum(positiveCount);
       document.getElementById('statNegative').textContent = fmtNum(overAccs.length);
-      if (mainAccs.length > 0) {
-        var largest = mainAccs.reduce(function(a, b) { return Math.abs(a.balance) > Math.abs(b.balance) ? a : b; });
+      var posAccs = allAccs.filter(function(a) { return a.balance > 0; });
+      if (posAccs.length > 0) {
+        var largest = posAccs.reduce(function(a, b) { return Math.abs(a.balance) > Math.abs(b.balance) ? a : b; });
         document.getElementById('statLargest').textContent = largest.name.slice(0, 25);
       }
 
-      renderDistribution(cashAccs);
+      renderDistribution([].concat(cashCurrentAccs, cashFixedAccs));
+
+      renderCategoryBox('cashCurrent', cashCurrentAccs, data.cash_current?.total || 0);
+      renderCategoryBox('cashFixed', cashFixedAccs, data.cash_fixed?.total || 0);
+      renderCategoryBox('cryptoHot', cryptoHotAccs, data.crypto_hot?.total || 0);
+      renderCategoryBox('cryptoCold', cryptoColdAccs, data.crypto_cold?.total || 0);
+      renderCategoryBox('cryptoDefi', cryptoDefiAccs, data.crypto_defi?.total || 0);
+      renderCategoryBox('cryptoOther', cryptoOtherAccs, data.crypto_other?.total || 0);
       renderCategoryBox('overworld', owAccs, data.overworld?.total || 0);
       renderCategoryBox('reach', reachAccs, data.reach?.total || 0);
-      renderCategoryBox('cash', cashAccs, data.cash?.total || 0);
-      renderCategoryBox('receivable', recvAccs, data.receivable?.total || 0);
       renderCategoryBox('overdrawn', overAccs, data.overdrawn?.total || 0);
     }
 

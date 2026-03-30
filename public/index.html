@@ -118,15 +118,17 @@
     <!-- Cash Overview -->
     <div class="cash-overview">
       <h2>Cash Overview</h2>
-      <div class="cash-metrics" style="grid-template-columns: 1fr 1fr;">
-        <div class="cash-metric">
-          <div class="cm-label">Total Cash</div>
-          <div class="cm-value" id="coTotalCash" style="color:var(--accent)">--</div>
-          <div class="cm-sub" id="coBreakdown">All entities combined</div>
+      <div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
+        <!-- Total Assets big number -->
+        <div style="flex:1;min-width:240px">
+          <div class="cm-label">TOTAL ASSETS</div>
+          <div id="coTotalCash" style="font-size:40px;font-weight:800;color:var(--accent);letter-spacing:-1px;font-variant-numeric:tabular-nums">--</div>
+          <div id="coTreeBreakdown" style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.9;font-family:monospace"></div>
         </div>
-        <div class="cash-metric">
+        <!-- Net Flow -->
+        <div style="min-width:180px">
           <div class="cm-label">Net Flow This Month</div>
-          <div class="cm-value" id="coNetFlow">--</div>
+          <div id="coNetFlow" style="font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px">--</div>
           <div class="cm-sub" id="coNetFlowSub">Inflows minus outflows</div>
         </div>
       </div>
@@ -140,7 +142,7 @@
     </div>
 
     <!-- Hero KPIs -->
-    <div class="hero-grid">
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr">
       <div class="hero-card main">
         <div class="label">Non-OW Available Cash</div>
         <div class="value" id="heroNonOW">--</div>
@@ -151,16 +153,6 @@
         <div class="label">OW & Reach Cash</div>
         <div class="value" id="heroOW" style="font-size:28px">--</div>
         <div class="change" id="heroOWChange"></div>
-      </div>
-      <div class="hero-card">
-        <div class="label">Monthly Burn</div>
-        <div class="value" id="heroBurn" style="font-size:28px;color:var(--yellow)">--</div>
-        <div class="sub">Avg across all entities</div>
-      </div>
-      <div class="hero-card">
-        <div class="label">Runway</div>
-        <div class="value" id="heroRunway" style="font-size:28px">--</div>
-        <div class="sub">Months at current burn</div>
       </div>
     </div>
 
@@ -220,9 +212,6 @@
         var owChgEl = document.getElementById('heroOWChange');
         owChgEl.textContent = fmtShort(owChg) + ' vs prior';
         owChgEl.className = 'change ' + (owChg >= 0 ? 'up' : 'down');
-
-        document.getElementById('heroBurn').textContent = fmtShort(data.monthly_burn);
-        document.getElementById('heroRunway').textContent = data.runway_months != null ? data.runway_months + ' mo' : 'N/A';
 
         // Cash trend chart
         if (data.cash_trend && data.cash_trend.length > 0) {
@@ -316,26 +305,49 @@
       btn.disabled = false; btn.textContent = 'Sync Odoo';
     }
 
+    function getAsOfParam() {
+      var d = document.getElementById('asOfDate').value;
+      return d ? '?as_of_date=' + d : '';
+    }
+
     async function loadCashSummary() {
       try {
         var results = await Promise.all([
-          fetch('/api/dashboard/cash-balances').then(function(r) { return r.json(); }),
+          fetch('/api/dashboard/cash-balances' + getAsOfParam()).then(function(r) { return r.json(); }),
           fetch('/api/dashboard/cash-flow').then(function(r) { return r.json(); })
         ]);
-        var balances = results[0];
+        var b = results[0];
         var flow = results[1];
 
-        // Total Cash = all entities: cash + overdrawn + overworld + reach
-        var cashTotal = (balances.cash ? balances.cash.total : 0);
-        var overdrawnTotal = (balances.overdrawn ? balances.overdrawn.total : 0);
-        var owTotal = (balances.overworld ? balances.overworld.total : 0);
-        var reachTotal = (balances.reach ? balances.reach.total : 0);
-        var totalCash = cashTotal + overdrawnTotal + owTotal + reachTotal;
-        var nonOwTotal = balances.non_ow_total || 0;
+        // Totals from new split fields
+        var totalBank = b.total_cash || 0;
+        var totalCrypto = b.total_crypto || 0;
+        var cashCurrentT = b.cash_current ? b.cash_current.total : 0;
+        var cashFixedT = b.cash_fixed ? b.cash_fixed.total : 0;
+        var cryptoHotT = b.crypto_hot ? b.crypto_hot.total : 0;
+        var cryptoColdT = b.crypto_cold ? b.crypto_cold.total : 0;
+        var cryptoDefiT = b.crypto_defi ? b.crypto_defi.total : 0;
+        var owTotal = b.overworld ? b.overworld.total : 0;
+        var reachTotal = b.reach ? b.reach.total : 0;
+        var overdrawnTotal = b.overdrawn ? b.overdrawn.total : 0;
+        var grandTotal = totalBank + totalCrypto + owTotal + reachTotal + overdrawnTotal;
 
-        document.getElementById('coTotalCash').textContent = fmtShort(totalCash);
-        document.getElementById('coBreakdown').innerHTML =
-          'Non-OW: ' + fmtShort(nonOwTotal) + ' &nbsp;|&nbsp; OW: ' + fmtShort(owTotal) + ' &nbsp;|&nbsp; Reach: ' + fmtShort(reachTotal);
+        document.getElementById('coTotalCash').textContent = fmtShort(grandTotal);
+
+        // Tree breakdown
+        var tree = document.getElementById('coTreeBreakdown');
+        tree.innerHTML =
+          '<span style="color:var(--green)">Cash (Bank): ' + fmtShort(totalBank) + '</span>' +
+          '  <span style="color:var(--text-dim)">[' +
+            '\u6D3B\u671F ' + fmtShort(cashCurrentT) + ' | \u5B9A\u671F ' + fmtShort(cashFixedT) +
+          ']</span><br>' +
+          '<span style="color:var(--cyan)">Crypto: ' + fmtShort(totalCrypto) + '</span>' +
+          '  <span style="color:var(--text-dim)">[' +
+            'Hot ' + fmtShort(cryptoHotT) + ' | Cold ' + fmtShort(cryptoColdT) + ' | DeFi ' + fmtShort(cryptoDefiT) +
+          ']</span><br>' +
+          '<span style="color:var(--yellow)">Overworld: ' + fmtShort(owTotal) + '</span>' +
+          ' &nbsp; <span style="color:var(--blue)">Reach: ' + fmtShort(reachTotal) + '</span>' +
+          (overdrawnTotal < -0.5 ? ' &nbsp; <span style="color:var(--red)">Overdrawn: ' + fmtShort(overdrawnTotal) + '</span>' : '');
 
         var netFlowEl = document.getElementById('coNetFlow');
         if (Array.isArray(flow) && flow.length > 0) {

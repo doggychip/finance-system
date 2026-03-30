@@ -182,7 +182,39 @@ export function dashboardRoutes(db: Database.Database): Router {
     const xterioFoundationCash = 5942149;
     const nonOWCash = nonOWBankCash + xterioFoundationCash;
 
+    // Split cash into bank (100xxx) vs crypto (10Wxxx) sub-categories
+    const allPositiveCash = [...cash]; // non-OW positive asset_cash accounts
+    const isBankCode = (code: string) => code.startsWith('100');
+    const isCryptoCode = (code: string) => code.startsWith('10W');
+    const isFixedDeposit = (name: string) => /time deposit|mma/i.test(name);
+    const isHotWallet = (name: string) => /integrated|segregate|mt ledger/i.test(name);
+    const isColdWallet = (name: string) => /cold wallet|safe wallet/i.test(name);
+    const isDefi = (name: string) => /defi/i.test(name);
+
+    const cash_current = allPositiveCash.filter(r => isBankCode(r.code) && !isFixedDeposit(r.name));
+    const cash_fixed = allPositiveCash.filter(r => isBankCode(r.code) && isFixedDeposit(r.name));
+    const crypto_hot = allPositiveCash.filter(r => isCryptoCode(r.code) && isHotWallet(r.name));
+    const crypto_cold = allPositiveCash.filter(r => isCryptoCode(r.code) && isColdWallet(r.name));
+    const crypto_defi = allPositiveCash.filter(r => isCryptoCode(r.code) && isDefi(r.name));
+    const crypto_other = allPositiveCash.filter(r => isCryptoCode(r.code) && !isHotWallet(r.name) && !isColdWallet(r.name) && !isDefi(r.name));
+    // Accounts that don't match 100 or 10W patterns go into cash_current as fallback
+    const unmatched = allPositiveCash.filter(r => !isBankCode(r.code) && !isCryptoCode(r.code));
+    const cash_current_all = [...cash_current, ...unmatched];
+
+    const total_cash_bank = sum(cash_current_all) + sum(cash_fixed);
+    const total_crypto = sum(crypto_hot) + sum(crypto_cold) + sum(crypto_defi) + sum(crypto_other);
+
     res.json({
+      // New split categories
+      cash_current: { accounts: cash_current_all, total: sum(cash_current_all) },
+      cash_fixed: { accounts: cash_fixed, total: sum(cash_fixed) },
+      crypto_hot: { accounts: crypto_hot, total: sum(crypto_hot) },
+      crypto_cold: { accounts: crypto_cold, total: sum(crypto_cold) },
+      crypto_defi: { accounts: crypto_defi, total: sum(crypto_defi) },
+      crypto_other: { accounts: crypto_other, total: sum(crypto_other) },
+      total_cash: total_cash_bank,
+      total_crypto: total_crypto,
+      // Backward-compatible fields
       cash: { accounts: cash, total: sum(cash) },
       receivable: { accounts: receivable, total: sum(receivable) },
       overdrawn: { accounts: overdrawn, total: sum(overdrawn) },
