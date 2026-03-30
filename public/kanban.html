@@ -66,6 +66,20 @@
     .priority-dot.low { background: var(--green); }
     .card-desc { font-size: 11px; color: var(--text-dim); margin-top: 6px; max-height: 40px; overflow: hidden; }
     .overdue-tag { background: rgba(239,68,68,0.15); color: var(--red); padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+    .card-actions { display: flex; gap: 4px; margin-top: 8px; }
+    .card-actions button { background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim); font-size: 11px; padding: 2px 8px; cursor: pointer; }
+    .card-actions button:hover { background: var(--border); color: var(--text); }
+    .card-actions button.del:hover { color: var(--red); }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 440px; max-width: 90vw; }
+    .modal-box h2 { font-size: 16px; margin-bottom: 16px; }
+    .modal-box label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; margin-top: 12px; }
+    .modal-box input, .modal-box select, .modal-box textarea { width: 100%; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; font-family: inherit; }
+    .modal-box textarea { resize: vertical; min-height: 60px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -81,6 +95,7 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn" onclick="loadBoard()">Refresh</button>
+      <button class="btn" style="background:var(--accent);border-color:var(--accent);color:white" onclick="openModal()">+ New Task</button>
     </div>
   </div>
 
@@ -132,13 +147,47 @@
     </div>
   </div>
 
+  <!-- Task Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-box">
+      <h2 id="modalTitle">New Task</h2>
+      <input type="hidden" id="fTaskId">
+      <label>Title *</label>
+      <input type="text" id="fTitle" placeholder="Task title">
+      <label>Description</label>
+      <textarea id="fDesc" placeholder="Details..."></textarea>
+      <label>Assignee</label>
+      <select id="fAssignee"><option value="">Unassigned</option></select>
+      <label>Priority</label>
+      <select id="fPriority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">Urgent</option>
+      </select>
+      <label>Category</label>
+      <input type="text" id="fCategory" placeholder="general" value="general">
+      <label>Due Date</label>
+      <input type="date" id="fDue">
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn" style="background:var(--accent);border-color:var(--accent);color:white" onclick="saveTask()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    var allTasks = [];
+    var allUsers = [];
+
     function today() { return new Date().toISOString().slice(0,10); }
 
     function fmt(n) {
       if (n == null || isNaN(n)) return '--';
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
     }
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     function makeCard(t) {
       var isOverdue = t.status !== 'done' && t.status !== 'cancelled' && t.due_date && t.due_date < today();
@@ -147,14 +196,18 @@
       el.draggable = true;
       el.dataset.id = t.id;
       el.innerHTML =
-        '<div class="card-title">' + t.title + '</div>' +
-        (t.description ? '<div class="card-desc">' + t.description + '</div>' : '') +
+        '<div class="card-title">' + esc(t.title) + '</div>' +
+        (t.description ? '<div class="card-desc">' + esc(t.description) + '</div>' : '') +
         '<div class="card-meta">' +
           '<span class="priority-dot ' + t.priority + '"></span>' +
           '<span>' + t.priority + '</span>' +
           (t.due_date ? '<span>' + t.due_date + '</span>' : '') +
           (isOverdue ? '<span class="overdue-tag">OVERDUE</span>' : '') +
-          '<span>' + (t.assigned_name || 'Unassigned') + '</span>' +
+          '<span>' + esc(t.assigned_name || 'Unassigned') + '</span>' +
+        '</div>' +
+        '<div class="card-actions">' +
+          '<button onclick="editTask(' + t.id + ')">Edit</button>' +
+          '<button class="del" onclick="deleteTask(' + t.id + ')">Delete</button>' +
         '</div>';
 
       el.addEventListener('dragstart', function(e) {
@@ -193,11 +246,77 @@
       loadBoard();
     }
 
+    async function loadUsers() {
+      try {
+        allUsers = await (await fetch('/api/tasks/users')).json();
+        var sel = document.getElementById('fAssignee');
+        sel.innerHTML = '<option value="">Unassigned</option>' +
+          allUsers.map(function(u) { return '<option value="' + u.id + '">' + esc(u.display_name) + '</option>'; }).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    function openModal(task) {
+      document.getElementById('modalTitle').textContent = task ? 'Edit Task' : 'New Task';
+      document.getElementById('fTaskId').value = task ? task.id : '';
+      document.getElementById('fTitle').value = task ? task.title : '';
+      document.getElementById('fDesc').value = task ? task.description : '';
+      document.getElementById('fAssignee').value = task ? (task.assigned_to || '') : '';
+      document.getElementById('fPriority').value = task ? task.priority : 'medium';
+      document.getElementById('fCategory').value = task ? (task.category || 'general') : 'general';
+      document.getElementById('fDue').value = task ? (task.due_date || '') : '';
+      document.getElementById('modalOverlay').classList.add('active');
+      document.getElementById('fTitle').focus();
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+    }
+
+    async function saveTask() {
+      var id = document.getElementById('fTaskId').value;
+      var assignee = document.getElementById('fAssignee').value;
+      var body = {
+        title: document.getElementById('fTitle').value,
+        description: document.getElementById('fDesc').value,
+        assigned_to: assignee ? parseInt(assignee) : null,
+        priority: document.getElementById('fPriority').value,
+        category: document.getElementById('fCategory').value,
+        due_date: document.getElementById('fDue').value || null,
+      };
+      if (!body.title) return alert('Title is required');
+      if (id) {
+        await fetch('/api/tasks/tasks/' + id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      } else {
+        await fetch('/api/tasks/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      }
+      closeModal();
+      loadBoard();
+    }
+
+    function editTask(id) {
+      var task = allTasks.find(function(t) { return t.id === id; });
+      if (task) openModal(task);
+    }
+
+    async function deleteTask(id) {
+      if (!confirm('Delete this task?')) return;
+      await fetch('/api/tasks/tasks/' + id, { method: 'DELETE' });
+      loadBoard();
+    }
+
     async function loadBoard() {
-      var tasks = await (await fetch('/api/tasks/tasks')).json();
+      allTasks = await (await fetch('/api/tasks/tasks')).json();
 
       var groups = { todo: [], in_progress: [], done: [], cancelled: [] };
-      tasks.forEach(function(t) {
+      allTasks.forEach(function(t) {
         if (groups[t.status]) groups[t.status].push(t);
       });
 
@@ -213,6 +332,16 @@
       loadHealth();
       loadAlerts();
     }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'n' || e.key === 'N') {
+        var tag = document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        openModal();
+      }
+    });
 
     async function loadHealth() {
       try {
@@ -274,6 +403,7 @@
     }
 
     setupDropZones();
+    loadUsers();
     loadBoard();
   </script>
 <script src="/chat-widget.js"></script>
