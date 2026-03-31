@@ -174,6 +174,24 @@
       <div id="entityBars"><div class="loading">Loading...</div></div>
     </div>
 
+    <!-- C2: Cash Distribution Pie Chart -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Cash & Crypto Distribution (by Entity)</h2>
+        <div class="chart-box"><canvas id="distChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Bank vs Crypto Split</h2>
+        <div class="chart-box"><canvas id="bankCryptoChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- C3: Top Expenses / Payments -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Top Expenses by Account (Largest First)</h2>
+      <div id="topExpenses"><div class="loading">Loading...</div></div>
+    </div>
+
     <div class="snap-info" id="snapInfo"></div>
   </div>
 
@@ -260,6 +278,41 @@
         }
 
         document.getElementById('snapInfo').textContent = 'Data as of ' + data.snapshot_date + (data.prior_date ? ' | Prior: ' + data.prior_date : '');
+
+        // C2: Distribution pie chart
+        if (entities.length > 0) {
+          var posEntities = entities.filter(function(e) { return e.cash > 0; }).sort(function(a,b) { return b.cash - a.cash; });
+          var ctx1 = document.getElementById('distChart').getContext('2d');
+          if (charts.dist) charts.dist.destroy();
+          charts.dist = new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+              labels: posEntities.map(function(e) { return e.name; }),
+              datasets: [{ data: posEntities.map(function(e) { return e.cash; }), backgroundColor: posEntities.map(function(_,i) { return palette[i % palette.length]; }), borderWidth: 0 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '50%',
+              plugins: { legend: { position: 'right', labels: { color: '#8b8fa3', font: { size: 10 }, boxWidth: 10, padding: 8 } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + fmt(c.parsed); } } } }
+            }
+          });
+
+          // Bank vs Crypto pie
+          var totalBank2 = entities.reduce(function(s,e) { return s + (e.bank || 0); }, 0);
+          var totalCrypto2 = entities.reduce(function(s,e) { return s + (e.crypto || 0); }, 0);
+          var ctx2 = document.getElementById('bankCryptoChart').getContext('2d');
+          if (charts.bankCrypto) charts.bankCrypto.destroy();
+          charts.bankCrypto = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+              labels: ['Bank Cash', 'Crypto'],
+              datasets: [{ data: [Math.abs(totalBank2), Math.abs(totalCrypto2)], backgroundColor: ['#22c55e', '#06b6d4'], borderWidth: 0 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '50%',
+              plugins: { legend: { position: 'bottom', labels: { color: '#8b8fa3', font: { size: 12 } } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + fmt(c.parsed); } } } }
+            }
+          });
+        }
       } catch (err) {
         console.error(err);
       }
@@ -419,12 +472,47 @@
       } catch(e) { console.error(e); }
     }
 
+    async function loadTopExpenses() {
+      try {
+        var asOf = document.getElementById('asOfDate').value;
+        var dateTo = asOf || new Date().toISOString().slice(0,10);
+        var dateFrom = dateTo.slice(0,4) + '-01-01'; // YTD
+        var data = await (await fetch('/api/reporting/pnl?period=monthly&date_from=' + dateFrom + '&date_to=' + dateTo)).json();
+        var el = document.getElementById('topExpenses');
+        if (!data.length) { el.innerHTML = '<div class="loading">No expense data</div>'; return; }
+
+        // Group by account, sum amounts, filter expenses only
+        var byAcct = {};
+        data.forEach(function(r) {
+          if (r.odoo_type !== 'expense' && r.odoo_type !== 'expense_direct_cost') return;
+          var key = r.code + ' ' + r.name;
+          if (!byAcct[key]) byAcct[key] = { code: r.code, name: r.name, total: 0 };
+          byAcct[key].total += r.amount;
+        });
+
+        var sorted = Object.values(byAcct).sort(function(a,b) { return b.total - a.total; }).slice(0, 20);
+        if (!sorted.length) { el.innerHTML = '<div class="loading">No expenses found</div>'; return; }
+
+        el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>' +
+          '<th style="text-align:left;padding:6px 10px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Account</th>' +
+          '<th style="text-align:left;padding:6px 10px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Description</th>' +
+          '<th style="text-align:right;padding:6px 10px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Amount (YTD)</th>' +
+          '</tr></thead><tbody>' +
+          sorted.map(function(a) {
+            return '<tr><td style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text-dim)">' + a.code + '</td>' +
+              '<td style="padding:5px 10px;border-bottom:1px solid var(--border)">' + a.name + '</td>' +
+              '<td style="padding:5px 10px;border-bottom:1px solid var(--border);text-align:right;color:var(--red);font-variant-numeric:tabular-nums">' + fmt(a.total) + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      } catch(e) { console.error('Top expenses error:', e); }
+    }
+
     function refreshData() {
       loadAll();
       loadHealth();
       loadDbAlerts();
       loadCashSummary();
       loadRevExpChart();
+      loadTopExpenses();
     }
 
     refreshData();
