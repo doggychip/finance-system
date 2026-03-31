@@ -184,8 +184,9 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     -- Seed default users if empty
     INSERT OR IGNORE INTO users (username, password, display_name, role) VALUES
       ('ryan', 'finance123', 'Ryan Cheung', 'admin'),
-      ('finance1', 'finance123', 'Finance Team 1', 'finance'),
-      ('finance2', 'finance123', 'Finance Team 2', 'finance');
+      ('paul', 'finance123', 'Paul', 'finance'),
+      ('mario', 'finance123', 'Mario', 'finance'),
+      ('bk', 'finance123', 'BK', 'finance');
   `);
 
   return db;
