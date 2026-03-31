@@ -121,7 +121,7 @@
       <div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
         <!-- Total Assets big number -->
         <div style="flex:1;min-width:240px">
-          <div class="cm-label">TOTAL ASSETS</div>
+          <div class="cm-label">CASH & CRYPTO (Excl. Xterio Foundation)</div>
           <div id="coTotalCash" style="font-size:40px;font-weight:800;color:var(--accent);letter-spacing:-1px;font-variant-numeric:tabular-nums">--</div>
           <div id="coTreeBreakdown" style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.9;font-family:monospace"></div>
         </div>
@@ -144,7 +144,7 @@
     <!-- Hero KPIs -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr">
       <div class="hero-card main">
-        <div class="label">Non-OW Available Cash</div>
+        <div class="label">Non-OW Available Cash (Excl. Crypto)</div>
         <div class="value" id="heroNonOW">--</div>
         <div class="change" id="heroNonOWChange"></div>
         <div class="sub" id="heroSub">Loading...</div>
@@ -196,7 +196,7 @@
 
     async function loadAll() {
       try {
-        var data = await (await fetch('/api/dashboard/executive-summary')).json();
+        var data = await (await fetch('/api/dashboard/executive-summary' + getAsOfParam())).json();
         if (!data.snapshot_date) return;
 
         document.getElementById('heroNonOW').textContent = fmt(data.non_ow_cash);
@@ -312,72 +312,65 @@
 
     async function loadCashSummary() {
       try {
-        var results = await Promise.all([
-          fetch('/api/dashboard/cash-balances' + getAsOfParam()).then(function(r) { return r.json(); }),
-          fetch('/api/dashboard/cash-flow').then(function(r) { return r.json(); })
-        ]);
-        var b = results[0];
-        var flow = results[1];
+        var asOf = getAsOfParam();
+        var b = await (await fetch('/api/dashboard/cash-balances' + asOf)).json();
 
-        // Totals from new split fields
-        var totalBank = b.total_cash || 0;
-        var totalCrypto = b.total_crypto || 0;
-        var cashCurrentT = b.cash_current ? b.cash_current.total : 0;
-        var cashFixedT = b.cash_fixed ? b.cash_fixed.total : 0;
-        var cryptoHotT = b.crypto_hot ? b.crypto_hot.total : 0;
-        var cryptoColdT = b.crypto_cold ? b.crypto_cold.total : 0;
-        var cryptoDefiT = b.crypto_defi ? b.crypto_defi.total : 0;
-        var owTotal = b.overworld ? b.overworld.total : 0;
-        var reachTotal = b.reach ? b.reach.total : 0;
-        var overdrawnTotal = b.overdrawn ? b.overdrawn.total : 0;
-        var grandTotal = totalBank + totalCrypto + owTotal + reachTotal + overdrawnTotal;
+        // Calculate totals from existing API fields
+        var cashAccounts = b.cash ? b.cash.accounts || [] : [];
+        var owAccounts = b.overworld ? b.overworld.accounts || [] : [];
+        var reachAccounts = b.reach ? b.reach.accounts || [] : [];
+        var overdrawnAccounts = b.overdrawn ? b.overdrawn.accounts || [] : [];
+        var allAccounts = [].concat(cashAccounts, owAccounts, reachAccounts, overdrawnAccounts);
+
+        // Split into bank (100xxx) and crypto (10Wxxx)
+        var totalBank = 0, totalCrypto = 0;
+        allAccounts.forEach(function(a) {
+          if (a.code && a.code.startsWith('10W')) totalCrypto += a.balance;
+          else totalBank += a.balance;
+        });
+        var grandTotal = totalBank + totalCrypto;
 
         document.getElementById('coTotalCash').textContent = fmtShort(grandTotal);
 
-        // Tree breakdown
+        var owTotal = b.overworld ? b.overworld.total : 0;
+        var reachTotal = b.reach ? b.reach.total : 0;
+        var overdrawnTotal = b.overdrawn ? b.overdrawn.total : 0;
+
         var tree = document.getElementById('coTreeBreakdown');
         tree.innerHTML =
-          '<span style="color:var(--green)">Cash (Bank): ' + fmtShort(totalBank) + '</span>' +
-          '  <span style="color:var(--text-dim)">[' +
-            '\u6D3B\u671F ' + fmtShort(cashCurrentT) + ' | \u5B9A\u671F ' + fmtShort(cashFixedT) +
-          ']</span><br>' +
-          '<span style="color:var(--cyan)">Crypto: ' + fmtShort(totalCrypto) + '</span>' +
-          '  <span style="color:var(--text-dim)">[' +
-            'Hot ' + fmtShort(cryptoHotT) + ' | Cold ' + fmtShort(cryptoColdT) + ' | DeFi ' + fmtShort(cryptoDefiT) +
-          ']</span><br>' +
+          '<span style="color:var(--green)">Cash (Bank): ' + fmtShort(totalBank) + '</span><br>' +
+          '<span style="color:var(--cyan)">Crypto: ' + fmtShort(totalCrypto) + '</span><br>' +
           '<span style="color:var(--yellow)">Overworld: ' + fmtShort(owTotal) + '</span>' +
           ' &nbsp; <span style="color:var(--blue)">Reach: ' + fmtShort(reachTotal) + '</span>' +
           (overdrawnTotal < -0.5 ? ' &nbsp; <span style="color:var(--red)">Overdrawn: ' + fmtShort(overdrawnTotal) + '</span>' : '');
 
+        // Cash flow chart from reporting API
+        var flow = await (await fetch('/api/reporting/cash-flow-series?period=monthly' + (asOf ? '&date_to=' + document.getElementById('asOfDate').value : ''))).json();
         var netFlowEl = document.getElementById('coNetFlow');
         if (Array.isArray(flow) && flow.length > 0) {
-          var latest = flow[0];
-          var netFlow = latest.net_flow || 0;
-          netFlowEl.textContent = fmtShort(netFlow);
-          netFlowEl.style.color = netFlow >= 0 ? 'var(--green)' : 'var(--red)';
-          document.getElementById('coNetFlowSub').textContent = latest.month;
-        } else {
-          netFlowEl.textContent = '--';
-          netFlowEl.style.color = 'var(--text-dim)';
+          var latest = flow[flow.length - 1];
+          netFlowEl.textContent = fmtShort(latest.net_flow || 0);
+          netFlowEl.style.color = (latest.net_flow || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+          document.getElementById('coNetFlowSub').textContent = latest.period || '';
         }
 
+        // Bar chart - show all months
         if (Array.isArray(flow) && flow.length > 0) {
-          var last6 = flow.slice(0, 6).reverse();
           var ctx = document.getElementById('cashFlowChart').getContext('2d');
           if (charts.cashFlow) charts.cashFlow.destroy();
           charts.cashFlow = new Chart(ctx, {
             type: 'bar',
             data: {
-              labels: last6.map(function(r) { return r.month; }),
+              labels: flow.map(function(r) { return r.period; }),
               datasets: [
-                { label: 'Inflows', data: last6.map(function(r) { return r.inflows || 0; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
-                { label: 'Outflows', data: last6.map(function(r) { return Math.abs(r.outflows || 0); }), backgroundColor: 'rgba(239,68,68,0.5)', borderRadius: 4 }
+                { label: 'Inflows', data: flow.map(function(r) { return r.inflows || 0; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
+                { label: 'Outflows', data: flow.map(function(r) { return Math.abs(r.outflows || 0); }), backgroundColor: 'rgba(239,68,68,0.5)', borderRadius: 4 }
               ]
             },
             options: {
               responsive: true, maintainAspectRatio: false,
               scales: {
-                x: { grid: { display: false }, ticks: { color: '#8b8fa3', font: { size: 10 } } },
+                x: { grid: { display: false }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 20 } },
                 y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } }
               },
               plugins: {
