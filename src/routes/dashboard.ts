@@ -1540,12 +1540,19 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Executive summary for CEO dashboard
-  router.get('/executive-summary', (_req, res) => {
-    // Find latest and prior snapshots
-    const snaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 2`).all() as any[];
-    const currentSnap = snaps[0]?.snapshot_date;
-    const priorSnap = snaps[1]?.snapshot_date;
+  router.get('/executive-summary', (req, res) => {
+    const requestedDate = (req.query.as_of_date as string) || '';
+
+    // Find matching snapshot
+    const snapQuery = requestedDate
+      ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate) as any
+      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`).get() as any;
+    const currentSnap = snapQuery?.snapshot_date;
     if (!currentSnap) return res.json({});
+
+    // Find prior snapshot (the one before current)
+    const priorQuery = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < ? ORDER BY snapshot_date DESC LIMIT 1`).get(currentSnap) as any;
+    const priorSnap = priorQuery?.snapshot_date;
 
     // Company to group mapping
     const companyToGroup: Record<number, string> = {};
