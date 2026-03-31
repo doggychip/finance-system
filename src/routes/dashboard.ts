@@ -552,6 +552,23 @@ export function dashboardRoutes(db: Database.Database): Router {
       const equityUnaffected = byType['equity_unaffected'] || 0;
       const pl = plTypes.reduce((s, t) => s + (byType[t] || 0), 0);
 
+      // Get equity account detail for breakdown
+      const equityAccounts = db.prepare(`
+        SELECT account_code, account_name, balance
+        FROM account_balances
+        WHERE company_id = ? AND snapshot_date = ? AND account_type = 'equity' AND ABS(balance) > 0.01
+        ORDER BY ABS(balance) DESC
+      `).all(company.company_id, snapDate) as any[];
+
+      // Categorize equity accounts
+      let retainedEarnings = 0, shareCapitals = 0, capitalInWallet = 0, otherEquity = 0;
+      for (const ea of equityAccounts) {
+        if (ea.account_code === '310000' || ea.account_name.toLowerCase().includes('share capital')) shareCapitals += ea.balance;
+        else if (ea.account_code === '201000' || ea.account_name.toLowerCase().includes('capital in wallet')) capitalInWallet += ea.balance;
+        else if (ea.account_name.toLowerCase().includes('retained') || ea.account_code === '500000') retainedEarnings += ea.balance;
+        else otherEquity += ea.balance;
+      }
+
       const totalCurrentAssets = bankCash + receivable + currentAssets + prepayments;
       const totalAssets = totalCurrentAssets + fixedAssets + nonCurrentAssets;
       const totalCurrentLiabilities = currentLiab + payable;
@@ -580,7 +597,10 @@ export function dashboardRoutes(db: Database.Database): Router {
         },
         equity: {
           equity: totalEquity,
-          equity_unaffected: 0,
+          unallocated_earnings: equityUnaffected + pl,
+          retained_earnings: retainedEarnings + otherEquity,
+          share_capitals: shareCapitals,
+          capital_in_wallet: capitalInWallet,
           total: totalEquity,
         },
         liabilities_plus_equity: totalLiabilities + totalEquity,
@@ -1656,13 +1676,33 @@ export function dashboardRoutes(db: Database.Database): Router {
       ORDER BY ABS(net) DESC LIMIT 5
     `).all(currentSnap) as any[];
 
-    // Cash by entity group for chart
+    // Cash by entity group for chart — split into bank and crypto
     const entityCash: any[] = [];
+    // Get per-entity bank vs crypto split
+    const entityDetailRows = db.prepare(`
+      SELECT company_id, account_code, balance
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
+    `).all(currentSnap) as any[];
+
+    const entityBankCash: Record<string, number> = {};
+    const entityCryptoCash: Record<string, number> = {};
+    for (const r of entityDetailRows) {
+      const group = companyToGroup[r.company_id] || 'Other';
+      if (r.account_code.startsWith('10W')) {
+        entityCryptoCash[group] = (entityCryptoCash[group] || 0) + r.balance;
+      } else {
+        entityBankCash[group] = (entityBankCash[group] || 0) + r.balance;
+      }
+    }
+
     for (const g of ENTITY_GROUPS) {
       if (g.is_subtotal || g.is_manual) continue;
-      const cash = groupCash[g.name] || 0;
-      if (Math.abs(cash) > 100) {
-        entityCash.push({ name: g.name, cash });
+      const bank = entityBankCash[g.name] || 0;
+      const crypto = entityCryptoCash[g.name] || 0;
+      const total = bank + crypto;
+      if (Math.abs(total) > 100) {
+        entityCash.push({ name: g.name, cash: total, bank, crypto });
       }
     }
     entityCash.sort((a, b) => b.cash - a.cash);
