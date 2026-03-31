@@ -29,6 +29,27 @@
     <input type="password" id="loginPass" placeholder="Enter password">
     <button onclick="login()">Sign In</button>
     <div class="error" id="loginError"></div>
+    <div style="margin-top:16px">
+      <a href="#" onclick="showReset()" style="color:var(--accent);font-size:13px;text-decoration:none">修改密码</a>
+    </div>
+
+    <!-- Reset password form (hidden by default) -->
+    <div id="resetForm" style="display:none;margin-top:20px;text-align:left;border-top:1px solid var(--border);padding-top:16px">
+      <label>选择用户</label>
+      <select id="resetUser" style="width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:12px"></select>
+      <label>当前密码</label>
+      <input type="password" id="resetCurrentPass" placeholder="输入当前密码" style="width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:12px">
+      <label>新密码</label>
+      <input type="password" id="resetNewPass" placeholder="输入新密码" style="width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:12px">
+      <label>确认新密码</label>
+      <input type="password" id="resetConfirmPass" placeholder="再次输入新密码" style="width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:12px">
+      <button onclick="resetPassword()" style="width:100%;padding:14px;border-radius:8px;border:none;background:var(--accent);color:white;font-size:15px;font-weight:600;cursor:pointer;">修改密码</button>
+      <div class="error" id="resetError" style="margin-top:8px"></div>
+      <div id="resetSuccess" style="color:var(--green);font-size:12px;margin-top:8px;display:none"></div>
+      <div style="margin-top:12px;text-align:center">
+        <a href="#" onclick="hideReset()" style="color:var(--text-dim);font-size:13px;text-decoration:none">返回登录</a>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -70,6 +91,61 @@
     document.getElementById('loginPass').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') login();
     });
+
+    function showReset() {
+      document.getElementById('resetForm').style.display = 'block';
+      // Copy users to reset dropdown
+      var users = document.getElementById('loginUser');
+      var resetSel = document.getElementById('resetUser');
+      resetSel.innerHTML = users.innerHTML;
+    }
+    function hideReset() {
+      document.getElementById('resetForm').style.display = 'none';
+      document.getElementById('resetError').textContent = '';
+      document.getElementById('resetSuccess').style.display = 'none';
+    }
+
+    async function resetPassword() {
+      var username = document.getElementById('resetUser').value;
+      var currentPass = document.getElementById('resetCurrentPass').value;
+      var newPass = document.getElementById('resetNewPass').value;
+      var confirmPass = document.getElementById('resetConfirmPass').value;
+      var errEl = document.getElementById('resetError');
+      var sucEl = document.getElementById('resetSuccess');
+      errEl.textContent = '';
+      sucEl.style.display = 'none';
+
+      if (!currentPass) { errEl.textContent = '请输入当前密码'; return; }
+      if (!newPass || newPass.length < 4) { errEl.textContent = '新密码至少4个字符'; return; }
+      if (newPass !== confirmPass) { errEl.textContent = '两次密码不一致'; return; }
+
+      // First login to get user ID
+      var loginRes = await fetch('/api/tasks/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: currentPass })
+      });
+      if (!loginRes.ok) { errEl.textContent = '当前密码错误'; return; }
+      var user = await loginRes.json();
+
+      // Change password
+      var res = await fetch('/api/tasks/users/' + user.id + '/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: currentPass, new_password: newPass })
+      });
+      if (!res.ok) {
+        var data = await res.json();
+        errEl.textContent = data.error || '修改失败';
+        return;
+      }
+      sucEl.textContent = '密码修改成功！';
+      sucEl.style.display = 'block';
+      document.getElementById('resetCurrentPass').value = '';
+      document.getElementById('resetNewPass').value = '';
+      document.getElementById('resetConfirmPass').value = '';
+      setTimeout(hideReset, 2000);
+    }
 
     loadUsers();
   </script>
