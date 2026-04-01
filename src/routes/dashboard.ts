@@ -179,8 +179,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Non-OW Total "Cash" = bank accounts only (100xxx codes) + Xterio Foundation
     // This excludes Digital Token (10Wxxx) — matches the "Cash" sub-line in consolidated BS
     const nonOWBankCash = nonOWRows.filter((r: any) => r.code.startsWith('100')).reduce((s: number, r: any) => s + r.balance, 0);
-    const xterioFoundationCash = 5942149;
-    const nonOWCash = nonOWBankCash + xterioFoundationCash;
+    const foundationCashLegacy = 5942149;
+    const nonOWCash = nonOWBankCash + foundationCashLegacy;
 
     // Split cash into bank (100xxx) vs crypto (10Wxxx) sub-categories
     const allPositiveCash = [...cash]; // non-OW positive asset_cash accounts
@@ -1590,7 +1590,10 @@ export function dashboardRoutes(db: Database.Database): Router {
     const holdingsGroups = new Set(['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
-    const xterioFoundationCash = 5942149;
+    // Foundation: manual entry
+    const foundationAssets = 5942149;       // Cash (CHF→USD)
+    const foundationLiabilities = 1369636;  // IC payables to Xterio entities
+    const foundationNetAssets = foundationAssets - foundationLiabilities; // 4,572,513
 
     // Helper: get all company IDs for a group set
     const getCompanyIds = (groups: Set<string>) =>
@@ -1692,12 +1695,12 @@ export function dashboardRoutes(db: Database.Database): Router {
     const wfXterio = buildWaterfall(xterioCompanyIds);
     const wfHoldings = buildWaterfall(holdingsCompanyIds);
     const wfOW = buildWaterfall(owCompanyIds);
-    const wfFoundation = { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: xterioFoundationCash, cash_crypto: 0 };
+    const wfFoundation = { receivable: 0, payable: 0, intercompany: -foundationLiabilities, deposit: 0, cash_fiat: foundationAssets, cash_crypto: 0 };
 
     const totalCashFiat = wfFoundation.cash_fiat + wfXterio.cash_fiat + wfHoldings.cash_fiat + wfOW.cash_fiat;
     const totalCashCrypto = wfXterio.cash_crypto + wfHoldings.cash_crypto + wfOW.cash_crypto;
     const totalCashAll = totalCashFiat + totalCashCrypto;
-    const totalGroupNetAssets = xterioFoundationCash + xterioNetAssets + holdingsNetAssets + owNetAssets;
+    const totalGroupNetAssets = foundationNetAssets + xterioNetAssets + holdingsNetAssets + owNetAssets;
 
     // === BACKWARD COMPAT: cash by entity group for chart ===
     const cashRows = db.prepare(`
@@ -1803,7 +1806,7 @@ export function dashboardRoutes(db: Database.Database): Router {
                SUM(CASE WHEN company_id IN (${Array.from(owGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as ow
         FROM account_balances WHERE snapshot_date = ? AND account_type = 'asset_cash'
       `).get(s.snapshot_date) as any;
-      return { date: s.snapshot_date, non_ow: (row?.non_ow || 0) + xterioFoundationCash, ow: row?.ow || 0 };
+      return { date: s.snapshot_date, non_ow: (row?.non_ow || 0) + foundationAssets, ow: row?.ow || 0 };
     });
 
     res.json({
@@ -1812,8 +1815,8 @@ export function dashboardRoutes(db: Database.Database): Router {
       // Net Assets per group
       xterio_net_assets: xterioNetAssets,
       xterio_net_assets_prior: priorXterioNetAssets,
-      foundation_net_assets: xterioFoundationCash,
-      foundation_net_assets_prior: xterioFoundationCash,
+      foundation_net_assets: foundationNetAssets,
+      foundation_net_assets_prior: foundationNetAssets,
       holdings_net_assets: holdingsNetAssets,
       holdings_net_assets_prior: priorHoldingsNetAssets,
       ow_net_assets: owNetAssets,
@@ -1822,7 +1825,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       total_group_net_assets: totalGroupNetAssets,
       // Per-function waterfall
       waterfall: {
-        foundation: { net_assets: xterioFoundationCash, ...wfFoundation },
+        foundation: { net_assets: foundationNetAssets, ...wfFoundation },
         xterio: { net_assets: xterioNetAssets, ...wfXterio },
         holdings: { net_assets: holdingsNetAssets, adj_300040: -holdingsAdj300040, ...wfHoldings },
         ow: { net_assets: owNetAssets, ...wfOW },
