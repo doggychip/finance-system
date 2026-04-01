@@ -118,12 +118,6 @@
           { key: 'thrackle_loan', label: 'Thrackle Loan' },
         ];
 
-        // Check if other_assets or other_liabilities have non-zero values
-        var hasOtherAssets = snaps.some(function(s) { return Math.abs(s.other_assets) > 0.5; });
-        var hasOtherLiab = snaps.some(function(s) { return Math.abs(s.other_liabilities) > 0.5; });
-        if (hasOtherAssets) rows.push({ key: 'other_assets', label: 'Other Assets' });
-        if (hasOtherLiab) rows.push({ key: 'other_liabilities', label: 'Other Liabilities' });
-
         var html = '<div style="overflow-x:auto"><table>';
         html += '<thead><tr><th>OW & ReachRHG</th>';
         snaps.forEach(function(s) {

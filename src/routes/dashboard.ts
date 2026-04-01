@@ -1861,53 +1861,51 @@ export function dashboardRoutes(db: Database.Database): Router {
         ORDER BY account_code
       `).all(s.snapshot_date, ...owCompanyIds) as any[];
 
-      // Categorize into closing balance line items
+      // Categorize into closing balance line items matching Excel definition
+      // Only include curated line items — exclude equity, P&L, fixed assets, non-current assets
       let cash = 0, orFromXterio = 0, ar = 0, noteReceivable = 0;
-      let payables = 0, accrualExp = 0, thrackle = 0, otherAssets = 0, otherLiabilities = 0;
+      let payables = 0, accrualExp = 0, thrackle = 0;
 
       for (const r of rows) {
         const code = r.code;
         const bal = r.balance;
 
-        // Cash (asset_cash)
+        // Cash (asset_cash — bank 100xxx + crypto 10Wxxx)
         if (r.account_type === 'asset_cash') {
           cash += bal;
         }
-        // OR From Xterio (intercompany 303030, 303031, 303040, 303041 etc.)
-        else if (code.startsWith('303')) {
+        // OR From Xterio — IC receivables from Xterio entities
+        // 303030 Xterio Fdn, 303031 Xterio Fdn W3, 303010 Holding, 303011 Holding W3
+        // 303040 Xterlabs, 303041 Xterlabs W3, 303020 Libecciotech, 303021 Libecciotech W3
+        else if (code === '303030' || code === '303031' || code === '303010' || code === '303011' ||
+                 code === '303040' || code === '303041' || code === '303020' || code === '303021' ||
+                 code === '303110' || code === '303100') {
           orFromXterio += bal;
         }
-        // AR (101000, 101010)
-        else if (code === '101000' || code === '101010') {
+        // AR — Accounts Receivable (101000 only)
+        else if (code === '101000') {
           ar += bal;
+        }
+        // NoteReceivable — Other Receivable (101010)
+        else if (code === '101010') {
+          noteReceivable += bal;
+        }
+        // Payables — Trade Payables (300030)
+        else if (code === '300030') {
+          payables += bal;
         }
         // Accrued Expenses (301000)
         else if (code === '301000') {
           accrualExp += bal;
         }
-        // Trade/Accounts Payable (300000, 300030)
-        else if (code === '300000' || code === '300030') {
-          payables += bal;
-        }
-        // Thrackle Loan / Other non-current liabilities (300040, 300050)
-        else if (code === '300040' || code === '300050') {
+        // Thrackle Loan — Other Payables non-trade (300040)
+        else if (code === '300040') {
           thrackle += bal;
         }
-        // Note receivable and other current assets
-        else if (r.account_type === 'asset_receivable' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') {
-          noteReceivable += bal;
-        }
-        // Other assets
-        else if (r.account_type?.startsWith('asset_')) {
-          otherAssets += bal;
-        }
-        // Other liabilities
-        else if (r.account_type?.startsWith('liability_')) {
-          otherLiabilities += bal;
-        }
+        // All other accounts are excluded from OW closing balance
       }
 
-      const total = cash + orFromXterio + ar + noteReceivable + payables + accrualExp + thrackle + otherAssets + otherLiabilities;
+      const total = cash + orFromXterio + ar + noteReceivable + payables + accrualExp + thrackle;
 
       return {
         date: s.snapshot_date,
@@ -1918,24 +1916,12 @@ export function dashboardRoutes(db: Database.Database): Router {
         payables,
         accrual_exp: accrualExp,
         thrackle_loan: thrackle,
-        other_assets: otherAssets,
-        other_liabilities: otherLiabilities,
         total,
       };
     });
 
-    // Monthly burn estimate (latest 2 months)
-    let monthlyBurn = 250000; // default
-    if (snapshots.length >= 2) {
-      const latest = snapshots[snapshots.length - 1];
-      const prior = snapshots[snapshots.length - 2];
-      const daysDiff = (new Date(latest.date).getTime() - new Date(prior.date).getTime()) / 86400000;
-      if (daysDiff > 0) {
-        const dailyBurn = (prior.total - latest.total) / daysDiff;
-        monthlyBurn = Math.max(0, dailyBurn * 30);
-      }
-    }
-
+    // Monthly burn from Excel: $250,000 (1 Month Bonus * 3 Years)
+    const monthlyBurn = 250000;
     const latestTotal = snapshots.length > 0 ? snapshots[snapshots.length - 1].total : 0;
     const availableBalance = latestTotal;
     const runwayMonths = monthlyBurn > 0 ? Math.round(availableBalance / monthlyBurn) : null;
