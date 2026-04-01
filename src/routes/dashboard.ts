@@ -773,6 +773,9 @@ export function dashboardRoutes(db: Database.Database): Router {
             'A_300040': 0, 'A_300050': 0, 'A_303030': 1204636,
             'EQUITY': 4563853,
             'EQUITY_RETAINED': -33889064,
+            'A_RETAINED_EARNINGS': -33889064,
+            'A_SHARE_CAPITALS': 0,
+            'A_CAPITAL_IN_WALLET': 0,
             'CURRENT_YEAR_PL': 12831 + 38452916, // Current Year + Share Capitals (38,452,916)
             'LIAB_EQUITY': 5933488,
           };
@@ -1403,8 +1406,10 @@ export function dashboardRoutes(db: Database.Database): Router {
       const groups = Object.entries(byGroup).map(([name, accs]) => ({
         name,
         accounts: accs,
-        total_current: accs.filter((a: any) => a.code.startsWith('100')).reduce((s: number, a: any) => s + a.current_balance, 0),
-        total_prior: accs.filter((a: any) => a.code.startsWith('100')).reduce((s: number, a: any) => s + a.prior_balance, 0),
+        total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
+        total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
+        total_cash_current: accs.filter((a: any) => a.code.startsWith('100')).reduce((s: number, a: any) => s + a.current_balance, 0),
+        total_crypto_current: accs.filter((a: any) => a.code.startsWith('10W')).reduce((s: number, a: any) => s + a.current_balance, 0),
         total_all: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
       }));
 
@@ -1725,9 +1730,23 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
     entityCash.sort((a, b) => b.cash - a.cash);
 
-    // Cash trend from snapshots
+    // Cash trend from snapshots — aggregated weekly (use latest snapshot per ISO week)
     const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
-    const cashTrend = allSnaps.map((s: any) => {
+    // Group snapshots by ISO week, keep only the latest snapshot per week
+    const weeklySnaps: any[] = [];
+    const seenWeeks = new Set<string>();
+    for (let i = allSnaps.length - 1; i >= 0; i--) {
+      const d = new Date(allSnaps[i].snapshot_date + 'T00:00:00Z');
+      const year = d.getUTCFullYear();
+      const jan1 = new Date(Date.UTC(year, 0, 1));
+      const weekNum = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getUTCDay() + 1) / 7);
+      const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`;
+      if (!seenWeeks.has(weekKey)) {
+        seenWeeks.add(weekKey);
+        weeklySnaps.unshift(allSnaps[i]);
+      }
+    }
+    const cashTrend = weeklySnaps.map((s: any) => {
       const row = db.prepare(`
         SELECT SUM(CASE WHEN company_id IN (${Array.from(nonOWGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as non_ow,
                SUM(CASE WHEN company_id IN (${Array.from(owGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as ow
