@@ -1628,6 +1628,13 @@ export function dashboardRoutes(db: Database.Database): Router {
       if (holdingsGroups.has(group)) holdingsNetAssets += r.total;
     }
 
+    // Holdings adjustment: add back 300040 "Other Payables (non-trade)" which is actually
+    // a shareholder investment (~$3.5M in Palios/CS), not a real payable
+    const holdingsAdj300040 = holdingsCompanyIds.length > 0
+      ? (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${holdingsCompanyIds.map(() => '?').join(',')}) AND account_code = '300040'`).get(currentSnap, ...holdingsCompanyIds) as any)?.total || 0
+      : 0;
+    holdingsNetAssets -= holdingsAdj300040; // balance is negative (liability), subtracting negative = adding
+
     let owNetAssets = 0;
     for (const r of owNetAssetsRows) {
       const group = companyToGroup[r.company_id] || 'Other';
@@ -1650,6 +1657,11 @@ export function dashboardRoutes(db: Database.Database): Router {
         if (xterioGroups.has(group)) priorXterioNetAssets += r.total;
         if (holdingsGroups.has(group)) priorHoldingsNetAssets += r.total;
       }
+      // Prior Holdings 300040 adjustment
+      const priorHoldingsAdj = holdingsCompanyIds.length > 0
+        ? (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${holdingsCompanyIds.map(() => '?').join(',')}) AND account_code = '300040'`).get(priorSnap, ...holdingsCompanyIds) as any)?.total || 0
+        : 0;
+      priorHoldingsNetAssets -= priorHoldingsAdj;
       const priorOWNARows = db.prepare(`
         SELECT company_id, SUM(balance) as total
         FROM account_balances
@@ -1812,7 +1824,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       waterfall: {
         foundation: { net_assets: xterioFoundationCash, ...wfFoundation },
         xterio: { net_assets: xterioNetAssets, ...wfXterio },
-        holdings: { net_assets: holdingsNetAssets, ...wfHoldings },
+        holdings: { net_assets: holdingsNetAssets, adj_300040: -holdingsAdj300040, ...wfHoldings },
         ow: { net_assets: owNetAssets, ...wfOW },
       },
       // Aggregated cash totals
