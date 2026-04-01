@@ -108,67 +108,80 @@
   </div>
 
   <div class="container">
-    <!-- Health Bar -->
-    <div class="health-bar">
-      <span class="label">System Health</span>
-      <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
-      <span class="health-score" id="healthScore">--</span>
-      <div class="health-meta" id="healthMeta"></div>
+    <!-- Level 1: Total Group Net Assets -->
+    <div class="hero-card main" style="text-align:center;margin-bottom:24px;padding:28px">
+      <div class="label" style="font-size:14px">Total Group Net Assets</div>
+      <div class="value" id="heroTotalNA" style="font-size:48px">--</div>
+      <div class="sub" id="heroTotalNASub" style="font-size:12px">Loading...</div>
     </div>
 
-    <!-- Net Assets Widgets -->
+    <!-- Level 2: 4 Function Net Assets -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <div class="hero-card">
-        <div class="label" title="Xterio Foundation — manual entry (CHF→USD)">Foundation Net Assets <span style="cursor:help;color:var(--text-dim)" title="Manual data. Entities: Xterio Foundation (22)">ⓘ</span></div>
-        <div class="value" id="heroFoundation" style="font-size:28px;color:var(--green)">--</div>
+        <div class="label" title="Xterio Foundation (22) — manual entry">Foundation <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="value" id="heroFoundation" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroFoundationChange"></div>
         <div class="sub" id="heroFoundationSub"></div>
       </div>
       <div class="hero-card">
-        <div class="label" title="LTECH, AOD, XLABS, PRIVILEGE HK + Foundation">Xterio Net Assets <span style="cursor:help;color:var(--text-dim)" title="Entities: LTECH(1,23), AOD(5,6,7,10), XLABS(17,18), PRIVILEGE HK(21) + Foundation(22). Net Assets = Total Assets + Total Liabilities.">ⓘ</span></div>
-        <div class="value" id="heroXterio" style="font-size:28px;color:var(--green)">--</div>
+        <div class="label" title="LTECH+AOD+XLABS+PRIVILEGE+Foundation">Xterio <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="value" id="heroXterio" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroXterioChange"></div>
         <div class="sub" id="heroXterioSub"></div>
       </div>
       <div class="hero-card">
-        <div class="label" title="CS, Palios, LHOLDINGS, QUANTUMMIND">Holdings Net Assets <span style="cursor:help;color:var(--text-dim)" title="Entities: CS(2,3,4,12,13,14), Palios(11,9), LHOLDINGS(19,20), QUANTUMMIND(8). Net Assets = Total Assets + Total Liabilities.">ⓘ</span></div>
-        <div class="value" id="heroHoldings" style="font-size:28px;color:var(--green)">--</div>
+        <div class="label" title="CS+Palios+LHOLDINGS+QUANTUMMIND">Holdings <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="value" id="heroHoldings" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroHoldingsChange"></div>
         <div class="sub" id="heroHoldingsSub"></div>
       </div>
       <div class="hero-card">
-        <div class="label" title="OW, Reach, Rough house, Keystone — excl. fixed assets">OW Net Assets <span style="cursor:help;color:var(--text-dim)" title="Entities: OW(15,16), Reach(30), Rough house(31), Keystone(28). Excludes asset_fixed & asset_non_current (project capitalization).">ⓘ</span></div>
-        <div class="value" id="heroOWClosing" style="font-size:28px;color:var(--green)">--</div>
+        <div class="label" title="OW+Reach+Rough house+Keystone, excl fixed assets">Overworld <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="value" id="heroOWClosing" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroOWClosingChange"></div>
         <div class="sub" id="heroOWClosingSub"></div>
       </div>
     </div>
 
-    <div class="snap-info" style="margin-bottom:16px;font-size:11px;color:var(--text-dim)">
-      Net Assets = Total Assets + Total Liabilities (excl. Equity & P&L). Cash = Fiat (100xxx) + Crypto (10Wxxx). All figures from Odoo snapshots.
-    </div>
-
-    <!-- Net Assets → Cash Waterfall -->
+    <!-- Level 3: Per-Function Waterfall -->
     <div class="card" style="margin-bottom:24px">
-      <h2>Net Assets → Cash Bridge (Non-OW) <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Shows adjustment items from Net Assets down to Cash+Crypto for Foundation + Xterio + Holdings groups.">ⓘ</span></h2>
-      <div id="waterfallTable"><div class="loading">Loading...</div></div>
+      <h2>Net Assets → Cash Breakdown <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Per-function adjustment from Net Assets to Cash+Crypto.">ⓘ</span></h2>
+      <div id="waterfallTable" style="overflow-x:auto"><div class="loading">Loading...</div></div>
     </div>
 
-    <!-- Cash Breakdown: Fiat + Crypto -->
+    <!-- Level 4: Cash Totals -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr">
       <div class="hero-card main">
-        <div class="label">Total Cash (Fiat) <span style="cursor:help;color:var(--text-dim)" title="Bank accounts (100xxx codes) for all non-OW entities + Foundation.">ⓘ</span></div>
+        <div class="label">Total Cash (Fiat) <span style="cursor:help;color:var(--text-dim)" title="Bank accounts (100xxx) across all entities incl. Foundation.">ⓘ</span></div>
         <div class="value" id="heroCashFiat">--</div>
         <div class="sub" id="heroCashFiatSub"></div>
       </div>
       <div class="hero-card">
-        <div class="label">Total Crypto <span style="cursor:help;color:var(--text-dim)" title="Digital token accounts (10Wxxx codes) for all non-OW entities.">ⓘ</span></div>
+        <div class="label">Total Crypto <span style="cursor:help;color:var(--text-dim)" title="Digital token accounts (10Wxxx) across all entities.">ⓘ</span></div>
         <div class="value" id="heroCashCrypto" style="font-size:28px;color:var(--cyan)">--</div>
         <div class="sub" id="heroCashCryptoSub"></div>
       </div>
     </div>
 
-    <!-- Cash Flow Chart -->
+    <!-- Level 5: Account Detail -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Cash (Fiat) by Account <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Bank accounts (100xxx), sorted by balance descending.">ⓘ</span></h2>
+        <div id="fiatAccounts"><div class="loading">Loading...</div></div>
+      </div>
+      <div class="card">
+        <h2>Crypto by Account <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Crypto/wallet accounts (10Wxxx), sorted by balance descending.">ⓘ</span></h2>
+        <div id="cryptoAccounts"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Key Alerts -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Key Alerts</h2>
+      <div id="dbAlerts"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Cash Flow -->
     <div class="cash-overview" style="margin-bottom:24px">
       <h2>Cash Flow</h2>
       <div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
@@ -181,13 +194,7 @@
       <div class="cash-flow-chart"><canvas id="cashFlowChart"></canvas></div>
     </div>
 
-    <!-- Key Alerts -->
-    <div class="card" style="margin-bottom:24px">
-      <h2>Key Alerts</h2>
-      <div id="dbAlerts"><div class="loading">Loading...</div></div>
-    </div>
-
-    <!-- Revenue vs Expense + Monthly Volume -->
+    <!-- Charts -->
     <div class="grid-2">
       <div class="card">
         <h2>Revenue vs Expenses</h2>
@@ -199,25 +206,7 @@
       </div>
     </div>
 
-    <!-- Entity Breakdown -->
-    <div class="card" style="margin-bottom:24px">
-      <h2>Cash by Entity</h2>
-      <div id="entityBars"><div class="loading">Loading...</div></div>
-    </div>
-
-    <!-- C2: Cash Distribution Pie Chart -->
-    <div class="grid-2">
-      <div class="card">
-        <h2>Cash & Crypto Distribution (by Entity)</h2>
-        <div class="chart-box"><canvas id="distChart"></canvas></div>
-      </div>
-      <div class="card">
-        <h2>Bank vs Crypto Split</h2>
-        <div class="chart-box"><canvas id="bankCryptoChart"></canvas></div>
-      </div>
-    </div>
-
-    <!-- C3: Top Expenses / Payments -->
+    <!-- Top Expenses -->
     <div class="card" style="margin-bottom:24px">
       <h2>Top Expenses by Account (Largest First)</h2>
       <div id="topExpenses"><div class="loading">Loading...</div></div>
@@ -259,41 +248,62 @@
           document.getElementById(idPrefix + 'Sub').textContent = subText;
         }
 
-        fillWidget('heroFoundation', data.foundation_net_assets, data.foundation_net_assets_prior, 'As of ' + data.snapshot_date + ' | Manual entry');
-        fillWidget('heroXterio', data.xterio_net_assets, data.xterio_net_assets_prior, 'As of ' + data.snapshot_date + ' | LTECH+AOD+XLABS+PRIVILEGE+Foundation');
-        fillWidget('heroHoldings', data.holdings_net_assets, data.holdings_net_assets_prior, 'As of ' + data.snapshot_date + ' | CS+Palios+LHOLDINGS+QM');
-        fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'As of ' + data.snapshot_date + ' | Excl. fixed assets');
+        // Level 1: Total Group Net Assets
+        var totalGroupNA = data.total_group_net_assets || 0;
+        document.getElementById('heroTotalNA').textContent = fmt(totalGroupNA);
+        document.getElementById('heroTotalNASub').textContent = 'As of ' + data.snapshot_date + ' | Foundation + Xterio + Holdings + OW';
 
-        // Waterfall table: Net Assets → Cash
-        var totalNA = data.total_net_assets || 0;
-        var cashCrypto = data.total_cash_all || 0;
-        var otherAdj = cashCrypto - totalNA - (data.total_receivable || 0) - (data.total_payable || 0) - (data.total_intercompany || 0) - (data.total_deposit || 0);
-        var wfRows = [
-          ['Net Assets Total (Xterio + Holdings)', totalNA, false, true],
-          ['Receivables', data.total_receivable, true, false],
-          ['Payables & Current Liabilities', data.total_payable, true, false],
-          ['Intercompany (303xxx)', data.total_intercompany, true, false],
-          ['Deposits (202000)', data.total_deposit, true, false],
-          ['Cash + Crypto Total', cashCrypto, false, true],
-          ['→ Cash (Fiat)', data.total_cash_fiat, true, false],
-          ['→ Crypto', data.total_cash_crypto, true, false],
+        // Level 2: 4 Function Net Assets
+        fillWidget('heroFoundation', data.foundation_net_assets, data.foundation_net_assets_prior, 'Manual entry');
+        fillWidget('heroXterio', data.xterio_net_assets, data.xterio_net_assets_prior, 'LTECH+AOD+XLABS+PRIVILEGE+Foundation');
+        fillWidget('heroHoldings', data.holdings_net_assets, data.holdings_net_assets_prior, 'CS+Palios+LHOLDINGS+QM');
+        fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'Excl. fixed assets');
+
+        // Level 3: Per-function waterfall table
+        var wf = data.waterfall || {};
+        var funcs = ['foundation', 'xterio', 'holdings', 'ow'];
+        var funcLabels = ['Foundation', 'Xterio', 'Holdings', 'OW'];
+        var rowDefs = [
+          { key: 'net_assets', label: 'Net Assets', bold: true },
+          { key: 'receivable', label: '  Receivables', bold: false },
+          { key: 'payable', label: '  Payables & Current Liab.', bold: false },
+          { key: 'intercompany', label: '  Intercompany (303xxx)', bold: false },
+          { key: 'deposit', label: '  Deposits (202000)', bold: false },
+          { key: '_cash_total', label: 'Cash + Crypto', bold: true },
+          { key: 'cash_fiat', label: '  → Cash (Fiat)', bold: false },
+          { key: 'cash_crypto', label: '  → Crypto', bold: false },
         ];
-        var wfHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
-        wfRows.forEach(function(row) {
-          var label = row[0], val = row[1], indent = row[2], bold = row[3];
-          var style = bold ? 'font-weight:700;font-size:14px;' : '';
-          var color = val < 0 ? 'color:var(--red)' : val > 0 ? 'color:var(--green)' : '';
-          var pad = indent ? 'padding-left:24px;' : '';
-          wfHtml += '<tr style="border-bottom:1px solid var(--border);' + style + '"><td style="padding:8px 12px;' + pad + '">' + label + '</td><td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;' + color + '">' + fmt(val) + '</td></tr>';
+
+        var wfHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        wfHtml += '<thead><tr><th style="text-align:left;padding:8px 10px;color:var(--text-dim);border-bottom:2px solid var(--border)">Item</th>';
+        funcLabels.forEach(function(l) { wfHtml += '<th style="text-align:right;padding:8px 10px;color:var(--text-dim);border-bottom:2px solid var(--border)">' + l + '</th>'; });
+        wfHtml += '<th style="text-align:right;padding:8px 10px;color:var(--text-dim);border-bottom:2px solid var(--border);font-weight:700">Total</th></tr></thead><tbody>';
+
+        rowDefs.forEach(function(rd) {
+          var isBold = rd.bold;
+          var style = isBold ? 'font-weight:700;' : '';
+          var border = isBold ? 'border-top:2px solid var(--accent);' : 'border-bottom:1px solid var(--border);';
+          wfHtml += '<tr style="' + border + style + '"><td style="padding:6px 10px;white-space:nowrap">' + rd.label + '</td>';
+          var rowTotal = 0;
+          funcs.forEach(function(f) {
+            var d = wf[f] || {};
+            var val = rd.key === '_cash_total' ? (d.cash_fiat || 0) + (d.cash_crypto || 0) : (d[rd.key] || 0);
+            rowTotal += val;
+            var color = val < -0.5 ? 'color:var(--red)' : val > 0.5 ? 'color:var(--green)' : '';
+            wfHtml += '<td style="padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums;' + color + '">' + fmt(val) + '</td>';
+          });
+          var totalColor = rowTotal < -0.5 ? 'color:var(--red)' : rowTotal > 0.5 ? 'color:var(--green)' : '';
+          wfHtml += '<td style="padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;' + totalColor + '">' + fmt(rowTotal) + '</td>';
+          wfHtml += '</tr>';
         });
-        wfHtml += '</table>';
+        wfHtml += '</tbody></table>';
         document.getElementById('waterfallTable').innerHTML = wfHtml;
 
-        // Cash Fiat & Crypto cards
+        // Level 4: Cash Fiat & Crypto totals
         document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
-        document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Foundation';
+        document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | All entities incl. Foundation';
         document.getElementById('heroCashCrypto').textContent = fmt(data.total_cash_crypto);
-        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snapshot_date;
+        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snapshot_date + ' | All entities';
 
         // Cash trend chart
         if (data.cash_trend && data.cash_trend.length > 0) {
@@ -322,61 +332,7 @@
           });
         }
 
-        // Entity cash bars
-        var barsEl = document.getElementById('entityBars');
-        var entities = data.entity_cash || [];
-        if (entities.length === 0) {
-          barsEl.innerHTML = '<div class="loading">No data</div>';
-        } else {
-          var maxCash = Math.max.apply(null, entities.map(function(e) { return Math.abs(e.cash); }));
-          barsEl.innerHTML = entities.map(function(e, i) {
-            var pct = maxCash > 0 ? (Math.abs(e.cash) / maxCash * 100) : 0;
-            var color = e.cash >= 0 ? palette[i % palette.length] : 'rgba(239,68,68,0.7)';
-            var bankStr = e.bank ? '<span style="color:var(--green)">Bank: ' + fmtShort(e.bank) + '</span>' : '';
-            var cryptoStr = e.crypto ? '<span style="color:var(--cyan)"> Crypto: ' + fmtShort(e.crypto) + '</span>' : '';
-            var detail = (bankStr || cryptoStr) ? '<div style="font-size:10px;color:var(--text-dim)">' + bankStr + cryptoStr + '</div>' : '';
-            return '<div class="entity-bar"><div class="name">' + e.name + detail + '</div>' +
-              '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(pct,2) + '%;background:' + color + '"></div></div>' +
-              '<div class="amount" style="color:' + (e.cash >= 0 ? 'var(--text)' : 'var(--red)') + '">' + fmtShort(e.cash) + '</div></div>';
-          }).join('');
-        }
-
         document.getElementById('snapInfo').textContent = 'Data as of ' + data.snapshot_date + (data.prior_date ? ' | Prior: ' + data.prior_date : '');
-
-        // C2: Distribution pie chart
-        if (entities.length > 0) {
-          var posEntities = entities.filter(function(e) { return e.cash > 0; }).sort(function(a,b) { return b.cash - a.cash; });
-          var ctx1 = document.getElementById('distChart').getContext('2d');
-          if (charts.dist) charts.dist.destroy();
-          charts.dist = new Chart(ctx1, {
-            type: 'doughnut',
-            data: {
-              labels: posEntities.map(function(e) { return e.name; }),
-              datasets: [{ data: posEntities.map(function(e) { return e.cash; }), backgroundColor: posEntities.map(function(_,i) { return palette[i % palette.length]; }), borderWidth: 0 }]
-            },
-            options: {
-              responsive: true, maintainAspectRatio: false, cutout: '50%',
-              plugins: { legend: { position: 'right', labels: { color: '#8b8fa3', font: { size: 10 }, boxWidth: 10, padding: 8 } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + fmt(c.parsed); } } } }
-            }
-          });
-
-          // Bank vs Crypto pie
-          var totalBank2 = entities.reduce(function(s,e) { return s + (e.bank || 0); }, 0);
-          var totalCrypto2 = entities.reduce(function(s,e) { return s + (e.crypto || 0); }, 0);
-          var ctx2 = document.getElementById('bankCryptoChart').getContext('2d');
-          if (charts.bankCrypto) charts.bankCrypto.destroy();
-          charts.bankCrypto = new Chart(ctx2, {
-            type: 'doughnut',
-            data: {
-              labels: ['Bank Cash', 'Crypto'],
-              datasets: [{ data: [Math.abs(totalBank2), Math.abs(totalCrypto2)], backgroundColor: ['#22c55e', '#06b6d4'], borderWidth: 0 }]
-            },
-            options: {
-              responsive: true, maintainAspectRatio: false, cutout: '50%',
-              plugins: { legend: { position: 'bottom', labels: { color: '#8b8fa3', font: { size: 12 } } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + fmt(c.parsed); } } } }
-            }
-          });
-        }
       } catch (err) {
         console.error(err);
       }
@@ -540,6 +496,51 @@
       } catch(e) { console.error('Top expenses error:', e); }
     }
 
+    // Level 5: Account detail tables (Fiat + Crypto)
+    async function loadAccountDetail() {
+      try {
+        var asOf = getAsOfParam();
+        var data = await (await fetch('/api/dashboard/bank-accounts' + asOf)).json();
+        var groups = data.groups || [];
+
+        var fiatAccounts = [];
+        var cryptoAccounts = [];
+
+        groups.forEach(function(g) {
+          (g.accounts || []).forEach(function(a) {
+            var item = { entity: g.name, code: a.code, name: a.name, balance: a.current_balance, company: a.company_name };
+            if (a.asset_type === 'Crypto' || (a.code && a.code.startsWith('10W'))) {
+              cryptoAccounts.push(item);
+            } else {
+              fiatAccounts.push(item);
+            }
+          });
+        });
+
+        fiatAccounts.sort(function(a, b) { return Math.abs(b.balance) - Math.abs(a.balance); });
+        cryptoAccounts.sort(function(a, b) { return Math.abs(b.balance) - Math.abs(a.balance); });
+
+        function renderTable(accounts, el) {
+          if (!accounts.length) { el.innerHTML = '<div class="loading">No accounts</div>'; return; }
+          var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+          html += '<thead><tr><th style="text-align:left;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Entity</th>';
+          html += '<th style="text-align:left;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Account</th>';
+          html += '<th style="text-align:right;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Balance</th></tr></thead><tbody>';
+          accounts.forEach(function(a) {
+            var color = a.balance < 0 ? 'color:var(--red)' : 'color:var(--green)';
+            html += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 8px;color:var(--text-dim);white-space:nowrap">' + a.entity + '</td>';
+            html += '<td style="padding:5px 8px;font-size:11px" title="' + a.code + ' — ' + a.company + '">' + a.name + '</td>';
+            html += '<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;' + color + '">' + fmt(a.balance) + '</td></tr>';
+          });
+          html += '</tbody></table>';
+          el.innerHTML = html;
+        }
+
+        renderTable(fiatAccounts, document.getElementById('fiatAccounts'));
+        renderTable(cryptoAccounts, document.getElementById('cryptoAccounts'));
+      } catch (e) { console.error('Account detail error:', e); }
+    }
+
     function refreshData() {
       loadAll();
       loadHealth();
@@ -547,6 +548,7 @@
       loadCashSummary();
       loadRevExpChart();
       loadTopExpenses();
+      loadAccountDetail();
     }
 
     refreshData();

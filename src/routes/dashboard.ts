@@ -1662,20 +1662,33 @@ export function dashboardRoutes(db: Database.Database): Router {
       }
     }
 
-    // === WATERFALL: Net Assets → Cash breakdown (non-OW only) ===
-    const nonOWPlaceholders = nonOWCompanyIds.map(() => '?').join(',');
-    const waterfallQuery = (accountFilter: string) =>
-      nonOWCompanyIds.length > 0
-        ? (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${nonOWPlaceholders}) AND ${accountFilter}`).get(currentSnap, ...nonOWCompanyIds) as any)?.total || 0
-        : 0;
+    // === PER-FUNCTION WATERFALL: Net Assets → Cash breakdown ===
+    const buildWaterfall = (companyIds: number[]) => {
+      if (companyIds.length === 0) return { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: 0, cash_crypto: 0 };
+      const ph = companyIds.map(() => '?').join(',');
+      const q = (filter: string) => (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${ph}) AND ${filter}`).get(currentSnap, ...companyIds) as any)?.total || 0;
+      return {
+        receivable: q(`account_type = 'asset_receivable'`),
+        payable: q(`account_type IN ('liability_payable', 'liability_current')`),
+        intercompany: q(`account_code LIKE '303%'`),
+        deposit: q(`account_code = '202000'`),
+        cash_fiat: q(`account_type = 'asset_cash' AND account_code LIKE '100%'`),
+        cash_crypto: q(`account_type = 'asset_cash' AND account_code LIKE '10W%'`),
+      };
+    };
 
-    const totalReceivable = waterfallQuery(`account_type = 'asset_receivable'`);
-    const totalPayable = waterfallQuery(`account_type IN ('liability_payable', 'liability_current')`);
-    const totalIntercompany = waterfallQuery(`account_code LIKE '303%'`);
-    const totalDeposit = waterfallQuery(`account_code = '202000'`);
-    const totalCashFiat = waterfallQuery(`account_type = 'asset_cash' AND account_code LIKE '100%'`) + xterioFoundationCash;
-    const totalCashCrypto = waterfallQuery(`account_type = 'asset_cash' AND account_code LIKE '10W%'`);
+    const wfXterio = buildWaterfall(xterioCompanyIds);
+    const wfHoldings = buildWaterfall(holdingsCompanyIds);
+    const wfOW = buildWaterfall(owCompanyIds);
+    const wfFoundation = { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: xterioFoundationCash, cash_crypto: 0 };
+
+    // Add foundation cash to xterio fiat
+    wfXterio.cash_fiat += xterioFoundationCash;
+
+    const totalCashFiat = wfFoundation.cash_fiat + wfXterio.cash_fiat - xterioFoundationCash + wfHoldings.cash_fiat + wfOW.cash_fiat;
+    const totalCashCrypto = wfXterio.cash_crypto + wfHoldings.cash_crypto + wfOW.cash_crypto;
     const totalCashAll = totalCashFiat + totalCashCrypto;
+    const totalGroupNetAssets = xterioNetAssets + holdingsNetAssets + owNetAssets;
 
     // === BACKWARD COMPAT: cash by entity group for chart ===
     const cashRows = db.prepare(`
@@ -1796,12 +1809,16 @@ export function dashboardRoutes(db: Database.Database): Router {
       holdings_net_assets_prior: priorHoldingsNetAssets,
       ow_net_assets: owNetAssets,
       ow_net_assets_prior: priorOWNetAssets,
-      // Waterfall: Net Assets → Cash
-      total_net_assets: xterioNetAssets + holdingsNetAssets,
-      total_receivable: totalReceivable,
-      total_payable: totalPayable,
-      total_intercompany: totalIntercompany,
-      total_deposit: totalDeposit,
+      // Total group
+      total_group_net_assets: totalGroupNetAssets,
+      // Per-function waterfall
+      waterfall: {
+        foundation: { net_assets: xterioFoundationCash, ...wfFoundation },
+        xterio: { net_assets: xterioNetAssets, ...wfXterio },
+        holdings: { net_assets: holdingsNetAssets, ...wfHoldings },
+        ow: { net_assets: owNetAssets, ...wfOW },
+      },
+      // Aggregated cash totals
       total_cash_fiat: totalCashFiat,
       total_cash_crypto: totalCashCrypto,
       total_cash_all: totalCashAll,
