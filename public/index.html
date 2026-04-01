@@ -135,10 +135,26 @@
       <div class="cash-flow-chart"><canvas id="cashFlowChart"></canvas></div>
     </div>
 
-    <!-- Key Alerts -->
-    <div class="card" style="margin-bottom:24px">
-      <h2>Key Alerts</h2>
-      <div id="dbAlerts"><div class="loading">Loading...</div></div>
+    <!-- Closing Balance Widgets -->
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="hero-card">
+        <div class="label">Xterio Closing Balance</div>
+        <div class="value" id="heroXterio" style="font-size:28px">--</div>
+        <div class="change" id="heroXterioChange"></div>
+        <div class="sub" id="heroXterioSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label">Holdings Closing Balance</div>
+        <div class="value" id="heroHoldings" style="font-size:28px">--</div>
+        <div class="change" id="heroHoldingsChange"></div>
+        <div class="sub" id="heroHoldingsSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label">OW Closing Balance</div>
+        <div class="value" id="heroOWClosing" style="font-size:28px">--</div>
+        <div class="change" id="heroOWClosingChange"></div>
+        <div class="sub" id="heroOWClosingSub"></div>
+      </div>
     </div>
 
     <!-- Hero KPIs -->
@@ -154,6 +170,12 @@
         <div class="value" id="heroOW" style="font-size:28px">--</div>
         <div class="change" id="heroOWChange"></div>
       </div>
+    </div>
+
+    <!-- Key Alerts -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Key Alerts</h2>
+      <div id="dbAlerts"><div class="loading">Loading...</div></div>
     </div>
 
     <!-- Revenue vs Expense + Monthly Volume -->
@@ -230,6 +252,33 @@
         var owChgEl = document.getElementById('heroOWChange');
         owChgEl.textContent = fmtShort(owChg) + ' vs prior';
         owChgEl.className = 'change ' + (owChg >= 0 ? 'up' : 'down');
+
+        // Xterio closing balance
+        document.getElementById('heroXterio').textContent = fmt(data.xterio_cash);
+        var xterioChg = data.xterio_cash - data.xterio_cash_prior;
+        var xterioPct = data.xterio_cash_prior ? (xterioChg / Math.abs(data.xterio_cash_prior) * 100) : 0;
+        var xterioChgEl = document.getElementById('heroXterioChange');
+        xterioChgEl.textContent = fmtShort(xterioChg) + ' (' + fmtPct(xterioPct) + ') vs prior';
+        xterioChgEl.className = 'change ' + (xterioChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroXterioSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
+
+        // Holdings closing balance
+        document.getElementById('heroHoldings').textContent = fmt(data.holdings_cash);
+        var holdingsChg = data.holdings_cash - data.holdings_cash_prior;
+        var holdingsPct = data.holdings_cash_prior ? (holdingsChg / Math.abs(data.holdings_cash_prior) * 100) : 0;
+        var holdingsChgEl = document.getElementById('heroHoldingsChange');
+        holdingsChgEl.textContent = fmtShort(holdingsChg) + ' (' + fmtPct(holdingsPct) + ') vs prior';
+        holdingsChgEl.className = 'change ' + (holdingsChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroHoldingsSub').textContent = 'As of ' + data.snapshot_date;
+
+        // OW closing balance
+        document.getElementById('heroOWClosing').textContent = fmt(data.ow_total_cash);
+        var owClosingChg = data.ow_total_cash - data.ow_total_cash_prior;
+        var owClosingPct = data.ow_total_cash_prior ? (owClosingChg / Math.abs(data.ow_total_cash_prior) * 100) : 0;
+        var owClosingChgEl = document.getElementById('heroOWClosingChange');
+        owClosingChgEl.textContent = fmtShort(owClosingChg) + ' (' + fmtPct(owClosingPct) + ') vs prior';
+        owClosingChgEl.className = 'change ' + (owClosingChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroOWClosingSub').textContent = 'As of ' + data.snapshot_date;
 
         // Cash trend chart
         if (data.cash_trend && data.cash_trend.length > 0) {
