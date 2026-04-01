@@ -136,12 +136,18 @@
     </div>
 
     <!-- Closing Balance Widgets -->
-    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <div class="hero-card">
         <div class="label">Xterio Closing Balance</div>
         <div class="value" id="heroXterio" style="font-size:28px">--</div>
         <div class="change" id="heroXterioChange"></div>
         <div class="sub" id="heroXterioSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label">Foundation Closing Balance</div>
+        <div class="value" id="heroFoundation" style="font-size:28px">--</div>
+        <div class="change" id="heroFoundationChange"></div>
+        <div class="sub" id="heroFoundationSub"></div>
       </div>
       <div class="hero-card">
         <div class="label">Holdings Closing Balance</div>
@@ -261,6 +267,15 @@
         xterioChgEl.textContent = fmtShort(xterioChg) + ' (' + fmtPct(xterioPct) + ') vs prior';
         xterioChgEl.className = 'change ' + (xterioChg >= 0 ? 'up' : 'down');
         document.getElementById('heroXterioSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
+
+        // Foundation closing balance
+        document.getElementById('heroFoundation').textContent = fmt(data.foundation_cash);
+        var foundationChg = data.foundation_cash - data.foundation_cash_prior;
+        var foundationPct = data.foundation_cash_prior ? (foundationChg / Math.abs(data.foundation_cash_prior) * 100) : 0;
+        var foundationChgEl = document.getElementById('heroFoundationChange');
+        foundationChgEl.textContent = fmtShort(foundationChg) + ' (' + fmtPct(foundationPct) + ') vs prior';
+        foundationChgEl.className = 'change ' + (foundationChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroFoundationSub').textContent = 'As of ' + data.snapshot_date;
 
         // Holdings closing balance
         document.getElementById('heroHoldings').textContent = fmt(data.holdings_cash);
