@@ -1810,5 +1810,118 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+  // OW Closing Balance history — breakdown by line item across snapshots
+  router.get('/ow-closing', (req, res) => {
+    const owCompanyIds = ENTITY_GROUPS
+      .filter(g => ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name) && !g.is_subtotal)
+      .flatMap(g => g.company_ids);
+
+    if (owCompanyIds.length === 0) return res.json({ snapshots: [] });
+
+    const placeholders = owCompanyIds.map(() => '?').join(',');
+
+    // Get all available snapshot dates
+    const snapDates = db.prepare(
+      `SELECT DISTINCT snapshot_date FROM account_balances WHERE company_id IN (${placeholders}) ORDER BY snapshot_date`
+    ).all(...owCompanyIds) as any[];
+
+    const snapshots = snapDates.map((s: any) => {
+      const rows = db.prepare(`
+        SELECT account_code as code, account_name as name, account_type, SUM(balance) as balance
+        FROM account_balances
+        WHERE snapshot_date = ? AND company_id IN (${placeholders}) AND ABS(balance) > 0.01
+        GROUP BY account_code, account_name, account_type
+        ORDER BY account_code
+      `).all(s.snapshot_date, ...owCompanyIds) as any[];
+
+      // Categorize into closing balance line items
+      let cash = 0, orFromXterio = 0, ar = 0, noteReceivable = 0;
+      let payables = 0, accrualExp = 0, thrackle = 0, otherAssets = 0, otherLiabilities = 0;
+
+      for (const r of rows) {
+        const code = r.code;
+        const bal = r.balance;
+
+        // Cash (asset_cash)
+        if (r.account_type === 'asset_cash') {
+          cash += bal;
+        }
+        // OR From Xterio (intercompany 303030, 303031, 303040, 303041 etc.)
+        else if (code.startsWith('303')) {
+          orFromXterio += bal;
+        }
+        // AR (101000, 101010)
+        else if (code === '101000' || code === '101010') {
+          ar += bal;
+        }
+        // Accrued Expenses (301000)
+        else if (code === '301000') {
+          accrualExp += bal;
+        }
+        // Trade/Accounts Payable (300000, 300030)
+        else if (code === '300000' || code === '300030') {
+          payables += bal;
+        }
+        // Thrackle Loan / Other non-current liabilities (300040, 300050)
+        else if (code === '300040' || code === '300050') {
+          thrackle += bal;
+        }
+        // Note receivable and other current assets
+        else if (r.account_type === 'asset_receivable' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') {
+          noteReceivable += bal;
+        }
+        // Other assets
+        else if (r.account_type?.startsWith('asset_')) {
+          otherAssets += bal;
+        }
+        // Other liabilities
+        else if (r.account_type?.startsWith('liability_')) {
+          otherLiabilities += bal;
+        }
+      }
+
+      const total = cash + orFromXterio + ar + noteReceivable + payables + accrualExp + thrackle + otherAssets + otherLiabilities;
+
+      return {
+        date: s.snapshot_date,
+        cash,
+        or_from_xterio: orFromXterio,
+        ar,
+        note_receivable: noteReceivable,
+        payables,
+        accrual_exp: accrualExp,
+        thrackle_loan: thrackle,
+        other_assets: otherAssets,
+        other_liabilities: otherLiabilities,
+        total,
+      };
+    });
+
+    // Monthly burn estimate (latest 2 months)
+    let monthlyBurn = 250000; // default
+    if (snapshots.length >= 2) {
+      const latest = snapshots[snapshots.length - 1];
+      const prior = snapshots[snapshots.length - 2];
+      const daysDiff = (new Date(latest.date).getTime() - new Date(prior.date).getTime()) / 86400000;
+      if (daysDiff > 0) {
+        const dailyBurn = (prior.total - latest.total) / daysDiff;
+        monthlyBurn = Math.max(0, dailyBurn * 30);
+      }
+    }
+
+    const latestTotal = snapshots.length > 0 ? snapshots[snapshots.length - 1].total : 0;
+    const availableBalance = latestTotal;
+    const runwayMonths = monthlyBurn > 0 ? Math.round(availableBalance / monthlyBurn) : null;
+
+    res.json({
+      snapshots,
+      summary: {
+        available_balance: availableBalance,
+        monthly_burn: monthlyBurn,
+        runway_months: runwayMonths,
+      },
+    });
+  });
+
   return router;
 }
