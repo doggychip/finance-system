@@ -1764,6 +1764,8 @@ export function dashboardRoutes(db: Database.Database): Router {
       ow_cash_prior: priorOWCash,
       xterio_cash: xterioCash,
       xterio_cash_prior: priorXterioCash,
+      foundation_cash: xterioFoundationCash,
+      foundation_cash_prior: xterioFoundationCash,
       holdings_cash: holdingsCash,
       holdings_cash_prior: priorHoldingsCash,
       ow_total_cash: owCash,
