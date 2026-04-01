@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OW Closing Balance — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --yellow: #eab308; --blue: #3b82f6; --cyan: #06b6d4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+
+    .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
+
+    .summary-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 800px) { .summary-row { grid-template-columns: 1fr; } }
+    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .summary-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
+    .summary-card .value { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+    .summary-card .sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: right; padding: 8px 12px; color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 2px solid var(--border); white-space: nowrap; font-weight: 600; }
+    th:first-child { text-align: left; }
+    td { text-align: right; padding: 7px 12px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child { text-align: left; color: var(--text-dim); font-weight: 500; }
+    tr:hover { background: var(--surface2); }
+    tr.total-row td { border-top: 2px solid var(--accent); font-weight: 700; font-size: 14px; padding-top: 10px; }
+    tr.total-row td:first-child { color: var(--text); }
+    .neg { color: var(--red); }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+  </style>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>OW & Reach Closing Balance</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/ow-closing.html" class="active">OW Closing</a>
+      <a href="/kanban.html">Tasks</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="summary-row">
+      <div class="summary-card">
+        <div class="label">Available Balance</div>
+        <div class="value" id="availBal" style="color:var(--green)">--</div>
+        <div class="sub" id="availSub"></div>
+      </div>
+      <div class="summary-card">
+        <div class="label">OW Monthly Burn</div>
+        <div class="value" id="monthlyBurn">--</div>
+        <div class="sub">Estimated from balance changes</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Runway (Months)</div>
+        <div class="value" id="runway" style="color:var(--cyan)">--</div>
+        <div class="sub">At current burn rate</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>OW & Reach Group — Closing Balance History</h2>
+      <div id="tableContainer"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '--';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
+    function fmtCell(n) {
+      if (n == null || isNaN(n)) return '--';
+      if (Math.abs(n) < 0.5) return '-';
+      var neg = n < 0;
+      var s = fmt(Math.abs(n));
+      return neg ? '<span class="neg">(' + s + ')</span>' : s;
+    }
+
+    async function load() {
+      try {
+        var data = await (await fetch('/api/dashboard/ow-closing')).json();
+        if (!data.snapshots || !data.snapshots.length) {
+          document.getElementById('tableContainer').innerHTML = '<div class="loading">No data available</div>';
+          return;
+        }
+
+        var snaps = data.snapshots;
+        var summary = data.summary;
+
+        document.getElementById('availBal').textContent = fmt(summary.available_balance);
+        document.getElementById('availSub').textContent = 'As of ' + snaps[snaps.length - 1].date;
+        document.getElementById('monthlyBurn').textContent = fmt(summary.monthly_burn);
+        document.getElementById('runway').textContent = summary.runway_months != null ? summary.runway_months : '--';
+
+        var rows = [
+          { key: 'cash', label: 'Cash' },
+          { key: 'or_from_xterio', label: 'OR From Xterio' },
+          { key: 'ar', label: 'AR' },
+          { key: 'note_receivable', label: 'NoteReceivable' },
+          { key: 'payables', label: 'Payables' },
+          { key: 'accrual_exp', label: 'Accrual exp' },
+          { key: 'thrackle_loan', label: 'Thrackle Loan' },
+        ];
+
+        // Check if other_assets or other_liabilities have non-zero values
+        var hasOtherAssets = snaps.some(function(s) { return Math.abs(s.other_assets) > 0.5; });
+        var hasOtherLiab = snaps.some(function(s) { return Math.abs(s.other_liabilities) > 0.5; });
+        if (hasOtherAssets) rows.push({ key: 'other_assets', label: 'Other Assets' });
+        if (hasOtherLiab) rows.push({ key: 'other_liabilities', label: 'Other Liabilities' });
+
+        var html = '<div style="overflow-x:auto"><table>';
+        html += '<thead><tr><th>OW & ReachRHG</th>';
+        snaps.forEach(function(s) {
+          html += '<th>' + s.date + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+
+        rows.forEach(function(row) {
+          html += '<tr><td>' + row.label + '</td>';
+          snaps.forEach(function(s) {
+            html += '<td>' + fmtCell(s[row.key]) + '</td>';
+          });
+          html += '</tr>';
+        });
+
+        // Total row
+        html += '<tr class="total-row"><td>OWGroupClosing</td>';
+        snaps.forEach(function(s) {
+          html += '<td>' + fmtCell(s.total) + '</td>';
+        });
+        html += '</tr>';
+
+        html += '</tbody></table></div>';
+        document.getElementById('tableContainer').innerHTML = html;
+      } catch (e) {
+        console.error(e);
+        document.getElementById('tableContainer').innerHTML = '<div class="loading">Error loading data</div>';
+      }
+    }
+
+    load();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>
