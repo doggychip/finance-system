@@ -1846,6 +1846,45 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+  // Debug: dump all OW accounts for a given snapshot
+  router.get('/ow-accounts', (req, res) => {
+    const owCompanyIds = ENTITY_GROUPS
+      .filter(g => ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name) && !g.is_subtotal)
+      .flatMap(g => g.company_ids);
+    if (owCompanyIds.length === 0) return res.json({ accounts: [] });
+
+    const placeholders = owCompanyIds.map(() => '?').join(',');
+    const requestedDate = (req.query.as_of_date as string) || '';
+    const snapQuery = requestedDate
+      ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND company_id IN (${placeholders}) ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate, ...owCompanyIds) as any
+      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE company_id IN (${placeholders}) ORDER BY snapshot_date DESC LIMIT 1`).get(...owCompanyIds) as any;
+    const snapDate = snapQuery?.snapshot_date;
+    if (!snapDate) return res.json({ accounts: [], snapshot_date: null });
+
+    const rows = db.prepare(`
+      SELECT account_code as code, account_name as name, account_type, company_name, SUM(balance) as balance
+      FROM account_balances
+      WHERE snapshot_date = ? AND company_id IN (${placeholders}) AND ABS(balance) > 0.5
+      GROUP BY account_code, account_name, account_type, company_name
+      ORDER BY account_type, account_code, company_name
+    `).all(snapDate, ...owCompanyIds) as any[];
+
+    // Also show the categorization for each account
+    const categorized = rows.map((r: any) => {
+      let category = 'EXCLUDED';
+      if (r.account_type === 'asset_cash') category = 'Cash';
+      else if (r.code.startsWith('303')) category = 'OR From Xterio';
+      else if (r.code === '101000') category = 'AR';
+      else if (r.code === '101010' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') category = 'NoteReceivable';
+      else if (r.code === '300030' || r.code === '300000') category = 'Payables';
+      else if (r.code === '301000' || r.code === '302010') category = 'Accrual exp';
+      else if (r.code === '300040' || r.code === '300050') category = 'Thrackle Loan';
+      return { ...r, category };
+    });
+
+    res.json({ snapshot_date: snapDate, accounts: categorized });
+  });
+
   // OW Closing Balance history — breakdown by line item across snapshots
   router.get('/ow-closing', (req, res) => {
     const owCompanyIds = ENTITY_GROUPS
