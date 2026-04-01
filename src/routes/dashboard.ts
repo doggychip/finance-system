@@ -1883,32 +1883,28 @@ export function dashboardRoutes(db: Database.Database): Router {
         if (r.account_type === 'asset_cash') {
           cash += bal;
         }
-        // OR From Xterio — IC receivables from Xterio entities
-        // 303030 Xterio Fdn, 303031 Xterio Fdn W3, 303010 Holding, 303011 Holding W3
-        // 303040 Xterlabs, 303041 Xterlabs W3, 303020 Libecciotech, 303021 Libecciotech W3
-        else if (code === '303030' || code === '303031' || code === '303010' || code === '303011' ||
-                 code === '303040' || code === '303041' || code === '303020' || code === '303021' ||
-                 code === '303110' || code === '303100') {
+        // OR From Xterio — ALL intercompany accounts (303xxx)
+        else if (code.startsWith('303')) {
           orFromXterio += bal;
         }
-        // AR — Accounts Receivable (101000 only)
+        // AR — Accounts Receivable (101000)
         else if (code === '101000') {
           ar += bal;
         }
-        // NoteReceivable — Other Receivable (101010)
-        else if (code === '101010') {
+        // NoteReceivable — Other Receivable (101010) + other current assets
+        else if (code === '101010' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') {
           noteReceivable += bal;
         }
-        // Payables — Trade Payables (300030)
-        else if (code === '300030') {
+        // Payables — Trade Payables (300030, 300000)
+        else if (code === '300030' || code === '300000') {
           payables += bal;
         }
-        // Accrued Expenses (301000)
-        else if (code === '301000') {
+        // Accrued Expenses (301000, 302010)
+        else if (code === '301000' || code === '302010') {
           accrualExp += bal;
         }
-        // Thrackle Loan — Other Payables non-trade (300040)
-        else if (code === '300040') {
+        // Thrackle Loan — Other Payables non-trade (300040, 300050)
+        else if (code === '300040' || code === '300050') {
           thrackle += bal;
         }
         // All other accounts are excluded from OW closing balance
