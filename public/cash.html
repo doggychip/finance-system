@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cash — Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --yellow: #eab308; --blue: #3b82f6; --cyan: #06b6d4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.15s; }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); }
+    .btn-export { background: rgba(34,197,94,0.12); border-color: var(--green); color: var(--green); font-weight: 600; }
+    .btn-export:hover { background: rgba(34,197,94,0.25); }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* Hero */
+    .hero { background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid var(--border); border-radius: 16px; padding: 40px; text-align: center; margin-bottom: 24px; position: relative; overflow: hidden; }
+    .hero::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 50%, rgba(34,197,94,0.06) 0%, transparent 50%); }
+    .hero .label { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 8px; }
+    .hero .total { font-size: 56px; font-weight: 800; letter-spacing: -2px; margin-bottom: 8px; }
+    .hero .total.positive { color: var(--green); }
+    .hero .total.negative { color: var(--red); }
+    .hero .sub { font-size: 14px; color: var(--text-dim); }
+
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .stat-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
+    .stat-card .value { font-size: 24px; font-weight: 700; }
+
+    /* Period toggle */
+    .period-toggle { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px; width: fit-content; margin-bottom: 24px; }
+    .period-toggle button { padding: 8px 20px; border: none; border-radius: 6px; background: transparent; color: var(--text-dim); font-size: 13px; font-weight: 500; cursor: pointer; }
+    .period-toggle button:hover { color: var(--text); }
+    .period-toggle button.active { background: var(--accent); color: white; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .card.fullwidth { margin-bottom: 24px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .card-header h2 { margin-bottom: 0; }
+    .chart-container { position: relative; height: 320px; }
+
+    /* Category boxes */
+    .category-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .box-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .box-header h3 { font-size: 14px; font-weight: 600; }
+    .box-total { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .box-count { font-size: 12px; color: var(--text-dim); }
+    .cash-current-box .box-header { border-left: 3px solid var(--green); }
+    .cash-fixed-box .box-header { border-left: 3px solid #22d3ee; }
+    .crypto-hot-box .box-header { border-left: 3px solid var(--yellow); }
+    .crypto-cold-box .box-header { border-left: 3px solid var(--blue); }
+    .crypto-defi-box .box-header { border-left: 3px solid #a855f7; }
+    .crypto-other-box .box-header { border-left: 3px solid var(--text-dim); }
+    .overworld-box .box-header { border-left: 3px solid var(--yellow); }
+    .reach-box .box-header { border-left: 3px solid var(--cyan); }
+    .receivable-box .box-header { border-left: 3px solid var(--blue); }
+    .overdrawn-box .box-header { border-left: 3px solid var(--red); }
+    .collapsible .box-list { display: none; }
+    .collapsible.open .box-list { display: block; }
+    .box-header { cursor: pointer; }
+    .box-toggle { font-size: 10px; color: var(--text-dim); margin-left: 8px; }
+    .box-list { max-height: 400px; overflow-y: auto; }
+    .box-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .box-item:last-child { border-bottom: none; }
+    .box-item:hover { background: var(--surface2); }
+    .box-item .item-name { flex: 1; }
+    .box-item .item-code { color: var(--text-dim); width: 80px; font-size: 12px; }
+    .box-item .item-balance { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
+    .box-empty { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+    /* Bank accounts / Cash Position table */
+    .section-title { font-size: 16px; font-weight: 700; margin: 32px 0 16px; border-top: 1px solid var(--border); padding-top: 24px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 6px 12px; font-size: 10px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 5px 12px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: var(--surface2); }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .pos { color: var(--text); } .neg { color: var(--red); } .zero { color: var(--text-dim); }
+    .change-pos { color: var(--green); } .change-neg { color: var(--red); }
+    .parent-row td { background: #1a365d; color: white; font-weight: 700; font-size: 13px; padding: 10px 12px; }
+    .company-row td { padding-left: 24px; }
+    .subtotal-row td { font-weight: 700; background: rgba(99,102,241,0.08); border-top: 2px solid var(--border); }
+    .grand-row td { font-weight: 800; font-size: 13px; background: rgba(234,179,8,0.08); border-top: 3px solid var(--yellow); }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+    .text-green { color: var(--green); }
+    .text-red { color: var(--red); }
+
+    /* Date controls for position */
+    .pos-controls { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .pos-controls label { font-size: 12px; color: var(--text-dim); }
+    .pos-controls select { padding: 5px 8px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; }
+    .btn-apply { padding: 6px 14px; border-radius: 5px; border: none; background: var(--accent); color: white; font-size: 12px; cursor: pointer; }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Cash</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash.html" class="active">Cash</a>
+      <a href="/kanban.html">Tasks</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="cashAsOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadAll()">Apply</button>
+      <button class="btn btn-export" onclick="exportExcel()">Export Excel</button>
+      <button class="btn primary" onclick="triggerSync()">Sync from Odoo</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="label">Total Assets (All Entities)</div>
+      <div class="total" id="heroTotal">--</div>
+      <div class="sub" id="heroSub">Loading...</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="label">Cash Accounts</div><div class="value" id="statCount">--</div></div>
+      <div class="stat-card"><div class="label">Positive Accounts</div><div class="value text-green" id="statPositive">--</div></div>
+      <div class="stat-card"><div class="label">Negative / Overdrawn</div><div class="value text-red" id="statNegative">--</div></div>
+      <div class="stat-card"><div class="label">Largest Account</div><div class="value" id="statLargest">--</div></div>
+    </div>
+
+    <!-- Period toggle -->
+    <div class="period-toggle" id="periodToggle">
+      <button data-period="daily">Daily</button>
+      <button data-period="weekly">Weekly</button>
+      <button data-period="monthly" class="active">Monthly</button>
+    </div>
+
+    <!-- Charts -->
+    <div class="card fullwidth">
+      <div class="card-header"><h2 id="balanceChartTitle">Cash Balance — Monthly</h2></div>
+      <div class="chart-container"><canvas id="balanceTimeChart"></canvas></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2 id="flowChartTitle">Inflows vs Outflows — Monthly</h2></div>
+        <div class="chart-container"><canvas id="flowChart"></canvas></div>
+      </div>
+      <div class="card"><h2>Cash Distribution</h2><div class="chart-container"><canvas id="distributionChart"></canvas></div></div>
+    </div>
+    <div class="card fullwidth">
+      <div class="card-header"><h2 id="accountHistoryTitle">Per-Account Balance — Monthly</h2></div>
+      <div class="chart-container" style="height:400px"><canvas id="accountHistoryChart"></canvas></div>
+    </div>
+
+    <!-- Category boxes: Cash (Bank) -->
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--green)">Cash (Bank)</div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="category-box cash-current-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>活期 Current<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashCurrentCount">--</div></div><div class="box-total text-green" id="cashCurrentTotal">--</div></div><div class="box-list" id="cashCurrentList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box cash-fixed-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>定期 Fixed Deposit<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashFixedCount">--</div></div><div class="box-total" style="color:#22d3ee" id="cashFixedTotal">--</div></div><div class="box-list" id="cashFixedList"><div class="box-empty">Loading...</div></div></div>
+    </div>
+
+    <!-- Category boxes: Crypto -->
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--cyan)">Crypto (On-chain)</div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="category-box crypto-hot-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Hot Wallets<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoHotCount">--</div></div><div class="box-total" style="color:var(--yellow)" id="cryptoHotTotal">--</div></div><div class="box-list" id="cryptoHotList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box crypto-cold-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Cold Wallets<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoColdCount">--</div></div><div class="box-total" style="color:var(--blue)" id="cryptoColdTotal">--</div></div><div class="box-list" id="cryptoColdList"><div class="box-empty">Loading...</div></div></div>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="category-box crypto-defi-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>DeFi<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoDefiCount">--</div></div><div class="box-total" style="color:#a855f7" id="cryptoDefiTotal">--</div></div><div class="box-list" id="cryptoDefiList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box crypto-other-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Other Crypto<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cryptoOtherCount">--</div></div><div class="box-total" style="color:var(--text-dim)" id="cryptoOtherTotal">--</div></div><div class="box-list" id="cryptoOtherList"><div class="box-empty">Loading...</div></div></div>
+    </div>
+
+    <!-- Category boxes: OW / Reach / Overdrawn -->
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--text-dim)">Other</div>
+    <div class="grid-3" style="margin-bottom:16px">
+      <div class="category-box overworld-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Overworld<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="overworldCount">--</div></div><div class="box-total" style="color:var(--yellow)" id="overworldTotal">--</div></div><div class="box-list" id="overworldList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box reach-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Reach Labs<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="reachCount">--</div></div><div class="box-total" style="color:var(--cyan)" id="reachTotal">--</div></div><div class="box-list" id="reachList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box overdrawn-box collapsible"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Overdrawn<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="overdrawnCount">--</div></div><div class="box-total text-red" id="overdrawnTotal">--</div></div><div class="box-list" id="overdrawnList"><div class="box-empty">Loading...</div></div></div>
+    </div>
+
+    <!-- Cash Position / Bank Accounts Section -->
+    <div class="section-title">Cash Position by Entity</div>
+    <div class="pos-controls">
+      <label>As of:</label>
+      <select id="asOfDate"></select>
+      <label>Prior:</label>
+      <select id="priorDate"></select>
+      <button class="btn-apply" onclick="loadPosition()">Apply</button>
+    </div>
+    <div id="positionContent"><div class="loading">Loading...</div></div>
+  </div>
+
+  <script>
+    var charts = {};
+    var currentPeriod = 'monthly';
+    var exportAccounts = [];
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '--';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    }
+    function fmtShort(n) {
+      if (n == null || isNaN(n)) return '--';
+      var abs = Math.abs(n);
+      if (abs >= 1e6) return (n/1e6).toFixed(1)+'M';
+      if (abs >= 1e3) return (n/1e3).toFixed(1)+'K';
+      return n.toFixed(0);
+    }
+    function fmtNum(n) { return new Intl.NumberFormat('en-US').format(n); }
+    function fmtPos(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(Math.round(n)).toLocaleString('en-US');
+      return n < 0 ? '(' + s + ')' : s;
+    }
+    function fmtPct(n) { return (n == null || isNaN(n) || !isFinite(n)) ? '-' : n.toFixed(1) + '%'; }
+    function valCls(n) { return Math.abs(n) < 0.5 ? 'val zero' : n < 0 ? 'val neg' : 'val pos'; }
+    function chgCls(n) { return n >= 0.5 ? 'val change-pos' : n <= -0.5 ? 'val change-neg' : 'val zero'; }
+
+    var palette = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e','#a855f7','#64748b','#0ea5e9','#84cc16','#d946ef','#f59e0b'];
+
+    function periodLabel(p) { return p === 'daily' ? 'Daily' : p === 'weekly' ? 'Weekly' : 'Monthly'; }
+    function periodLimit(p) { return p === 'daily' ? 90 : p === 'weekly' ? 52 : 24; }
+
+    document.getElementById('periodToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      var period = btn.dataset.period;
+      if (!period || period === currentPeriod) return;
+      currentPeriod = period;
+      document.querySelectorAll('.period-toggle button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      loadTimeCharts();
+    });
+
+    function getCashAsOfParam() {
+      var d = document.getElementById('cashAsOfDate').value;
+      return d ? '?as_of_date=' + d : '';
+    }
+
+    async function loadCashBalances() {
+      var data = await (await fetch('/api/dashboard/cash-balances' + getCashAsOfParam())).json();
+
+      // Use new split fields
+      var cashCurrentAccs = data.cash_current?.accounts || [];
+      var cashFixedAccs = data.cash_fixed?.accounts || [];
+      var cryptoHotAccs = data.crypto_hot?.accounts || [];
+      var cryptoColdAccs = data.crypto_cold?.accounts || [];
+      var cryptoDefiAccs = data.crypto_defi?.accounts || [];
+      var cryptoOtherAccs = data.crypto_other?.accounts || [];
+      var overAccs = data.overdrawn?.accounts || [];
+      var owAccs = data.overworld?.accounts || [];
+      var reachAccs = data.reach?.accounts || [];
+
+      var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
+      var totalBank = data.total_cash || 0;
+      var totalCrypto = data.total_crypto || 0;
+      var grandTotal = totalBank + totalCrypto + (data.overworld?.total || 0) + (data.reach?.total || 0) + (data.overdrawn?.total || 0);
+
+      exportAccounts = allAccs.map(function(a) {
+        return { Code: a.code, Name: a.name, Company: a.company_name, Balance: a.balance };
+      });
+
+      var heroEl = document.getElementById('heroTotal');
+      heroEl.textContent = fmt(grandTotal);
+      heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
+      document.getElementById('heroSub').textContent =
+        'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
+        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0) +
+        ' | ' + (data.snapshot_date || '');
+
+      var positiveCount = cashCurrentAccs.length + cashFixedAccs.length + cryptoHotAccs.length + cryptoColdAccs.length + cryptoDefiAccs.length + cryptoOtherAccs.length;
+      document.getElementById('statCount').textContent = fmtNum(positiveCount);
+      document.getElementById('statPositive').textContent = fmtNum(positiveCount);
+      document.getElementById('statNegative').textContent = fmtNum(overAccs.length);
+      var posAccs = allAccs.filter(function(a) { return a.balance > 0; });
+      if (posAccs.length > 0) {
+        var largest = posAccs.reduce(function(a, b) { return Math.abs(a.balance) > Math.abs(b.balance) ? a : b; });
+        document.getElementById('statLargest').textContent = largest.name.slice(0, 25);
+      }
+
+      renderDistribution([].concat(cashCurrentAccs, cashFixedAccs));
+
+      renderCategoryBox('cashCurrent', cashCurrentAccs, data.cash_current?.total || 0);
+      renderCategoryBox('cashFixed', cashFixedAccs, data.cash_fixed?.total || 0);
+      renderCategoryBox('cryptoHot', cryptoHotAccs, data.crypto_hot?.total || 0);
+      renderCategoryBox('cryptoCold', cryptoColdAccs, data.crypto_cold?.total || 0);
+      renderCategoryBox('cryptoDefi', cryptoDefiAccs, data.crypto_defi?.total || 0);
+      renderCategoryBox('cryptoOther', cryptoOtherAccs, data.crypto_other?.total || 0);
+      renderCategoryBox('overworld', owAccs, data.overworld?.total || 0);
+      renderCategoryBox('reach', reachAccs, data.reach?.total || 0);
+      renderCategoryBox('overdrawn', overAccs, data.overdrawn?.total || 0);
+    }
+
+    function renderCategoryBox(type, accounts, total) {
+      document.getElementById(type + 'Total').textContent = fmt(total);
+      document.getElementById(type + 'Count').textContent = accounts.length + ' account' + (accounts.length !== 1 ? 's' : '');
+      var listEl = document.getElementById(type + 'List');
+      if (accounts.length === 0) { listEl.innerHTML = '<div class="box-empty">None</div>'; return; }
+      var sorted = accounts.slice().sort(function(a,b){ return Math.abs(b.balance) - Math.abs(a.balance); });
+      listEl.innerHTML = sorted.map(function(a) {
+        var balColor = a.balance >= 0 ? 'var(--green)' : 'var(--red)';
+        return '<div class="box-item"><div class="item-code">' + a.code + '</div><div class="item-name">' + (a.name.length > 35 ? a.name.slice(0,35) + '...' : a.name) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
+      }).join('');
+    }
+
+    function renderDistribution(accounts) {
+      var top = accounts.filter(function(a) { return a.balance > 0; }).slice(0, 10);
+      var ctx = document.getElementById('distributionChart').getContext('2d');
+      if (charts.dist) charts.dist.destroy();
+      if (top.length === 0) return;
+      charts.dist = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: top.map(function(a) { return a.name.length > 25 ? a.name.slice(0,25) + '...' : a.name; }), datasets: [{ data: top.map(function(a) { return a.balance; }), backgroundColor: top.map(function(_,i) { return palette[i % palette.length]; }), borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { color: '#8b8fa3', padding: 10, font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': ' + fmt(ctx.parsed); } } } } }
+      });
+    }
+
+    async function loadTimeCharts() {
+      var limit = periodLimit(currentPeriod);
+      var label = periodLabel(currentPeriod);
+      document.getElementById('balanceChartTitle').textContent = 'Cash Balance — ' + label;
+      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows — ' + label;
+      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance — ' + label;
+
+      var results = await Promise.all([
+        (await fetch('/api/dashboard/cash-history?period=' + currentPeriod + '&limit=' + limit)).json(),
+        (await fetch('/api/dashboard/cash-account-history?period=' + currentPeriod + '&limit=' + limit)).json()
+      ]);
+      renderBalanceChart(results[0]);
+      renderFlowChart(results[0]);
+      renderAccountHistory(results[1]);
+    }
+
+    function renderBalanceChart(data) {
+      var ctx = document.getElementById('balanceTimeChart').getContext('2d');
+      if (charts.balTime) charts.balTime.destroy();
+      if (!data.length) return;
+      charts.balTime = new Chart(ctx, {
+        type: 'bar', data: { labels: data.map(function(r){return r.period;}), datasets: [{ label: 'Cash Balance', data: data.map(function(r){return r.balance;}), backgroundColor: data.map(function(r){return r.balance>=0?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.6)';}), borderRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 11 }, maxTicksLimit: 20 } }, y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return 'Balance: ' + fmt(ctx.parsed.y); } } } } }
+      });
+    }
+
+    function renderFlowChart(data) {
+      var ctx = document.getElementById('flowChart').getContext('2d');
+      if (charts.flow) charts.flow.destroy();
+      if (!data.length) return;
+      charts.flow = new Chart(ctx, {
+        type: 'bar', data: { labels: data.map(function(r){return r.period;}), datasets: [ { label: 'Inflows', data: data.map(function(r){return r.inflows;}), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 }, { label: 'Outflows', data: data.map(function(r){return -r.outflows;}), backgroundColor: 'rgba(239,68,68,0.6)', borderRadius: 3 } ] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 15 } }, y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } } }, plugins: { legend: { labels: { color: '#8b8fa3' } }, tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + fmt(Math.abs(ctx.parsed.y)); } } } } }
+      });
+    }
+
+    function renderAccountHistory(accounts) {
+      var ctx = document.getElementById('accountHistoryChart').getContext('2d');
+      if (charts.accHist) charts.accHist.destroy();
+      if (!accounts.length) return;
+      var top = accounts.slice(0, 8);
+      var allPeriods = [];
+      var seen = {};
+      top.forEach(function(a) { a.periods.forEach(function(p) { if (!seen[p.period]) { seen[p.period] = 1; allPeriods.push(p.period); } }); });
+      allPeriods.sort();
+      var datasets = top.map(function(acc, i) {
+        var map = {};
+        acc.periods.forEach(function(p) { map[p.period] = p.balance; });
+        return { label: acc.code + ' ' + (acc.name.length > 20 ? acc.name.slice(0,20) + '...' : acc.name), data: allPeriods.map(function(p) { return map[p] || null; }), borderColor: palette[i % palette.length], backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: currentPeriod === 'monthly' ? 3 : 1 };
+      });
+      charts.accHist = new Chart(ctx, {
+        type: 'line', data: { labels: allPeriods, datasets: datasets },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 20 } }, y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } } }, plugins: { legend: { position: 'bottom', labels: { color: '#8b8fa3', padding: 12, font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + fmt(ctx.parsed.y); } } } } }
+      });
+    }
+
+    // ── Cash Position ──
+    var LAYOUT = [
+      { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
+      { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
+      { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs', companies: ['XLABS', 'XLABS W3'] },
+      { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK', companies: ['PRIVILEGE HK'] },
+      { type: 'manual', label: 'Xterio Foundation', value: 5933488 },
+      { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], manualAdd: 5933488 },
+      { type: 'parent', name: 'Gamephilos' },
+      { type: 'entity', key: 'AOD', label: 'AOD', companies: ['GAMEPHILOS', 'GAMEPHILOS W3', 'MAOFAN', 'DIFANHA'] },
+      { type: 'parent', name: 'CS' },
+      { type: 'entity', key: 'CS', label: 'CS', companies: ['SHADOWCAY', 'SHADOWCAY W3', 'CHAOYING', 'DIREWOLF', 'COS GAMES', 'COS GAMES W3'] },
+      { type: 'parent', name: 'Palios' },
+      { type: 'entity', key: 'Palios', label: 'Palios', companies: ['PALIO W3', 'BJ TUDONG'] },
+      { type: 'entity', key: 'QUANTUMMIND', label: 'Quantummind', companies: ['QUANTUMMIND SOLUTIONS HK'] },
+      { type: 'parent', name: 'Holdings' },
+      { type: 'entity', key: 'LHOLDINGS', label: 'Holdings', companies: ['LHOLDINGS', 'LHOLDINGS W3'] },
+      { type: 'parent', name: 'Overworld Inc' },
+      { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
+      { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
+      { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
+      { type: 'entity', key: 'Keystone', label: 'Keystone Foundation', companies: ['PLAY ALGORITHM (BVI)'] },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'] },
+    ];
+
+    function posRow(label, cur, prior, cls) {
+      var chg = cur - prior;
+      var pct = prior !== 0 ? (chg / Math.abs(prior) * 100) : 0;
+      return '<tr class="' + (cls || '') + '"><td>' + label + '</td>' +
+        '<td class="' + valCls(cur) + '">' + fmtPos(cur) + '</td>' +
+        '<td class="' + valCls(prior) + '">' + fmtPos(prior) + '</td>' +
+        '<td class="' + chgCls(chg) + '">' + fmtPos(chg) + '</td>' +
+        '<td class="' + chgCls(chg) + '">' + fmtPct(pct) + '</td></tr>';
+    }
+
+    async function loadSnapshots() {
+      var snaps = await (await fetch('/api/dashboard/snapshots')).json();
+      var asOf = document.getElementById('asOfDate');
+      var prior = document.getElementById('priorDate');
+      asOf.innerHTML = ''; prior.innerHTML = '';
+      snaps.forEach(function(s) {
+        var o1 = document.createElement('option'); o1.value = s.snapshot_date; o1.textContent = s.snapshot_date + ' (' + s.account_count + ')'; asOf.appendChild(o1);
+        var o2 = document.createElement('option'); o2.value = s.snapshot_date; o2.textContent = s.snapshot_date + ' (' + s.account_count + ')'; prior.appendChild(o2);
+      });
+      if (snaps.length >= 2) { asOf.value = snaps[0].snapshot_date; prior.value = snaps[1].snapshot_date; }
+    }
+
+    async function loadPosition() {
+      var el = document.getElementById('positionContent');
+      var asOf = document.getElementById('asOfDate').value;
+      var prior = document.getElementById('priorDate').value;
+      if (!asOf || !prior) { el.innerHTML = '<div class="loading">Select dates</div>'; return; }
+      try {
+        var data = await (await fetch('/api/dashboard/bank-accounts?as_of_date=' + asOf + '&prior_date=' + prior)).json();
+        if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
+
+        var byCompany = {};
+        var byEntity = {};
+        data.groups.forEach(function(g) {
+          byEntity[g.name] = g;
+          g.accounts.forEach(function(a) {
+            if (!byCompany[a.company_name]) byCompany[a.company_name] = { current: 0, prior: 0 };
+            byCompany[a.company_name].current += a.current_balance;
+            byCompany[a.company_name].prior += a.prior_balance;
+          });
+        });
+
+        var html = '<div style="font-size:11px;color:var(--text-dim);padding:8px 0">As at <strong>' + data.snapshot_date + '</strong> | Prior: ' + data.prior_date + '</div>';
+        html += '<table><thead><tr><th>Entity / Company</th><th class="val">Balance (USD)</th><th class="val">Prior</th><th class="val">Change</th><th class="val">%</th></tr></thead><tbody>';
+        var grandCur = 0, grandPrior = 0;
+
+        LAYOUT.forEach(function(item) {
+          if (item.type === 'parent') {
+            html += '<tr class="parent-row"><td colspan="5">' + item.name + '</td></tr>';
+          } else if (item.type === 'entity') {
+            var g = byEntity[item.key];
+            var eCur = g ? g.total_current : 0;
+            var ePrior = g ? g.total_prior : 0;
+            html += posRow(item.label, eCur, ePrior, 'subtotal-row');
+            grandCur += eCur; grandPrior += ePrior;
+            if (item.companies) {
+              item.companies.forEach(function(cName) {
+                var c = byCompany[cName];
+                if (c && Math.abs(c.current) > 0.5) html += posRow(cName, c.current, c.prior, 'company-row');
+              });
+            }
+          } else if (item.type === 'manual') {
+            html += posRow(item.label, item.value, item.value, 'company-row');
+            grandCur += item.value; grandPrior += item.value;
+          } else if (item.type === 'subtotal') {
+            var cur = item.manualAdd || 0, pr = item.manualAdd || 0;
+            (item.keys || []).forEach(function(k) { var g = byEntity[k]; if (g) { cur += g.total_current; pr += g.total_prior; } });
+            html += posRow(item.label, cur, pr, 'subtotal-row');
+          }
+        });
+        html += posRow('Grand Total', grandCur, grandPrior, 'grand-row');
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+    }
+
+    async function loadAll() {
+      await Promise.all([loadCashBalances(), loadTimeCharts(), loadPosition()]);
+    }
+
+    async function triggerSync() {
+      var btn = document.querySelector('.btn.primary');
+      btn.disabled = true; btn.textContent = 'Syncing...';
+      try {
+        await fetch('/api/sync/accounts', { method: 'POST' });
+        await fetch('/api/sync/journal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 500 }) });
+        await loadAll();
+      } catch (e) { console.error(e); }
+      btn.disabled = false; btn.textContent = 'Sync from Odoo';
+    }
+
+    function exportExcel() {
+      if (!exportAccounts.length) {
+        var table = document.querySelector('#positionContent table');
+        if (table) {
+          var wb = XLSX.utils.table_to_book(table, { sheet: 'Cash Position' });
+          XLSX.writeFile(wb, 'cash-position.xlsx');
+          return;
+        }
+        alert('No data to export.');
+        return;
+      }
+      var ws = XLSX.utils.json_to_sheet(exportAccounts);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cash Accounts');
+      XLSX.writeFile(wb, 'cash-accounts.xlsx');
+    }
+
+    loadSnapshots().then(function() { loadAll(); });
+    setInterval(function() { loadCashBalances(); loadTimeCharts(); }, 5 * 60 * 1000);
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

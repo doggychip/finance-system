@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balance Sheet — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344;
+      --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1;
+      --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --cyan: #06b6d4; --yellow: #eab308;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+
+    .container { max-width: 100%; margin: 0 auto; padding: 24px; overflow-x: auto; }
+
+    .bs-grid {
+      display: grid;
+      gap: 12px;
+      min-width: fit-content;
+    }
+
+    .bs-column {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-width: 220px;
+      overflow: hidden;
+    }
+    .bs-column .col-header {
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .bs-section { border-bottom: 1px solid var(--border); }
+    .bs-section:last-child { border-bottom: none; }
+
+    .bs-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 14px;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .bs-row:hover { background: var(--surface2); }
+    .bs-row .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bs-row .value { font-variant-numeric: tabular-nums; text-align: right; min-width: 90px; font-weight: 500; }
+
+    .bs-row.header {
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding-top: 8px;
+      padding-bottom: 4px;
+      color: var(--text);
+    }
+    .bs-row.sub-header {
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--text-dim);
+      padding-top: 6px;
+    }
+    .bs-row.total {
+      font-weight: 700;
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+    .bs-row.grand-total {
+      font-weight: 800;
+      font-size: 13px;
+      border-top: 2px solid var(--border);
+      padding: 8px 14px;
+      background: var(--surface2);
+    }
+    .bs-row .positive { color: var(--green); }
+    .bs-row .negative { color: var(--red); }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 400px; color: var(--text-dim); }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Balance Sheet</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html" class="active">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
+      <a href="/tasks.html">Tasks</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadData()">Apply</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="content"><div class="loading">Loading balance sheets...</div></div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      if (n == null || isNaN(n) || n === 0) return '-';
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n);
+    }
+
+    function valClass(n) {
+      if (n > 0.01) return 'positive';
+      if (n < -0.01) return 'negative';
+      return '';
+    }
+
+    function renderColumn(c) {
+      const a = c.assets;
+      const l = c.liabilities;
+      const e = c.equity;
+
+      return `
+        <div class="bs-column">
+          <div class="col-header">${c.company_name}</div>
+
+          <div class="bs-section">
+            <div class="bs-row header"><span class="label">ASSETS</span><span class="value ${valClass(a.total)}">${fmt(a.total)}</span></div>
+
+            <div class="bs-row sub-header"><span class="label">Current Assets</span><span class="value">${fmt(a.total_current)}</span></div>
+            <div class="bs-row"><span class="label">Bank and Cash Accounts</span><span class="value ${valClass(a.bank_cash)}">${fmt(a.bank_cash)}</span></div>
+            <div class="bs-row"><span class="label">Receivables</span><span class="value ${valClass(a.receivable)}">${fmt(a.receivable)}</span></div>
+            <div class="bs-row"><span class="label">Current Assets</span><span class="value ${valClass(a.current_assets)}">${fmt(a.current_assets)}</span></div>
+            <div class="bs-row"><span class="label">Prepayments</span><span class="value ${valClass(a.prepayments)}">${fmt(a.prepayments)}</span></div>
+
+            <div class="bs-row sub-header"><span class="label">Plus Fixed Assets</span><span class="value">${fmt(a.fixed_assets)}</span></div>
+            <div class="bs-row sub-header"><span class="label">Plus Non-current Assets</span><span class="value">${fmt(a.non_current_assets)}</span></div>
+          </div>
+
+          <div class="bs-section">
+            <div class="bs-row header"><span class="label">LIABILITIES</span><span class="value ${valClass(l.total)}">${fmt(l.total)}</span></div>
+
+            <div class="bs-row sub-header"><span class="label">Current Liabilities</span><span class="value">${fmt(l.total_current)}</span></div>
+            <div class="bs-row"><span class="label">Payables</span><span class="value ${valClass(l.payable)}">${fmt(l.payable)}</span></div>
+            <div class="bs-row"><span class="label">Current Liabilities</span><span class="value ${valClass(l.current_liabilities)}">${fmt(l.current_liabilities)}</span></div>
+
+            <div class="bs-row sub-header"><span class="label">Plus Non-current Liabilities</span><span class="value">${fmt(l.non_current_liabilities)}</span></div>
+          </div>
+
+          <div class="bs-section">
+            <div class="bs-row header"><span class="label">EQUITY</span><span class="value ${valClass(e.total)}">${fmt(e.total)}</span></div>
+            <div class="bs-row"><span class="label">Unallocated Earnings</span><span class="value ${valClass(e.equity_unaffected)}">${fmt(e.equity_unaffected)}</span></div>
+            <div class="bs-row"><span class="label">Retained Earnings</span><span class="value ${valClass(e.equity)}">${fmt(e.equity)}</span></div>
+          </div>
+
+          <div class="bs-section">
+            <div class="bs-row grand-total"><span class="label">LIABILITIES + EQUITY</span><span class="value ${valClass(c.liabilities_plus_equity)}">${fmt(c.liabilities_plus_equity)}</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadData() {
+      const el = document.getElementById('content');
+      try {
+        var asOf = document.getElementById('asOfDate').value || '';
+        const res = await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''));
+        const data = await res.json();
+
+        if (!data.length) {
+          el.innerHTML = '<div class="loading">No company data. Sync journal entries with company info first.</div>';
+          return;
+        }
+
+        // Sort: put larger companies first
+        data.sort((a, b) => Math.abs(b.assets.total) - Math.abs(a.assets.total));
+
+        const cols = data.length;
+        el.innerHTML = `<div class="bs-grid" style="grid-template-columns: repeat(${cols}, minmax(220px, 1fr))">
+          ${data.map(renderColumn).join('')}
+        </div>`;
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error loading data: ' + err.message + '</div>';
+      }
+    }
+
+    loadData();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

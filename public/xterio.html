@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xterio Foundation — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; font-size: 12px; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; justify-content: center; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .scroll-wrap { overflow-x: auto; padding: 16px; }
+    table { border-collapse: collapse; min-width: 100%; }
+    th, td { padding: 4px 10px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; }
+    thead th { background: #1a365d; color: white; font-weight: 700; text-align: center; padding: 8px 10px; position: sticky; top: 0; z-index: 2; }
+    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 200px; font-weight: 500; }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .val.pos { color: var(--text); }
+    .val.neg { color: var(--red); }
+    .val.zero { color: var(--text-dim); }
+    .section td { background: var(--surface2); font-weight: 700; }
+    .section .row-label { background: var(--surface2); }
+    .total td { font-weight: 700; border-top: 2px solid var(--border); background: rgba(34,197,94,0.06); }
+    .total .row-label { background: rgba(34,197,94,0.06); }
+    .sub td { color: var(--text-dim); font-size: 10px; }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 300px; color: var(--text-dim); font-size: 14px; }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Xterio Foundation (CHF)</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
+      <a href="/tasks.html">Tasks</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadData()">Apply</button>
+    </div>
+  </div>
+  <div class="scroll-wrap">
+    <div id="content"><div class="loading">Loading Xterio Foundation data...</div></div>
+  </div>
+  <script>
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      return n < 0 ? '(' + s + ')' : s;
+    }
+    function valCls(n) {
+      if (Math.abs(n) < 0.5) return 'val zero';
+      return n < 0 ? 'val neg' : 'val pos';
+    }
+
+    async function loadData() {
+      var el = document.getElementById('content');
+      try {
+        var data = await (await fetch('/api/dashboard/xterio-foundation')).json();
+        if (!data.periods || !data.periods.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
+
+        var periods = data.periods;
+        var accounts = data.accounts;
+
+        // Group accounts by category then code
+        var categories = {};
+        accounts.forEach(function(a) {
+          if (!categories[a.category]) categories[a.category] = {};
+          var key = a.account_code + ' ' + a.account_name;
+          if (!categories[a.category][key]) categories[a.category][key] = { code: a.account_code, name: a.account_name, periods: {} };
+          categories[a.category][key].periods[a.period] = { chf: a.amount_local, usd: a.amount_usd, rate: a.exchange_rate };
+        });
+
+        var html = '<table>';
+
+        // Header
+        html += '<thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">Xterio Foundation</th>';
+        periods.forEach(function(p) { html += '<th>' + p.period + '<br><small>CHF</small></th><th>' + p.period + '<br><small>USD</small></th>'; });
+        html += '</tr></thead><tbody>';
+
+        // Account rows by category
+        Object.entries(categories).forEach(function(entry) {
+          var catName = entry[0];
+          var accts = entry[1];
+
+          // Category header
+          html += '<tr class="section"><td class="row-label">' + catName + '</td>';
+          periods.forEach(function() { html += '<td></td><td></td>'; });
+          html += '</tr>';
+
+          Object.values(accts).forEach(function(acct) {
+            html += '<tr><td class="row-label" style="padding-left:16px">' + acct.code + ' ' + acct.name + '</td>';
+            periods.forEach(function(p) {
+              var d = acct.periods[p.period] || { chf: 0, usd: 0 };
+              html += '<td class="' + valCls(d.chf) + '">' + fmt(d.chf) + '</td>';
+              html += '<td class="' + valCls(d.usd) + '">' + fmt(d.usd) + '</td>';
+            });
+            html += '</tr>';
+          });
+        });
+
+        // Category totals
+        html += '<tr class="section"><td class="row-label">Totals</td>';
+        periods.forEach(function() { html += '<td></td><td></td>'; });
+        html += '</tr>';
+
+        // Corporate Premium total
+        html += '<tr><td class="row-label" style="padding-left:16px">Total Corporate Premium</td>';
+        periods.forEach(function(p) {
+          html += '<td class="' + valCls(p.corporate_premium_chf) + '">' + fmt(p.corporate_premium_chf) + '</td>';
+          html += '<td class="' + valCls(p.corporate_premium_usd) + '">' + fmt(p.corporate_premium_usd) + '</td>';
+        });
+        html += '</tr>';
+
+        // Liquidity Optimizer total
+        html += '<tr><td class="row-label" style="padding-left:16px">Total Liquidity Optimizer</td>';
+        periods.forEach(function(p) {
+          html += '<td class="' + valCls(p.liquidity_optimizer_chf) + '">' + fmt(p.liquidity_optimizer_chf) + '</td>';
+          html += '<td class="' + valCls(p.liquidity_optimizer_usd) + '">' + fmt(p.liquidity_optimizer_usd) + '</td>';
+        });
+        html += '</tr>';
+
+        // FX Forward total
+        html += '<tr><td class="row-label" style="padding-left:16px">Total FX Forward</td>';
+        periods.forEach(function(p) {
+          html += '<td class="' + valCls(p.fx_forward_chf) + '">' + fmt(p.fx_forward_chf) + '</td>';
+          html += '<td class="' + valCls(p.fx_forward_usd) + '">' + fmt(p.fx_forward_usd) + '</td>';
+        });
+        html += '</tr>';
+
+        // Exchange rate row
+        html += '<tr class="sub"><td class="row-label">Exchange Rate CHF/USD</td>';
+        periods.forEach(function(p) {
+          html += '<td class="val">' + p.exchange_rate.toFixed(2) + '</td><td class="val">-</td>';
+        });
+        html += '</tr>';
+
+        // Grand total
+        html += '<tr class="total"><td class="row-label"><strong>Total (USD)</strong></td>';
+        periods.forEach(function(p) {
+          html += '<td class="' + valCls(p.total_chf) + '">' + fmt(p.total_chf) + '</td>';
+          html += '<td class="' + valCls(p.total_usd) + '"><strong>' + fmt(p.total_usd) + '</strong></td>';
+        });
+        html += '</tr>';
+
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
+    }
+    loadData();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

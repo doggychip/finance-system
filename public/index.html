@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Dashboard — Executive View</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .actions { display: flex; gap: 8px; }
+    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.15s; }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* Health bar */
+    .health-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+    .health-bar .label { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
+    .health-score { font-size: 16px; font-weight: 700; min-width: 50px; text-align: right; }
+    .health-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
+
+    /* Alerts */
+    .alert-list { list-style: none; }
+    .alert-item { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-item:hover { background: var(--surface2); }
+    .alert-item .alert-label { flex: 1; }
+    .alert-item .alert-value { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 100px; text-align: right; }
+    .alert-item .alert-value.neg { color: var(--red); }
+    .alert-item .alert-value.warn { color: var(--yellow); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .badge.danger { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge.warning { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+
+    /* Cash Overview */
+    .cash-overview { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .cash-overview h2 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+    .cash-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .cash-metrics { grid-template-columns: 1fr 1fr; } }
+    .cash-metric { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .cash-metric .cm-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
+    .cash-metric .cm-value { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+    .cash-metric .cm-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .cash-flow-chart { position: relative; height: 180px; }
+
+    /* Hero KPIs */
+    .hero-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1000px) { .hero-grid { grid-template-columns: 1fr 1fr; } }
+    .hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
+    .hero-card.main { background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--green); }
+    .hero-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 8px; }
+    .hero-card .value { font-size: 36px; font-weight: 800; letter-spacing: -1px; }
+    .hero-card.main .value { font-size: 42px; color: var(--green); }
+    .hero-card .change { font-size: 12px; margin-top: 6px; }
+    .hero-card .change.up { color: var(--green); }
+    .hero-card .change.down { color: var(--red); }
+    .hero-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+    .chart-box { position: relative; height: 260px; }
+
+    /* Entity cash bars */
+    .entity-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .entity-bar .name { font-size: 12px; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .entity-bar .bar-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .entity-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; min-width: 2px; }
+    .entity-bar .amount { font-size: 12px; font-weight: 600; width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Executive Dashboard</h1>
+    <div class="nav">
+      <a href="/" class="active">Overview</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/kanban.html">Tasks</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="refreshData()">Apply</button>
+      <button class="btn" onclick="refreshData()">Refresh</button>
+      <button class="btn primary" onclick="triggerSync()" id="syncBtn">Sync Odoo</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Health Bar -->
+    <div class="health-bar">
+      <span class="label">System Health</span>
+      <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
+      <span class="health-score" id="healthScore">--</span>
+      <div class="health-meta" id="healthMeta"></div>
+    </div>
+
+    <!-- Cash Overview -->
+    <div class="cash-overview">
+      <h2>Cash Overview</h2>
+      <div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
+        <!-- Total Assets big number -->
+        <div style="flex:1;min-width:240px">
+          <div class="cm-label">CASH & CRYPTO (Excl. Xterio Foundation)</div>
+          <div id="coTotalCash" style="font-size:40px;font-weight:800;color:var(--accent);letter-spacing:-1px;font-variant-numeric:tabular-nums">--</div>
+          <div id="coTreeBreakdown" style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.9;font-family:monospace"></div>
+        </div>
+        <!-- Net Flow -->
+        <div style="min-width:180px">
+          <div class="cm-label">Net Flow This Month</div>
+          <div id="coNetFlow" style="font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px">--</div>
+          <div class="cm-sub" id="coNetFlowSub">Inflows minus outflows</div>
+        </div>
+      </div>
+      <div class="cash-flow-chart"><canvas id="cashFlowChart"></canvas></div>
+    </div>
+
+    <!-- Closing Balance Widgets -->
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="hero-card">
+        <div class="label">Xterio Closing Balance</div>
+        <div class="value" id="heroXterio" style="font-size:28px">--</div>
+        <div class="change" id="heroXterioChange"></div>
+        <div class="sub" id="heroXterioSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label">Holdings Closing Balance</div>
+        <div class="value" id="heroHoldings" style="font-size:28px">--</div>
+        <div class="change" id="heroHoldingsChange"></div>
+        <div class="sub" id="heroHoldingsSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label">OW Closing Balance</div>
+        <div class="value" id="heroOWClosing" style="font-size:28px">--</div>
+        <div class="change" id="heroOWClosingChange"></div>
+        <div class="sub" id="heroOWClosingSub"></div>
+      </div>
+    </div>
+
+    <!-- Hero KPIs -->
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr">
+      <div class="hero-card main">
+        <div class="label">Non-OW Available Cash (Excl. Crypto)</div>
+        <div class="value" id="heroNonOW">--</div>
+        <div class="change" id="heroNonOWChange"></div>
+        <div class="sub" id="heroSub">Loading...</div>
+      </div>
+      <div class="hero-card">
+        <div class="label">OW & Reach Cash</div>
+        <div class="value" id="heroOW" style="font-size:28px">--</div>
+        <div class="change" id="heroOWChange"></div>
+      </div>
+    </div>
+
+    <!-- Key Alerts -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Key Alerts</h2>
+      <div id="dbAlerts"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Revenue vs Expense + Monthly Volume -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Revenue vs Expenses</h2>
+        <div class="chart-box"><canvas id="revExpChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Cash Trend</h2>
+        <div class="chart-box"><canvas id="trendChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Entity Breakdown -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Cash by Entity</h2>
+      <div id="entityBars"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- C2: Cash Distribution Pie Chart -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Cash & Crypto Distribution (by Entity)</h2>
+        <div class="chart-box"><canvas id="distChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Bank vs Crypto Split</h2>
+        <div class="chart-box"><canvas id="bankCryptoChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- C3: Top Expenses / Payments -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Top Expenses by Account (Largest First)</h2>
+      <div id="topExpenses"><div class="loading">Loading...</div></div>
+    </div>
+
+    <div class="snap-info" id="snapInfo"></div>
+  </div>
+
+  <script>
+    var charts = {};
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '--';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
+    function fmtShort(n) {
+      if (n == null) return '--';
+      var abs = Math.abs(n);
+      if (abs >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+      if (abs >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+      return '$' + Math.round(n);
+    }
+    function fmtPct(n) { return (n == null || isNaN(n) || !isFinite(n)) ? '' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+    var palette = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e','#a855f7','#64748b','#0ea5e9'];
+
+    async function loadAll() {
+      try {
+        var data = await (await fetch('/api/dashboard/executive-summary' + getAsOfParam())).json();
+        if (!data.snapshot_date) return;
+
+        document.getElementById('heroNonOW').textContent = fmt(data.non_ow_cash);
+        var nonOWChg = data.non_ow_cash - data.non_ow_cash_prior;
+        var nonOWPct = data.non_ow_cash_prior ? (nonOWChg / Math.abs(data.non_ow_cash_prior) * 100) : 0;
+        var chgEl = document.getElementById('heroNonOWChange');
+        chgEl.textContent = fmtShort(nonOWChg) + ' (' + fmtPct(nonOWPct) + ') vs prior';
+        chgEl.className = 'change ' + (nonOWChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
+
+        document.getElementById('heroOW').textContent = fmt(data.ow_cash);
+        var owChg = data.ow_cash - data.ow_cash_prior;
+        var owChgEl = document.getElementById('heroOWChange');
+        owChgEl.textContent = fmtShort(owChg) + ' vs prior';
+        owChgEl.className = 'change ' + (owChg >= 0 ? 'up' : 'down');
+
+        // Xterio closing balance
+        document.getElementById('heroXterio').textContent = fmt(data.xterio_cash);
+        var xterioChg = data.xterio_cash - data.xterio_cash_prior;
+        var xterioPct = data.xterio_cash_prior ? (xterioChg / Math.abs(data.xterio_cash_prior) * 100) : 0;
+        var xterioChgEl = document.getElementById('heroXterioChange');
+        xterioChgEl.textContent = fmtShort(xterioChg) + ' (' + fmtPct(xterioPct) + ') vs prior';
+        xterioChgEl.className = 'change ' + (xterioChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroXterioSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
+
+        // Holdings closing balance
+        document.getElementById('heroHoldings').textContent = fmt(data.holdings_cash);
+        var holdingsChg = data.holdings_cash - data.holdings_cash_prior;
+        var holdingsPct = data.holdings_cash_prior ? (holdingsChg / Math.abs(data.holdings_cash_prior) * 100) : 0;
+        var holdingsChgEl = document.getElementById('heroHoldingsChange');
+        holdingsChgEl.textContent = fmtShort(holdingsChg) + ' (' + fmtPct(holdingsPct) + ') vs prior';
+        holdingsChgEl.className = 'change ' + (holdingsChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroHoldingsSub').textContent = 'As of ' + data.snapshot_date;
+
+        // OW closing balance
+        document.getElementById('heroOWClosing').textContent = fmt(data.ow_total_cash);
+        var owClosingChg = data.ow_total_cash - data.ow_total_cash_prior;
+        var owClosingPct = data.ow_total_cash_prior ? (owClosingChg / Math.abs(data.ow_total_cash_prior) * 100) : 0;
+        var owClosingChgEl = document.getElementById('heroOWClosingChange');
+        owClosingChgEl.textContent = fmtShort(owClosingChg) + ' (' + fmtPct(owClosingPct) + ') vs prior';
+        owClosingChgEl.className = 'change ' + (owClosingChg >= 0 ? 'up' : 'down');
+        document.getElementById('heroOWClosingSub').textContent = 'As of ' + data.snapshot_date;
+
+        // Cash trend chart
+        if (data.cash_trend && data.cash_trend.length > 0) {
+          var ctx = document.getElementById('trendChart').getContext('2d');
+          if (charts.trend) charts.trend.destroy();
+          charts.trend = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: data.cash_trend.map(function(r) { return r.date; }),
+              datasets: [
+                { label: 'Non-OW Cash', data: data.cash_trend.map(function(r) { return r.non_ow; }), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#22c55e' },
+                { label: 'OW Cash', data: data.cash_trend.map(function(r) { return r.ow; }), borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 3, borderDash: [5,3] },
+              ]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              scales: {
+                x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 } } },
+                y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } }
+              },
+              plugins: {
+                legend: { labels: { color: '#8b8fa3', font: { size: 11 } } },
+                tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + fmt(ctx.parsed.y); } } }
+              }
+            }
+          });
+        }
+
+        // Entity cash bars
+        var barsEl = document.getElementById('entityBars');
+        var entities = data.entity_cash || [];
+        if (entities.length === 0) {
+          barsEl.innerHTML = '<div class="loading">No data</div>';
+        } else {
+          var maxCash = Math.max.apply(null, entities.map(function(e) { return Math.abs(e.cash); }));
+          barsEl.innerHTML = entities.map(function(e, i) {
+            var pct = maxCash > 0 ? (Math.abs(e.cash) / maxCash * 100) : 0;
+            var color = e.cash >= 0 ? palette[i % palette.length] : 'rgba(239,68,68,0.7)';
+            var bankStr = e.bank ? '<span style="color:var(--green)">Bank: ' + fmtShort(e.bank) + '</span>' : '';
+            var cryptoStr = e.crypto ? '<span style="color:var(--cyan)"> Crypto: ' + fmtShort(e.crypto) + '</span>' : '';
+            var detail = (bankStr || cryptoStr) ? '<div style="font-size:10px;color:var(--text-dim)">' + bankStr + cryptoStr + '</div>' : '';
+            return '<div class="entity-bar"><div class="name">' + e.name + detail + '</div>' +
+              '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(pct,2) + '%;background:' + color + '"></div></div>' +
+              '<div class="amount" style="color:' + (e.cash >= 0 ? 'var(--text)' : 'var(--red)') + '">' + fmtShort(e.cash) + '</div></div>';
+          }).join('');
+        }
+
+        document.getElementById('snapInfo').textContent = 'Data as of ' + data.snapshot_date + (data.prior_date ? ' | Prior: ' + data.prior_date : '');
+
+        // C2: Distribution pie chart
+        if (entities.length > 0) {
+          var posEntities = entities.filter(function(e) { return e.cash > 0; }).sort(function(a,b) { return b.cash - a.cash; });
+          var ctx1 = document.getElementById('distChart').getContext('2d');
+          if (charts.dist) charts.dist.destroy();
+          charts.dist = new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+              labels: posEntities.map(function(e) { return e.name; }),
+              datasets: [{ data: posEntities.map(function(e) { return e.cash; }), backgroundColor: posEntities.map(function(_,i) { return palette[i % palette.length]; }), borderWidth: 0 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '50%',
+              plugins: { legend: { position: 'right', labels: { color: '#8b8fa3', font: { size: 10 }, boxWidth: 10, padding: 8 } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + fmt(c.parsed); } } } }
+            }
+          });
+
+          // Bank vs Crypto pie
+          var totalBank2 = entities.reduce(function(s,e) { return s + (e.bank || 0); }, 0);
+          var totalCrypto2 = entities.reduce(function(s,e) { return s + (e.crypto || 0); }, 0);
+          var ctx2 = document.getElementById('bankCryptoChart').getContext('2d');
+          if (charts.bankCrypto) charts.bankCrypto.destroy();
+          charts.bankCrypto = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+              labels: ['Bank Cash', 'Crypto'],
+              datasets: [{ data: [Math.abs(totalBank2), Math.abs(totalCrypto2)], backgroundColor: ['#22c55e', '#06b6d4'], borderWidth: 0 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '50%',
+              plugins: { legend: { position: 'bottom', labels: { color: '#8b8fa3', font: { size: 12 } } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + fmt(c.parsed); } } } }
+            }
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadRevExpChart() {
+      try {
+        var now = new Date();
+        var from = (now.getFullYear() - 1) + now.toISOString().slice(4, 10);
+        var to = now.toISOString().slice(0, 10);
+        var data = await (await fetch('/api/reporting/revenue-expenses?period=monthly&date_from=' + from + '&date_to=' + to)).json();
+        if (!data.length) return;
+        if (charts.revExp) charts.revExp.destroy();
+        charts.revExp = new Chart(document.getElementById('revExpChart').getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: data.map(function(r) { return r.period; }),
+            datasets: [
+              { label: 'Revenue', data: data.map(function(r) { return r.total_revenue; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+              { label: 'Expenses', data: data.map(function(r) { return r.total_expenses; }), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 3 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+              x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 12 } },
+              y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } }
+            },
+            plugins: {
+              legend: { labels: { color: '#8b8fa3', font: { size: 11 } } },
+              tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + fmt(c.parsed.y); } } }
+            }
+          }
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    async function triggerSync() {
+      var btn = document.getElementById('syncBtn');
+      btn.disabled = true; btn.textContent = 'Syncing...';
+      try {
+        await fetch('/api/sync/accounts', { method: 'POST' });
+        await fetch('/api/sync/balances', { method: 'POST' });
+        await refreshData();
+      } catch (e) { console.error(e); }
+      btn.disabled = false; btn.textContent = 'Sync Odoo';
+    }
+
+    function getAsOfParam() {
+      var d = document.getElementById('asOfDate').value;
+      return d ? '?as_of_date=' + d : '';
+    }
+
+    async function loadCashSummary() {
+      try {
+        var asOf = getAsOfParam();
+        var b = await (await fetch('/api/dashboard/cash-balances' + asOf)).json();
+
+        // Calculate totals from existing API fields
+        var cashAccounts = b.cash ? b.cash.accounts || [] : [];
+        var owAccounts = b.overworld ? b.overworld.accounts || [] : [];
+        var reachAccounts = b.reach ? b.reach.accounts || [] : [];
+        var overdrawnAccounts = b.overdrawn ? b.overdrawn.accounts || [] : [];
+        var allAccounts = [].concat(cashAccounts, owAccounts, reachAccounts, overdrawnAccounts);
+
+        // Split into bank (100xxx) and crypto (10Wxxx)
+        var totalBank = 0, totalCrypto = 0;
+        allAccounts.forEach(function(a) {
+          if (a.code && a.code.startsWith('10W')) totalCrypto += a.balance;
+          else totalBank += a.balance;
+        });
+        var grandTotal = totalBank + totalCrypto;
+
+        document.getElementById('coTotalCash').textContent = fmtShort(grandTotal);
+
+        var owTotal = b.overworld ? b.overworld.total : 0;
+        var reachTotal = b.reach ? b.reach.total : 0;
+        var overdrawnTotal = b.overdrawn ? b.overdrawn.total : 0;
+
+        var tree = document.getElementById('coTreeBreakdown');
+        tree.innerHTML =
+          '<span style="color:var(--green)">Cash (Bank): ' + fmtShort(totalBank) + '</span><br>' +
+          '<span style="color:var(--cyan)">Crypto: ' + fmtShort(totalCrypto) + '</span><br>' +
+          '<span style="color:var(--yellow)">Overworld: ' + fmtShort(owTotal) + '</span>' +
+          ' &nbsp; <span style="color:var(--blue)">Reach: ' + fmtShort(reachTotal) + '</span>' +
+          (overdrawnTotal < -0.5 ? ' &nbsp; <span style="color:var(--red)">Overdrawn: ' + fmtShort(overdrawnTotal) + '</span>' : '');
+
+        // Cash flow chart from reporting API
+        var flow = await (await fetch('/api/reporting/cash-flow-series?period=monthly' + (asOf ? '&date_to=' + document.getElementById('asOfDate').value : ''))).json();
+        var netFlowEl = document.getElementById('coNetFlow');
+        if (Array.isArray(flow) && flow.length > 0) {
+          var latest = flow[flow.length - 1];
+          netFlowEl.textContent = fmtShort(latest.net_flow || 0);
+          netFlowEl.style.color = (latest.net_flow || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+          document.getElementById('coNetFlowSub').textContent = latest.period || '';
+        }
+
+        // Bar chart - show all months
+        if (Array.isArray(flow) && flow.length > 0) {
+          var ctx = document.getElementById('cashFlowChart').getContext('2d');
+          if (charts.cashFlow) charts.cashFlow.destroy();
+          charts.cashFlow = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: flow.map(function(r) { return r.period; }),
+              datasets: [
+                { label: 'Inflows', data: flow.map(function(r) { return r.inflows || 0; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
+                { label: 'Outflows', data: flow.map(function(r) { return Math.abs(r.outflows || 0); }), backgroundColor: 'rgba(239,68,68,0.5)', borderRadius: 4 }
+              ]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 20 } },
+                y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } }
+              },
+              plugins: {
+                legend: { labels: { color: '#8b8fa3', font: { size: 11 } } },
+                tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + fmt(c.parsed.y); } } }
+              }
+            }
+          });
+        }
+      } catch (e) { console.error('Cash summary error:', e); }
+    }
+
+    async function loadHealth() {
+      try {
+        var data = await (await fetch('/api/alerts-tasks/health-status')).json();
+        var fill = document.getElementById('healthFill');
+        var score = document.getElementById('healthScore');
+        var meta = document.getElementById('healthMeta');
+        fill.style.width = data.score + '%';
+        fill.style.background = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        score.textContent = data.score + '%';
+        score.style.color = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        meta.innerHTML =
+          '<span>Tasks: ' + data.tasks.done + '/' + data.tasks.total + ' done</span>' +
+          (data.tasks.overdue > 0 ? '<span style="color:var(--red)">' + data.tasks.overdue + ' overdue</span>' : '') +
+          (data.alerts.critical > 0 ? '<span style="color:var(--red)">' + data.alerts.critical + ' critical</span>' : '') +
+          (data.alerts.open > 0 ? '<span>' + data.alerts.open + ' open alerts</span>' : '');
+      } catch(e) { console.error(e); }
+    }
+
+    async function loadDbAlerts() {
+      try {
+        var alerts = await (await fetch('/api/alerts-tasks/alerts?resolved=false')).json();
+        var el = document.getElementById('dbAlerts');
+        if (!alerts.length) {
+          el.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">All Clear</span> No active alerts</span></li></ul>';
+          return;
+        }
+        el.innerHTML = '<ul class="alert-list">' + alerts.map(function(a) {
+          var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
+          return '<li class="alert-item"><span class="alert-label"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span> ' + a.title + (a.entity ? ' — ' + a.entity : '') + '</span><span class="alert-value" style="color:var(--text-dim);font-size:11px">' + (a.message || '') + '</span></li>';
+        }).join('') + '</ul>';
+      } catch(e) { console.error(e); }
+    }
+
+    async function loadTopExpenses() {
+      try {
+        var asOf = document.getElementById('asOfDate').value;
+        var dateTo = asOf || new Date().toISOString().slice(0,10);
+        var dateFrom = dateTo.slice(0,4) + '-01-01'; // YTD
+        var data = await (await fetch('/api/reporting/pnl?period=monthly&date_from=' + dateFrom + '&date_to=' + dateTo)).json();
+        var el = document.getElementById('topExpenses');
+        if (!data.length) { el.innerHTML = '<div class="loading">No expense data</div>'; return; }
+
+        // Group by account, sum amounts, filter expenses only
+        var byAcct = {};
+        data.forEach(function(r) {
+          if (r.odoo_type !== 'expense' && r.odoo_type !== 'expense_direct_cost') return;
+          var key = r.code + ' ' + r.name;
+          if (!byAcct[key]) byAcct[key] = { code: r.code, name: r.name, total: 0 };
+          byAcct[key].total += r.amount;
+        });
+
+        var sorted = Object.values(byAcct).sort(function(a,b) { return b.total - a.total; }).slice(0, 20);
+        if (!sorted.length) { el.innerHTML = '<div class="loading">No expenses found</div>'; return; }
+
+        el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>' +
+          '<th style="text-align:left;padding:6px 10px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Account</th>' +
+          '<th style="text-align:left;padding:6px 10px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Description</th>' +
+          '<th style="text-align:right;padding:6px 10px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Amount (YTD)</th>' +
+          '</tr></thead><tbody>' +
+          sorted.map(function(a) {
+            return '<tr><td style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text-dim)">' + a.code + '</td>' +
+              '<td style="padding:5px 10px;border-bottom:1px solid var(--border)">' + a.name + '</td>' +
+              '<td style="padding:5px 10px;border-bottom:1px solid var(--border);text-align:right;color:var(--red);font-variant-numeric:tabular-nums">' + fmt(a.total) + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      } catch(e) { console.error('Top expenses error:', e); }
+    }
+
+    function refreshData() {
+      loadAll();
+      loadHealth();
+      loadDbAlerts();
+      loadCashSummary();
+      loadRevExpChart();
+      loadTopExpenses();
+    }
+
+    refreshData();
+    setInterval(refreshData, 5 * 60 * 1000);
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

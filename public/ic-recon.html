@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IC Reconciliation — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; justify-content: center; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .stat-card .label { font-size: 12px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+    .stat-card .value { font-size: 24px; font-weight: 700; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .ic-account { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .ic-header { padding: 12px 16px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .ic-header:hover { background: var(--border); }
+    .ic-header .ic-name { font-weight: 600; font-size: 13px; }
+    .ic-header .ic-total { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ic-header .ic-total.balanced { color: var(--green); }
+    .ic-header .ic-total.unbalanced { color: var(--red); }
+    .ic-header .ic-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+    .ic-badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+    .ic-badge.warn { background: rgba(239,68,68,0.15); color: var(--red); }
+    .ic-entries { padding: 8px 0; }
+    .ic-entry { display: flex; justify-content: space-between; padding: 6px 16px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .ic-entry:last-child { border-bottom: none; }
+    .ic-entry:hover { background: var(--surface2); }
+    .ic-entry .company { flex: 1; }
+    .ic-entry .balance { font-variant-numeric: tabular-nums; font-weight: 500; min-width: 120px; text-align: right; }
+    .ic-entry .balance.pos { color: var(--green); }
+    .ic-entry .balance.neg { color: var(--red); }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>IC Reconciliation</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
+      <a href="/tasks.html">Tasks</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadData()">Apply</button>
+      <button class="btn" onclick="loadData()">Refresh</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="stats-row">
+      <div class="stat-card"><div class="label">IC Accounts</div><div class="value" id="statTotal">--</div></div>
+      <div class="stat-card"><div class="label">Unreconciled</div><div class="value" style="color:var(--red)" id="statUnrecon">--</div></div>
+      <div class="stat-card"><div class="label">Net Unreconciled</div><div class="value" id="statNet">--</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Unreconciled Accounts</h2>
+      <div id="unreconList"><div class="loading">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>All Intercompany Accounts</h2>
+      <div id="allList"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(Math.round(n)).toLocaleString('en-US');
+      return n < 0 ? '(' + s + ')' : s;
+    }
+
+    function renderAccount(acc) {
+      var balanced = Math.abs(acc.total) < 1;
+      var html = '<div class="ic-account">';
+      html += '<div class="ic-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+      html += '<div><span class="ic-name">' + acc.code + ' ' + acc.name + '</span>';
+      html += '<span class="ic-badge ' + (balanced ? 'ok' : 'warn') + '">' + (balanced ? 'Balanced' : 'Unreconciled') + '</span></div>';
+      html += '<span class="ic-total ' + (balanced ? 'balanced' : 'unbalanced') + '">' + fmt(acc.total) + '</span>';
+      html += '</div>';
+      html += '<div class="ic-entries">';
+      acc.entries.sort(function(a, b) { return b.balance - a.balance; }).forEach(function(e) {
+        var cls = e.balance > 0.5 ? 'pos' : e.balance < -0.5 ? 'neg' : '';
+        html += '<div class="ic-entry"><span class="company">' + e.company_name + '</span><span class="balance ' + cls + '">' + fmt(e.balance) + '</span></div>';
+      });
+      html += '</div></div>';
+      return html;
+    }
+
+    async function loadData() {
+      var res = await fetch('/api/dashboard/ic-reconciliation');
+      var data = await res.json();
+
+      document.getElementById('statTotal').textContent = data.summary.total_ic_accounts;
+      document.getElementById('statUnrecon').textContent = data.summary.unreconciled_count;
+      var net = data.summary.net_unreconciled;
+      var netEl = document.getElementById('statNet');
+      netEl.textContent = fmt(net);
+      netEl.style.color = Math.abs(net) < 1 ? 'var(--green)' : 'var(--red)';
+
+      var unreconciled = data.accounts.filter(function(a) { return Math.abs(a.total) > 1; });
+      var reconciled = data.accounts.filter(function(a) { return Math.abs(a.total) <= 1; });
+
+      document.getElementById('unreconList').innerHTML = unreconciled.length
+        ? unreconciled.map(renderAccount).join('')
+        : '<div class="loading" style="color:var(--green)">All intercompany accounts are balanced!</div>';
+
+      document.getElementById('allList').innerHTML = data.accounts.map(renderAccount).join('');
+    }
+
+    loadData();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

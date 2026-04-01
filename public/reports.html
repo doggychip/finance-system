@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports — Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --cyan: #06b6d4; --yellow: #eab308; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+
+    /* Sub-tabs */
+    .sub-tabs { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; }
+    .sub-tab { padding: 12px 20px; font-size: 13px; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .sub-tab:hover { color: var(--text); background: var(--surface2); }
+    .sub-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .sub-tabs .spacer { flex: 1; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn-export { background: rgba(34,197,94,0.12); border-color: var(--green); color: var(--green); font-weight: 600; margin: 0 8px; }
+    .btn-export:hover { background: rgba(34,197,94,0.25); }
+
+    /* Controls bar */
+    .controls { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .controls label { font-size: 12px; color: var(--text-dim); }
+    .controls select, .controls input { padding: 5px 8px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; }
+    .period-btns { display: flex; gap: 2px; background: var(--surface2); border-radius: 6px; padding: 2px; }
+    .period-btns button { padding: 5px 14px; border: none; border-radius: 4px; background: transparent; color: var(--text-dim); font-size: 12px; cursor: pointer; }
+    .period-btns button.active { background: var(--accent); color: white; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+    .chart-box { position: relative; height: 350px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* Shared table styles */
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { text-align: left; padding: 6px 8px; color: var(--text-dim); font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: var(--surface2); }
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .val.pos, .val.positive { color: var(--green); }
+    .val.neg, .val.negative { color: var(--red); }
+    .val.zero { color: var(--text-dim); }
+    .section-row td { font-weight: 700; background: var(--surface2); }
+    .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+
+    /* Balance Sheet tab styles */
+    .scroll-wrap { overflow-x: auto; }
+    .scroll-wrap table { min-width: 100%; border-collapse: collapse; }
+    .scroll-wrap th, .scroll-wrap td { padding: 3px 8px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; }
+    .scroll-wrap thead th { background: #1a365d; color: white; font-weight: 700; text-align: center; padding: 8px 8px; position: sticky; top: 0; z-index: 2; }
+    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 200px; font-weight: 500; }
+    .indent-0 .row-label { font-weight: 800; font-size: 12px; }
+    .indent-1 .row-label { padding-left: 12px; font-weight: 600; }
+    .indent-2 .row-label { padding-left: 24px; font-weight: 400; color: var(--text-dim); }
+    .section-row-bs td, .section-row-bs .row-label { background: #1e293b; font-weight: 800; font-size: 12px; color: white; padding-top: 6px; padding-bottom: 6px; }
+    .total-row-bs td { font-weight: 700; background: rgba(99,102,241,0.06); }
+    .total-row-bs .row-label { background: rgba(99,102,241,0.06); font-weight: 700; }
+    .check-row td { font-size: 10px; color: var(--text-dim); }
+    .check-row .nonzero { color: var(--red); font-weight: 700; }
+    .subtotal-col { background: #2d4a22; }
+    .total-col { background: #4a1d1d; }
+    .elim-col { background: #4a3d1d; }
+    .consol-col { background: #1d2d4a; font-size: 11px; }
+    .elim-val { background: rgba(234,179,8,0.04); }
+    .consol-val { background: rgba(59,130,246,0.06); font-weight: 600; }
+    .subtotal-val { background: rgba(34,197,94,0.04); }
+    .total-val { background: rgba(239,68,68,0.04); }
+
+    /* BS grid columns */
+    .bs-grid { display: grid; gap: 12px; min-width: fit-content; }
+    .bs-column { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-width: 220px; overflow: hidden; }
+    .bs-column .col-header { padding: 12px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; text-align: center; }
+    .bs-section { border-bottom: 1px solid var(--border); }
+    .bs-section:last-child { border-bottom: none; }
+    .bs-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 12px; line-height: 1.8; }
+    .bs-row:hover { background: var(--surface2); }
+    .bs-row .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bs-row .value { font-variant-numeric: tabular-nums; text-align: right; min-width: 90px; font-weight: 500; }
+    .bs-row.header { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; padding-top: 8px; color: var(--text); }
+    .bs-row.sub-header { font-weight: 600; font-size: 11px; color: var(--text-dim); padding-top: 6px; }
+    .bs-row.total { font-weight: 700; border-top: 1px solid var(--border); padding-top: 6px; }
+    .bs-row.grand-total { font-weight: 800; font-size: 13px; border-top: 2px solid var(--border); padding: 8px 14px; background: var(--surface2); }
+    .bs-row .positive { color: var(--green); }
+    .bs-row .negative { color: var(--red); }
+
+    /* Cash flow statement */
+    .cf-table { border-collapse: collapse; min-width: 100%; }
+    .cf-table th, .cf-table td { padding: 3px 10px; white-space: nowrap; border: 1px solid var(--border); font-size: 11px; }
+    .cf-table .company-header th { background: #1e3a5f; color: white; font-weight: 700; font-size: 12px; text-align: center; padding: 8px 10px; position: sticky; top: 0; z-index: 2; }
+    .cf-table .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; font-weight: 500; min-width: 280px; max-width: 280px; }
+    .cf-table .section-header td { background: var(--surface2); font-weight: 700; padding: 6px 10px; }
+    .cf-table .section-header .row-label { background: var(--surface2); }
+    .cf-table .cash-account td { color: var(--text-dim); font-size: 10px; }
+    .cf-table .cash-account .row-label { padding-left: 20px; background: var(--surface); }
+    .cf-table .total-row td { font-weight: 700; border-top: 2px solid var(--border); background: rgba(34,197,94,0.05); padding: 6px 10px; }
+    .cf-table .total-row .row-label { background: rgba(34,197,94,0.05); }
+    .cf-table .movement-row .row-label { padding-left: 16px; }
+    .cf-table .sub-header td { font-weight: 600; background: rgba(99,102,241,0.06); }
+    .cf-table .sub-header .row-label { background: rgba(99,102,241,0.06); }
+
+    /* IC Recon */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .stat-card .stat-label { font-size: 12px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+    .stat-card .stat-value { font-size: 24px; font-weight: 700; }
+    .ic-account { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .ic-header { padding: 12px 16px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .ic-header:hover { background: var(--border); }
+    .ic-header .ic-name { font-weight: 600; font-size: 13px; }
+    .ic-header .ic-total { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ic-header .ic-total.balanced { color: var(--green); }
+    .ic-header .ic-total.unbalanced { color: var(--red); }
+    .ic-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; display: inline-block; }
+    .ic-badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+    .ic-badge.warn { background: rgba(239,68,68,0.15); color: var(--red); }
+    .ic-entries { padding: 8px 0; }
+    .ic-entry { display: flex; justify-content: space-between; padding: 6px 16px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .ic-entry:last-child { border-bottom: none; }
+    .ic-entry:hover { background: var(--surface2); }
+    .ic-entry .balance.pos { color: var(--green); }
+    .ic-entry .balance.neg { color: var(--red); }
+    .ic-entry .balance { font-variant-numeric: tabular-nums; font-weight: 500; min-width: 120px; text-align: right; }
+
+    /* Xterio */
+    .xterio-table th, .xterio-table td { padding: 4px 10px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; }
+    .xterio-table thead th { background: #1a365d; color: white; font-weight: 700; text-align: center; padding: 8px 10px; position: sticky; top: 0; z-index: 2; }
+    .xterio-table .section td { background: var(--surface2); font-weight: 700; }
+    .xterio-table .section .row-label { background: var(--surface2); }
+    .xterio-table .total td { font-weight: 700; border-top: 2px solid var(--border); background: rgba(34,197,94,0.06); }
+    .xterio-table .total .row-label { background: rgba(34,197,94,0.06); }
+    .xterio-table .sub td { color: var(--text-dim); font-size: 10px; }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Financial Reports</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/reports.html" class="active">Reports</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/kanban.html">Tasks</a>
+    </div>
+  </div>
+
+  <div class="sub-tabs">
+    <div class="sub-tab active" data-tab="balanceSheet">Balance Sheet</div>
+    <div class="sub-tab" data-tab="consolidated">Consolidated</div>
+    <div class="sub-tab" data-tab="cashFlow">Cash Flow</div>
+    <div class="sub-tab" data-tab="icRecon">IC Recon</div>
+    <div class="sub-tab" data-tab="xterio">Xterio</div>
+    <div class="sub-tab" data-tab="pnl">P&L / Charts</div>
+    <div class="spacer"></div>
+    <button class="btn btn-export" onclick="exportExcel()">Export Excel</button>
+    <div style="display:flex;gap:6px;align-items:center;padding:8px 0">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadCurrentTab()">Apply</button>
+    </div>
+  </div>
+
+  <!-- Controls for P&L tab only -->
+  <div class="controls" id="pnlControls" style="display:none">
+    <label>Period:</label>
+    <div class="period-btns" id="periodBtns">
+      <button data-p="daily">Daily</button>
+      <button data-p="weekly">Weekly</button>
+      <button data-p="monthly" class="active">Monthly</button>
+    </div>
+    <label>From:</label>
+    <input type="date" id="dateFrom" value="">
+    <label>To:</label>
+    <input type="date" id="dateTo" value="">
+    <label>Company:</label>
+    <select id="companySelect"><option value="">All</option></select>
+    <button class="btn primary" onclick="loadPnlTab()">Apply</button>
+  </div>
+
+  <!-- Tab: Balance Sheet -->
+  <div class="tab-content active" id="tab-balanceSheet">
+    <div class="container" style="max-width:100%;overflow-x:auto">
+      <div id="bsContent"><div class="loading">Loading balance sheets...</div></div>
+    </div>
+  </div>
+
+  <!-- Tab: Consolidated -->
+  <div class="tab-content" id="tab-consolidated">
+    <div class="scroll-wrap" style="padding:16px">
+      <div id="consolContent"><div class="loading">Loading consolidated balance sheet...</div></div>
+    </div>
+  </div>
+
+  <!-- Tab: Cash Flow -->
+  <div class="tab-content" id="tab-cashFlow">
+    <div class="scroll-wrap" style="padding:16px">
+      <div id="cfContent"><div class="loading">Loading cash flow data...</div></div>
+    </div>
+  </div>
+
+  <!-- Tab: IC Recon -->
+  <div class="tab-content" id="tab-icRecon">
+    <div class="container" style="max-width:1200px">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">IC Accounts</div><div class="stat-value" id="icStatTotal">--</div></div>
+        <div class="stat-card"><div class="stat-label">Unreconciled</div><div class="stat-value" style="color:var(--red)" id="icStatUnrecon">--</div></div>
+        <div class="stat-card"><div class="stat-label">Net Unreconciled</div><div class="stat-value" id="icStatNet">--</div></div>
+      </div>
+      <div class="card"><h2>Unreconciled Accounts</h2><div id="unreconList"><div class="loading">Loading...</div></div></div>
+      <div class="card"><h2>All Intercompany Accounts</h2><div id="allIcList"><div class="loading">Loading...</div></div></div>
+    </div>
+  </div>
+
+  <!-- Tab: Xterio -->
+  <div class="tab-content" id="tab-xterio">
+    <div class="scroll-wrap" style="padding:16px">
+      <div id="xterioContent"><div class="loading">Loading Xterio Foundation data...</div></div>
+    </div>
+  </div>
+
+  <!-- Tab: P&L / Charts -->
+  <div class="tab-content" id="tab-pnl">
+    <div class="container">
+      <div class="card"><h2>Revenue & Expenses</h2><div class="chart-box"><canvas id="revExpChart"></canvas></div></div>
+      <div class="card"><h2>Net Income</h2><div class="chart-box"><canvas id="netIncomeChart"></canvas></div></div>
+      <div class="grid-2">
+        <div class="card"><h2>Assets Over Time</h2><div class="chart-box"><canvas id="assetsChart"></canvas></div></div>
+        <div class="card"><h2>Liabilities & Equity Over Time</h2><div class="chart-box"><canvas id="liabEquityChart"></canvas></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h2>Cash Inflows vs Outflows</h2><div class="chart-box"><canvas id="cashFlowBarChart"></canvas></div></div>
+        <div class="card"><h2>Cash Balance</h2><div class="chart-box"><canvas id="cashBalanceChart"></canvas></div></div>
+      </div>
+      <div class="card"><h2>P&L Detail</h2><div id="pnlTable"><div class="loading">Loading...</div></div></div>
+    </div>
+  </div>
+
+  <script>
+    var currentTab = 'balanceSheet';
+    var currentPeriod = 'monthly';
+    var charts = {};
+    var lastExportData = [];
+
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(Math.round(n)).toLocaleString('en-US');
+      return n < 0 ? '(' + s + ')' : s;
+    }
+    function fmtBs(n) {
+      if (n == null || isNaN(n) || n === 0) return '-';
+      return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    }
+    function fmtShort(n) {
+      var abs = Math.abs(n);
+      if (abs >= 1e6) return (n/1e6).toFixed(1)+'M';
+      if (abs >= 1e3) return (n/1e3).toFixed(0)+'K';
+      return Math.round(n).toString();
+    }
+    function valCls(n) { return Math.abs(n) < 0.5 ? 'val zero' : n < 0 ? 'val negative' : 'val positive'; }
+    function valClass(n) { return n > 0.01 ? 'positive' : n < -0.01 ? 'negative' : ''; }
+    function consolValCls(n, isSub, isTotal, isElim, isConsol) {
+      var base = 'val';
+      if (isConsol) base += ' consol-val';
+      else if (isElim) base += ' elim-val';
+      else if (isTotal) base += ' total-val';
+      else if (isSub) base += ' subtotal-val';
+      if (Math.abs(n) < 0.5) return base + ' zero';
+      return n < 0 ? base + ' negative' : base + ' positive';
+    }
+
+    var chartPalette = { green: '#22c55e', red: '#ef4444', blue: '#3b82f6', purple: '#8b5cf6', cyan: '#06b6d4', orange: '#f97316' };
+    var chartDefaults = { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', font: { size: 10 }, maxTicksLimit: 30 } }, y: { grid: { color: '#2e3344' }, ticks: { color: '#8b8fa3', callback: function(v) { return fmtShort(v); } } } }, plugins: { legend: { labels: { color: '#8b8fa3', font: { size: 11 } } } } };
+    function destroyChart(name) { if (charts[name]) charts[name].destroy(); }
+
+    // Sub-tab switching
+    document.querySelector('.sub-tabs').addEventListener('click', function(e) {
+      var tab = e.target.closest('.sub-tab');
+      if (!tab) return;
+      var tabName = tab.dataset.tab;
+      if (tabName === currentTab) return;
+      currentTab = tabName;
+      document.querySelectorAll('.sub-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      document.getElementById('tab-' + tabName).classList.add('active');
+      document.getElementById('pnlControls').style.display = tabName === 'pnl' ? 'flex' : 'none';
+      loadCurrentTab();
+    });
+
+    function loadCurrentTab() {
+      lastExportData = [];
+      if (currentTab === 'balanceSheet') loadBalanceSheet();
+      else if (currentTab === 'consolidated') loadConsolidated();
+      else if (currentTab === 'cashFlow') loadCashFlowStatement();
+      else if (currentTab === 'icRecon') loadIcRecon();
+      else if (currentTab === 'xterio') loadXterio();
+      else if (currentTab === 'pnl') loadPnlTab();
+    }
+
+    // Period buttons for P&L
+    document.getElementById('periodBtns').addEventListener('click', function(e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      currentPeriod = btn.dataset.p;
+      document.querySelectorAll('.period-btns button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      loadPnlTab();
+    });
+
+    var now = new Date();
+    document.getElementById('dateTo').value = now.toISOString().slice(0, 10);
+    document.getElementById('dateFrom').value = (now.getFullYear() - 1) + now.toISOString().slice(4, 10);
+    fetch('/api/dashboard/companies').then(function(r) { return r.json(); }).then(function(data) {
+      var sel = document.getElementById('companySelect');
+      data.forEach(function(c) { var o = document.createElement('option'); o.value = c.company_id; o.textContent = c.company_name; sel.appendChild(o); });
+    });
+
+    function getAsOf() { return document.getElementById('asOfDate').value || ''; }
+    function getPnlParams() {
+      var p = '?period=' + currentPeriod;
+      var df = document.getElementById('dateFrom').value;
+      var dt = document.getElementById('dateTo').value;
+      var co = document.getElementById('companySelect').value;
+      if (df) p += '&date_from=' + df;
+      if (dt) p += '&date_to=' + dt;
+      if (co) p += '&company_id=' + co;
+      return p;
+    }
+
+    // ── Balance Sheet ──
+    async function loadBalanceSheet() {
+      var el = document.getElementById('bsContent');
+      try {
+        var asOf = getAsOf();
+        var data = await (await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''))).json();
+        if (!data.length) { el.innerHTML = '<div class="loading">No company data.</div>'; return; }
+        data.sort(function(a, b) { return Math.abs(b.assets.total) - Math.abs(a.assets.total); });
+
+        lastExportData = data.map(function(c) {
+          return { Company: c.company_name, 'Total Assets': c.assets.total, 'Bank Cash': c.assets.bank_cash, Receivables: c.assets.receivable, 'Total Liabilities': c.liabilities.total, 'Total Equity': c.equity.total, 'L+E': c.liabilities_plus_equity };
+        });
+
+        el.innerHTML = '<div class="bs-grid" style="grid-template-columns:repeat(' + data.length + ',minmax(220px,1fr))">' + data.map(function(c) {
+          var a = c.assets, l = c.liabilities, e = c.equity;
+          return '<div class="bs-column"><div class="col-header">' + c.company_name + '</div>' +
+            '<div class="bs-section">' +
+              '<div class="bs-row header"><span class="label">ASSETS</span><span class="value ' + valClass(a.total) + '">' + fmtBs(a.total) + '</span></div>' +
+              '<div class="bs-row sub-header"><span class="label">Current Assets</span><span class="value">' + fmtBs(a.total_current) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Bank and Cash</span><span class="value ' + valClass(a.bank_cash) + '">' + fmtBs(a.bank_cash) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Receivables</span><span class="value ' + valClass(a.receivable) + '">' + fmtBs(a.receivable) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Current Assets</span><span class="value ' + valClass(a.current_assets) + '">' + fmtBs(a.current_assets) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Prepayments</span><span class="value ' + valClass(a.prepayments) + '">' + fmtBs(a.prepayments) + '</span></div>' +
+              '<div class="bs-row sub-header"><span class="label">Fixed Assets</span><span class="value">' + fmtBs(a.fixed_assets) + '</span></div>' +
+              '<div class="bs-row sub-header"><span class="label">Non-current Assets</span><span class="value">' + fmtBs(a.non_current_assets) + '</span></div>' +
+            '</div>' +
+            '<div class="bs-section">' +
+              '<div class="bs-row header"><span class="label">LIABILITIES</span><span class="value ' + valClass(l.total) + '">' + fmtBs(l.total) + '</span></div>' +
+              '<div class="bs-row sub-header"><span class="label">Current Liabilities</span><span class="value">' + fmtBs(l.total_current) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Payables</span><span class="value ' + valClass(l.payable) + '">' + fmtBs(l.payable) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Current Liabilities</span><span class="value ' + valClass(l.current_liabilities) + '">' + fmtBs(l.current_liabilities) + '</span></div>' +
+              '<div class="bs-row sub-header"><span class="label">Non-current Liabilities</span><span class="value">' + fmtBs(l.non_current_liabilities) + '</span></div>' +
+            '</div>' +
+            '<div class="bs-section">' +
+              '<div class="bs-row header"><span class="label">EQUITY</span><span class="value ' + valClass(e.total) + '">' + fmtBs(e.total) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Unallocated Earnings</span><span class="value ' + valClass(e.equity_unaffected) + '">' + fmtBs(e.equity_unaffected) + '</span></div>' +
+              '<div class="bs-row"><span class="label">Retained Earnings</span><span class="value ' + valClass(e.equity) + '">' + fmtBs(e.equity) + '</span></div>' +
+            '</div>' +
+            '<div class="bs-section"><div class="bs-row grand-total"><span class="label">L + E</span><span class="value ' + valClass(c.liabilities_plus_equity) + '">' + fmtBs(c.liabilities_plus_equity) + '</span></div></div>' +
+          '</div>';
+        }).join('') + '</div>';
+      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+    }
+
+    // ── Consolidated BS ──
+    async function loadConsolidated() {
+      var el = document.getElementById('consolContent');
+      try {
+        var data = await (await fetch('/api/dashboard/consolidated-bs?as_of_date=' + getAsOf())).json();
+        if (!data.columns || !data.rows) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
+
+        lastExportData = data.rows.map(function(row) {
+          var obj = { Label: row.label };
+          row.values.forEach(function(v, i) { obj[data.columns[i].name] = v; });
+          return obj;
+        });
+
+        var html = '<table><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">Conso Balance Sheet</th>';
+        data.columns.forEach(function(col) {
+          var cls = col.is_consolidated ? 'consol-col' : col.is_elimination ? 'elim-col' : col.name === 'Total' ? 'total-col' : col.is_subtotal ? 'subtotal-col' : '';
+          html += '<th class="' + cls + '">' + col.name + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        data.rows.forEach(function(row) {
+          var rowCls = 'indent-' + row.indent;
+          if (row.is_section) rowCls += ' section-row-bs';
+          if (row.is_total) rowCls += ' total-row-bs';
+          if (row.code === 'CHECK') rowCls = 'check-row';
+          html += '<tr class="' + rowCls + '"><td class="row-label">' + row.label + '</td>';
+          row.values.forEach(function(val, i) {
+            var col = data.columns[i];
+            var cls = consolValCls(val, col.is_subtotal, col.name === 'Total', col.is_elimination, col.is_consolidated);
+            if (row.code === 'CHECK' && Math.abs(val) > 0.5) cls += ' nonzero';
+            html += '<td class="' + cls + '">' + fmt(val) + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+    }
+
+    // ── Cash Flow Statement ──
+    async function loadCashFlowStatement() {
+      var el = document.getElementById('cfContent');
+      try {
+        var data = await (await fetch('/api/dashboard/cash-flow-statement')).json();
+        data.sort(function(a, b) { return a.company_name.localeCompare(b.company_name); });
+        if (!data.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
+
+        // Build export data
+        var exportRows = [];
+        var allCashAccs = {};
+        data.forEach(function(c) { c.cash_accounts.forEach(function(a) { allCashAccs[a.code + ' ' + a.name] = a; }); });
+
+        var allCodes = {};
+        data.forEach(function(c) { c.movements.forEach(function(m) { allCodes[m.code] = m.name; }); });
+        var sortedCodes = Object.entries(allCodes).sort(function(a,b) { return a[0].localeCompare(b[0]); });
+        var cashInCodes = sortedCodes.filter(function(e) { return e[0].startsWith('8'); });
+        var cashOutCodes = sortedCodes.filter(function(e) { return !e[0].startsWith('8'); });
+
+        function getMovement(company, code) { var m = company.movements.find(function(x) { return x.code === code; }); return m ? m.net : 0; }
+
+        var cols = data.length;
+        var html = '<table class="cf-table"><tr class="company-header"><th class="row-label" style="background:#1e3a5f;color:white">Account</th>';
+        data.forEach(function(c) { html += '<th>' + c.company_name + '</th>'; });
+        html += '</tr>';
+
+        html += '<tr class="section-header"><td class="row-label">Bank & Cash Accounts</td>';
+        for (var i=0;i<cols;i++) html += '<td></td>';
+        html += '</tr>';
+
+        Object.values(allCashAccs).sort(function(a,b){return a.code.localeCompare(b.code);}).forEach(function(acc) {
+          html += '<tr class="cash-account"><td class="row-label">' + acc.code + ' ' + acc.name + '</td>';
+          data.forEach(function(c) {
+            var ca = c.cash_accounts.find(function(x) { return x.code === acc.code && x.name === acc.name; });
+            var val = ca ? ca.balance : 0;
+            html += '<td class="' + valCls(val) + '">' + fmt(val) + '</td>';
+          });
+          html += '</tr>';
+        });
+
+        html += '<tr class="total-row"><td class="row-label">Cash and cash equivalents</td>';
+        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_balance) + '">' + fmt(c.cash_balance) + '</td>'; });
+        html += '</tr>';
+
+        html += '<tr><td class="row-label" style="border:none"></td>';
+        for (i=0;i<cols;i++) html += '<td style="border:none"></td>';
+        html += '</tr>';
+
+        html += '<tr class="sub-header"><td class="row-label">Cash in</td>';
+        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_in) + '">' + fmt(c.cash_in) + '</td>'; });
+        html += '</tr>';
+        cashInCodes.forEach(function(entry) {
+          var vals = data.map(function(c) { return getMovement(c, entry[0]); });
+          if (!vals.some(function(v) { return Math.abs(v) > 0.01; })) return;
+          html += '<tr class="movement-row"><td class="row-label">' + entry[0] + ' ' + entry[1] + '</td>';
+          vals.forEach(function(v) { html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>'; });
+          html += '</tr>';
+        });
+
+        html += '<tr class="sub-header"><td class="row-label">Cash out</td>';
+        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_out) + '">' + fmt(c.cash_out) + '</td>'; });
+        html += '</tr>';
+        cashOutCodes.forEach(function(entry) {
+          var vals = data.map(function(c) { return getMovement(c, entry[0]); });
+          if (!vals.some(function(v) { return Math.abs(v) > 0.01; })) return;
+          html += '<tr class="movement-row"><td class="row-label">' + entry[0] + ' ' + entry[1] + '</td>';
+          vals.forEach(function(v) { html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>'; });
+          html += '</tr>';
+        });
+
+        html += '<tr><td class="row-label" style="border:none"></td>';
+        for (i=0;i<cols;i++) html += '<td style="border:none"></td>';
+        html += '</tr>';
+        html += '<tr class="total-row"><td class="row-label">Cash and cash equivalents, closing</td>';
+        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_balance) + '">' + fmt(c.cash_balance) + '</td>'; });
+        html += '</tr></table>';
+        el.innerHTML = html;
+
+        // Build export data from the table
+        lastExportData = [];
+        var allMovCodes = cashInCodes.concat(cashOutCodes);
+        allMovCodes.forEach(function(entry) {
+          var row = { Account: entry[0] + ' ' + entry[1] };
+          data.forEach(function(c) { row[c.company_name] = getMovement(c, entry[0]); });
+          lastExportData.push(row);
+        });
+      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+    }
+
+    // ── IC Recon ──
+    async function loadIcRecon() {
+      try {
+        var data = await (await fetch('/api/dashboard/ic-reconciliation')).json();
+        document.getElementById('icStatTotal').textContent = data.summary.total_ic_accounts;
+        document.getElementById('icStatUnrecon').textContent = data.summary.unreconciled_count;
+        var net = data.summary.net_unreconciled;
+        var netEl = document.getElementById('icStatNet');
+        netEl.textContent = fmt(net);
+        netEl.style.color = Math.abs(net) < 1 ? 'var(--green)' : 'var(--red)';
+
+        var unreconciled = data.accounts.filter(function(a) { return Math.abs(a.total) > 1; });
+        document.getElementById('unreconList').innerHTML = unreconciled.length
+          ? unreconciled.map(renderIcAccount).join('')
+          : '<div class="loading" style="color:var(--green)">All intercompany accounts are balanced!</div>';
+        document.getElementById('allIcList').innerHTML = data.accounts.map(renderIcAccount).join('');
+
+        lastExportData = [];
+        data.accounts.forEach(function(acc) {
+          acc.entries.forEach(function(e) {
+            lastExportData.push({ Account: acc.code + ' ' + acc.name, Company: e.company_name, Balance: e.balance, 'Net Total': acc.total });
+          });
+        });
+      } catch (err) { console.error(err); }
+    }
+
+    function renderIcAccount(acc) {
+      var balanced = Math.abs(acc.total) < 1;
+      var html = '<div class="ic-account"><div class="ic-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+      html += '<div><span class="ic-name">' + acc.code + ' ' + acc.name + '</span><span class="ic-badge ' + (balanced ? 'ok' : 'warn') + '">' + (balanced ? 'Balanced' : 'Unreconciled') + '</span></div>';
+      html += '<span class="ic-total ' + (balanced ? 'balanced' : 'unbalanced') + '">' + fmt(acc.total) + '</span></div>';
+      html += '<div class="ic-entries">';
+      acc.entries.sort(function(a,b){ return b.balance - a.balance; }).forEach(function(e) {
+        var cls = e.balance > 0.5 ? 'pos' : e.balance < -0.5 ? 'neg' : '';
+        html += '<div class="ic-entry"><span class="company">' + e.company_name + '</span><span class="balance ' + cls + '">' + fmt(e.balance) + '</span></div>';
+      });
+      html += '</div></div>';
+      return html;
+    }
+
+    // ── Xterio ──
+    async function loadXterio() {
+      var el = document.getElementById('xterioContent');
+      try {
+        var data = await (await fetch('/api/dashboard/xterio-foundation')).json();
+        if (!data.periods || !data.periods.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
+        var periods = data.periods;
+        var accounts = data.accounts;
+
+        var categories = {};
+        accounts.forEach(function(a) {
+          if (!categories[a.category]) categories[a.category] = {};
+          var key = a.account_code + ' ' + a.account_name;
+          if (!categories[a.category][key]) categories[a.category][key] = { code: a.account_code, name: a.account_name, periods: {} };
+          categories[a.category][key].periods[a.period] = { chf: a.amount_local, usd: a.amount_usd, rate: a.exchange_rate };
+        });
+
+        var html = '<table class="xterio-table"><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">Xterio Foundation</th>';
+        periods.forEach(function(p) { html += '<th>' + p.period + '<br><small>CHF</small></th><th>' + p.period + '<br><small>USD</small></th>'; });
+        html += '</tr></thead><tbody>';
+
+        lastExportData = [];
+        Object.entries(categories).forEach(function(entry) {
+          html += '<tr class="section"><td class="row-label">' + entry[0] + '</td>';
+          periods.forEach(function() { html += '<td></td><td></td>'; });
+          html += '</tr>';
+          Object.values(entry[1]).forEach(function(acct) {
+            html += '<tr><td class="row-label" style="padding-left:16px">' + acct.code + ' ' + acct.name + '</td>';
+            var row = { Category: entry[0], Account: acct.code + ' ' + acct.name };
+            periods.forEach(function(p) {
+              var d = acct.periods[p.period] || { chf: 0, usd: 0 };
+              html += '<td class="' + valCls(d.chf) + '">' + fmt(d.chf) + '</td><td class="' + valCls(d.usd) + '">' + fmt(d.usd) + '</td>';
+              row[p.period + ' CHF'] = d.chf;
+              row[p.period + ' USD'] = d.usd;
+            });
+            html += '</tr>';
+            lastExportData.push(row);
+          });
+        });
+
+        html += '<tr class="section"><td class="row-label">Totals</td>';
+        periods.forEach(function() { html += '<td></td><td></td>'; });
+        html += '</tr>';
+
+        [['Total Corporate Premium', 'corporate_premium_chf', 'corporate_premium_usd'],
+         ['Total Liquidity Optimizer', 'liquidity_optimizer_chf', 'liquidity_optimizer_usd'],
+         ['Total FX Forward', 'fx_forward_chf', 'fx_forward_usd']].forEach(function(t) {
+          html += '<tr><td class="row-label" style="padding-left:16px">' + t[0] + '</td>';
+          periods.forEach(function(p) {
+            html += '<td class="' + valCls(p[t[1]]) + '">' + fmt(p[t[1]]) + '</td><td class="' + valCls(p[t[2]]) + '">' + fmt(p[t[2]]) + '</td>';
+          });
+          html += '</tr>';
+        });
+
+        html += '<tr class="sub"><td class="row-label">Exchange Rate CHF/USD</td>';
+        periods.forEach(function(p) { html += '<td class="val">' + p.exchange_rate.toFixed(2) + '</td><td class="val">-</td>'; });
+        html += '</tr>';
+
+        html += '<tr class="total"><td class="row-label"><strong>Total (USD)</strong></td>';
+        periods.forEach(function(p) {
+          html += '<td class="' + valCls(p.total_chf) + '">' + fmt(p.total_chf) + '</td><td class="' + valCls(p.total_usd) + '"><strong>' + fmt(p.total_usd) + '</strong></td>';
+        });
+        html += '</tr></tbody></table>';
+        el.innerHTML = html;
+      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+    }
+
+    // ── P&L / Charts ──
+    async function loadPnlTab() {
+      await Promise.all([loadRevExp(), loadNetIncome(), loadBsCharts(), loadCfCharts(), loadPnlTable()]);
+    }
+
+    async function loadRevExp() {
+      var data = await (await fetch('/api/reporting/revenue-expenses' + getPnlParams())).json();
+      destroyChart('revExp');
+      charts.revExp = new Chart(document.getElementById('revExpChart').getContext('2d'), {
+        type: 'bar', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Revenue', data: data.map(function(r) { return r.total_revenue; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+            { label: 'Expenses', data: data.map(function(r) { return r.total_expenses; }), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 3 }
+          ]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadNetIncome() {
+      var data = await (await fetch('/api/reporting/revenue-expenses' + getPnlParams())).json();
+      destroyChart('netIncome');
+      var cumulative = 0;
+      var cumData = data.map(function(r) { cumulative += r.net_income; return cumulative; });
+      charts.netIncome = new Chart(document.getElementById('netIncomeChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Net Income (Period)', data: data.map(function(r) { return r.net_income; }), type: 'bar', backgroundColor: data.map(function(r) { return r.net_income >= 0 ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)'; }), borderRadius: 3, order: 2 },
+            { label: 'Cumulative', data: cumData, borderColor: chartPalette.blue, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1, order: 1 }
+          ]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadBsCharts() {
+      var data = await (await fetch('/api/reporting/balance-sheet-series' + getPnlParams())).json();
+      destroyChart('assets');
+      charts.assets = new Chart(document.getElementById('assetsChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Cash', data: data.map(function(r) { return r.assets.bank_cash; }), borderColor: chartPalette.green, backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Receivable', data: data.map(function(r) { return r.assets.receivable; }), borderColor: chartPalette.cyan, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Total Assets', data: data.map(function(r) { return r.assets.total; }), borderColor: chartPalette.blue, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2.5, pointRadius: 1, borderDash: [5,3] }
+          ]
+        }, options: chartDefaults
+      });
+      destroyChart('liabEquity');
+      charts.liabEquity = new Chart(document.getElementById('liabEquityChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Liabilities', data: data.map(function(r) { return Math.abs(r.liabilities.total); }), borderColor: chartPalette.red, backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 1 },
+            { label: 'Equity', data: data.map(function(r) { return Math.abs(r.equity); }), borderColor: chartPalette.purple, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 1 }
+          ]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadCfCharts() {
+      var data = await (await fetch('/api/reporting/cash-flow-series' + getPnlParams())).json();
+      destroyChart('cashFlowBar');
+      charts.cashFlowBar = new Chart(document.getElementById('cashFlowBarChart').getContext('2d'), {
+        type: 'bar', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [
+            { label: 'Inflows', data: data.map(function(r) { return r.inflows; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+            { label: 'Outflows', data: data.map(function(r) { return -r.outflows; }), backgroundColor: 'rgba(239,68,68,0.6)', borderRadius: 3 }
+          ]
+        }, options: chartDefaults
+      });
+      destroyChart('cashBalance');
+      charts.cashBalance = new Chart(document.getElementById('cashBalanceChart').getContext('2d'), {
+        type: 'line', data: {
+          labels: data.map(function(r) { return r.period; }),
+          datasets: [{ label: 'Cash Balance', data: data.map(function(r) { return r.balance; }), borderColor: chartPalette.green, backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2 }]
+        }, options: chartDefaults
+      });
+    }
+
+    async function loadPnlTable() {
+      var data = await (await fetch('/api/reporting/pnl' + getPnlParams())).json();
+      var el = document.getElementById('pnlTable');
+      if (!data.length) { el.innerHTML = '<div class="loading">No data</div>'; return; }
+
+      var accounts = {};
+      data.forEach(function(r) {
+        var key = r.code + ' ' + r.name;
+        if (!accounts[key]) accounts[key] = { code: r.code, name: r.name, odoo_type: r.odoo_type, total: 0 };
+        accounts[key].total += r.amount;
+      });
+      var sorted = Object.values(accounts).sort(function(a,b) {
+        if (a.odoo_type !== b.odoo_type) return a.odoo_type.localeCompare(b.odoo_type);
+        return Math.abs(b.total) - Math.abs(a.total);
+      });
+
+      lastExportData = sorted.map(function(a) { return { Code: a.code, Account: a.name, Type: a.odoo_type, Amount: a.total }; });
+
+      var totalRevenue = 0, totalExpense = 0;
+      var html = '<table><thead><tr><th>Code</th><th>Account</th><th>Type</th><th class="text-right">Amount</th></tr></thead><tbody>';
+      var lastType = '';
+      sorted.forEach(function(a) {
+        var typeLabel = a.odoo_type.replace('_', ' ');
+        if (a.odoo_type !== lastType) {
+          html += '<tr class="section-row"><td colspan="4">' + typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1) + '</td></tr>';
+          lastType = a.odoo_type;
+        }
+        var cls = a.total > 0.5 ? 'val pos' : a.total < -0.5 ? 'val neg' : 'val zero';
+        html += '<tr><td>' + a.code + '</td><td>' + a.name + '</td><td style="color:var(--text-dim)">' + typeLabel + '</td><td class="' + cls + '">' + fmt(a.total) + '</td></tr>';
+        if (a.odoo_type === 'income' || a.odoo_type === 'income_other') totalRevenue += a.total;
+        else totalExpense += a.total;
+      });
+      var netIncome = totalRevenue - totalExpense;
+      html += '<tr class="total-row"><td colspan="3">Total Revenue</td><td class="val pos">' + fmt(totalRevenue) + '</td></tr>';
+      html += '<tr class="total-row"><td colspan="3">Total Expenses</td><td class="val neg">' + fmt(totalExpense) + '</td></tr>';
+      html += '<tr class="total-row"><td colspan="3"><strong>Net Income</strong></td><td class="val ' + (netIncome >= 0 ? 'pos' : 'neg') + '"><strong>' + fmt(netIncome) + '</strong></td></tr>';
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    // ── Export Excel ──
+    function exportExcel() {
+      if (!lastExportData.length) {
+        // Try to scrape the visible table
+        var activeTab = document.querySelector('.tab-content.active');
+        var table = activeTab ? activeTab.querySelector('table') : null;
+        if (table) {
+          var wb = XLSX.utils.table_to_book(table, { sheet: currentTab });
+          XLSX.writeFile(wb, 'report-' + currentTab + '.xlsx');
+          return;
+        }
+        alert('No data to export. Load a report first.');
+        return;
+      }
+      var ws = XLSX.utils.json_to_sheet(lastExportData);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, currentTab);
+      XLSX.writeFile(wb, 'report-' + currentTab + '.xlsx');
+    }
+
+    loadCurrentTab();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>

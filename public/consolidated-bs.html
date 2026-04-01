@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consolidated Balance Sheet — Finance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344;
+      --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1;
+      --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; font-size: 11px; }
+
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 17px; font-weight: 600; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 5px 12px; border-radius: 5px; color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+    .btn:hover { background: var(--border); }
+
+    .scroll-container { overflow-x: auto; padding: 16px; }
+
+    table { border-collapse: collapse; width: max-content; }
+    th, td { padding: 3px 8px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; }
+
+    /* Column headers */
+    thead th {
+      background: #1a365d;
+      color: white;
+      font-weight: 700;
+      font-size: 10px;
+      text-align: center;
+      padding: 8px 8px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    thead th.subtotal-col { background: #2d4a22; }
+    thead th.total-col { background: #4a1d1d; }
+    thead th.elim-col { background: #4a3d1d; }
+    thead th.consol-col { background: #1d2d4a; font-size: 11px; }
+
+    .elim-val { background: rgba(234,179,8,0.04); }
+    .consol-val { background: rgba(59,130,246,0.06); font-weight: 600; }
+
+    /* Row label sticky */
+    .row-label {
+      position: sticky;
+      left: 0;
+      background: var(--surface);
+      z-index: 1;
+      min-width: 260px;
+      max-width: 260px;
+      font-weight: 500;
+    }
+
+    /* Indent levels */
+    .indent-0 .row-label { font-weight: 800; font-size: 12px; }
+    .indent-1 .row-label { padding-left: 12px; font-weight: 600; }
+    .indent-2 .row-label { padding-left: 24px; font-weight: 400; color: var(--text-dim); }
+
+    /* Section header rows */
+    .section-row td, .section-row .row-label {
+      background: #1e293b;
+      font-weight: 800;
+      font-size: 12px;
+      color: white;
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+
+    /* Total rows */
+    .total-row td { font-weight: 700; background: rgba(99,102,241,0.06); }
+    .total-row .row-label { background: rgba(99,102,241,0.06); font-weight: 700; }
+
+    /* Check row */
+    .check-row td { font-size: 10px; color: var(--text-dim); }
+    .check-row .nonzero { color: var(--red); font-weight: 700; }
+
+    /* Value cells */
+    .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .val.positive { color: var(--text); }
+    .val.negative { color: var(--red); }
+    .val.zero { color: var(--text-dim); }
+
+    /* Subtotal columns */
+    .subtotal-val { background: rgba(34,197,94,0.04); }
+    .total-val { background: rgba(239,68,68,0.04); }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 400px; color: var(--text-dim); font-size: 14px; }
+  </style>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Consolidated Balance Sheet</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/balance-sheet.html">Balance Sheet</a>
+      <a href="/cash-flow.html">Cash Flow</a>
+      <a href="/consolidated-bs.html" class="active">Consolidated</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash-position.html">Cash Position</a>
+      <a href="/tasks.html">Tasks</a>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:#8b8fa3">As of:</label>
+      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+      <button class="btn" onclick="loadData()">Apply</button>
+    </div>
+  </div>
+  <script src="/odoo-links.js"></script>
+
+  <div class="scroll-container">
+    <div id="content"><div class="loading">Loading consolidated balance sheet...</div></div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '-';
+      if (Math.abs(n) < 0.5) return '-';
+      var s = Math.abs(Math.round(n)).toLocaleString('en-US');
+      return n < 0 ? '(' + s + ')' : s;
+    }
+
+    function valCls(n, isSubtotal, isTotal, isElim, isConsol) {
+      var base = 'val';
+      if (isConsol) base += ' consol-val';
+      else if (isElim) base += ' elim-val';
+      else if (isTotal) base += ' total-val';
+      else if (isSubtotal) base += ' subtotal-val';
+      if (Math.abs(n) < 0.5) return base + ' zero';
+      if (n < 0) return base + ' negative';
+      return base + ' positive';
+    }
+
+    async function loadData() {
+      var el = document.getElementById('content');
+      try {
+        var asOf = document.getElementById('asOfDate').value || '';
+        var res = await fetch('/api/dashboard/consolidated-bs?as_of_date=' + asOf);
+        var data = await res.json();
+
+        if (!data.columns || !data.rows) {
+          el.innerHTML = '<div class="loading">No data available. Sync from Odoo first.</div>';
+          return;
+        }
+
+        var html = '<table>';
+
+        // Header row
+        html += '<thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left">Conso Balance Sheet</th>';
+        data.columns.forEach(function(col) {
+          var cls = '';
+          if (col.is_consolidated) cls = 'consol-col';
+          else if (col.is_elimination) cls = 'elim-col';
+          else if (col.name === 'Total') cls = 'total-col';
+          else if (col.is_subtotal) cls = 'subtotal-col';
+          html += '<th class="' + cls + '">' + col.name + '</th>';
+        });
+        html += '</tr></thead>';
+
+        // Body
+        html += '<tbody>';
+        data.rows.forEach(function(row) {
+          var rowCls = 'indent-' + row.indent;
+          if (row.is_section) rowCls += ' section-row';
+          if (row.is_total) rowCls += ' total-row';
+          if (row.code === 'CHECK') rowCls = 'check-row';
+
+          html += '<tr class="' + rowCls + '">';
+          // Make account-code rows clickable to Odoo
+          var acctCode = row.code.replace('A_', '');
+          var isAcctRow = /^\d{6}/.test(acctCode);
+          if (isAcctRow) {
+            html += '<td class="row-label" style="cursor:pointer;text-decoration:underline dotted" onclick="window.open(odooUrl(\'journal-items\',{account:\'' + acctCode + '\'}),\'_blank\')">' + row.label + '</td>';
+          } else if (row.is_section) {
+            var reportType = row.code === 'ASSETS' ? 'balance-sheet' : row.code === 'LIABILITIES' ? 'balance-sheet' : row.code === 'EQUITY' ? 'balance-sheet' : null;
+            if (reportType) {
+              html += '<td class="row-label" style="cursor:pointer" onclick="window.open(odooUrl(\'' + reportType + '\'),\'_blank\')">' + row.label + '</td>';
+            } else {
+              html += '<td class="row-label">' + row.label + '</td>';
+            }
+          } else {
+            html += '<td class="row-label">' + row.label + '</td>';
+          }
+
+          row.values.forEach(function(val, i) {
+            var col = data.columns[i];
+            var cls = valCls(val, col.is_subtotal, col.name === 'Total', col.is_elimination, col.is_consolidated);
+            if (row.code === 'CHECK' && Math.abs(val) > 0.5) cls += ' nonzero';
+            html += '<td class="' + cls + '">' + fmt(val) + '</td>';
+          });
+
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+
+        el.innerHTML = html;
+      } catch (err) {
+        el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
+    }
+
+    loadData();
+  </script>
+<script src="/chat-widget.js"></script>
+</body>
+</html>
