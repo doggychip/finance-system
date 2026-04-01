@@ -1620,7 +1620,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       GROUP BY company_id
     `).all(currentSnap) as any[];
 
-    let xterioNetAssets = xterioFoundationCash;
+    let xterioNetAssets = 0;
     let holdingsNetAssets = 0;
     for (const r of netAssetsRows) {
       const group = companyToGroup[r.company_id] || 'Other';
@@ -1635,7 +1635,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
 
     // === PRIOR NET ASSETS ===
-    let priorXterioNetAssets = xterioFoundationCash;
+    let priorXterioNetAssets = 0;
     let priorHoldingsNetAssets = 0;
     let priorOWNetAssets = 0;
     if (priorSnap) {
@@ -1682,13 +1682,10 @@ export function dashboardRoutes(db: Database.Database): Router {
     const wfOW = buildWaterfall(owCompanyIds);
     const wfFoundation = { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: xterioFoundationCash, cash_crypto: 0 };
 
-    // Add foundation cash to xterio fiat
-    wfXterio.cash_fiat += xterioFoundationCash;
-
-    const totalCashFiat = wfFoundation.cash_fiat + wfXterio.cash_fiat - xterioFoundationCash + wfHoldings.cash_fiat + wfOW.cash_fiat;
+    const totalCashFiat = wfFoundation.cash_fiat + wfXterio.cash_fiat + wfHoldings.cash_fiat + wfOW.cash_fiat;
     const totalCashCrypto = wfXterio.cash_crypto + wfHoldings.cash_crypto + wfOW.cash_crypto;
     const totalCashAll = totalCashFiat + totalCashCrypto;
-    const totalGroupNetAssets = xterioNetAssets + holdingsNetAssets + owNetAssets;
+    const totalGroupNetAssets = xterioFoundationCash + xterioNetAssets + holdingsNetAssets + owNetAssets;
 
     // === BACKWARD COMPAT: cash by entity group for chart ===
     const cashRows = db.prepare(`
