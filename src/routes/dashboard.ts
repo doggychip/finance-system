@@ -1616,15 +1616,17 @@ export function dashboardRoutes(db: Database.Database): Router {
       groupCash[group] = (groupCash[group] || 0) + r.cash;
       if (owGroups.has(group)) owCash += r.cash;
     }
+    const groupBankCash: Record<string, number> = {};
     for (const r of bankCashRows) {
       const group = companyToGroup[r.company_id] || 'Other';
+      groupBankCash[group] = (groupBankCash[group] || 0) + r.cash;
       if (nonOWGroups.has(group)) nonOWCashBank += r.cash;
     }
 
-    // Closing balances by entity group
+    // Closing balances by entity group (bank-only to reconcile with Non-OW)
     let xterioCash = xterioFoundationCash;
     let holdingsCash = 0;
-    for (const [group, cash] of Object.entries(groupCash)) {
+    for (const [group, cash] of Object.entries(groupBankCash)) {
       if (xterioGroups.has(group)) xterioCash += cash;
       if (holdingsGroups.has(group)) holdingsCash += cash;
     }
@@ -1644,6 +1646,8 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const r of priorBankRows) {
         const group = companyToGroup[r.company_id] || 'Other';
         if (nonOWGroups.has(group)) priorNonOWCash += r.cash;
+        if (xterioGroups.has(group)) priorXterioCash += r.cash;
+        if (holdingsGroups.has(group)) priorHoldingsCash += r.cash;
       }
       const priorOWRows = db.prepare(`
         SELECT company_id, SUM(balance) as cash
@@ -1651,15 +1655,9 @@ export function dashboardRoutes(db: Database.Database): Router {
         WHERE snapshot_date = ? AND account_type = 'asset_cash'
         GROUP BY company_id
       `).all(priorSnap) as any[];
-      const priorGroupCash: Record<string, number> = {};
       for (const r of priorOWRows) {
         const group = companyToGroup[r.company_id] || 'Other';
-        priorGroupCash[group] = (priorGroupCash[group] || 0) + r.cash;
         if (owGroups.has(group)) priorOWCash += r.cash;
-      }
-      for (const [group, cash] of Object.entries(priorGroupCash)) {
-        if (xterioGroups.has(group)) priorXterioCash += cash;
-        if (holdingsGroups.has(group)) priorHoldingsCash += cash;
       }
     }
 
