@@ -101,7 +101,7 @@ export function chatRoutes(db: Database.Database): Router {
       context += `Closing Balance: Same as Net Assets for a given period.\n\n`;
 
       context += `=== FOUR ENTITY GROUPS ===\n`;
-      context += `1. Foundation (Xterio Foundation): Company ID 22, manual entry, cash = $5,942,149\n`;
+      context += `1. Foundation (Xterio Foundation): Company ID 22, manual entry, assets = $5,942,149, liabilities = $1,369,636, net assets = $4,572,513\n`;
       context += `2. Xterio: LTECH(1,23) + AOD/Gamephilos(5,6,7,10) + XLABS(17,18) + PRIVILEGE HK(21) + Foundation(22)\n`;
       context += `   - Note: AOD was moved under Xterio because shareholders restructured AOD into Xterio equity\n`;
       context += `3. Holdings: CS/Shadowcay(2,3,4,12,13,14) + Palios(11,9) + LHOLDINGS(19,20) + QUANTUMMIND(8)\n`;
