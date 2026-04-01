@@ -1616,6 +1616,22 @@ export function dashboardRoutes(db: Database.Database): Router {
       groupCash[group] = (groupCash[group] || 0) + r.cash;
       if (owGroups.has(group)) owCash += r.cash;
     }
+
+    // OW closing balance = net assets (all assets + all liabilities) for OW entities
+    const owClosingRows = db.prepare(`
+      SELECT company_id, SUM(balance) as total
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type IN (
+        'asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments', 'asset_fixed', 'asset_non_current',
+        'liability_current', 'liability_payable', 'liability_non_current', 'liability_credit_card'
+      )
+      GROUP BY company_id
+    `).all(currentSnap) as any[];
+    let owClosingCash = 0;
+    for (const r of owClosingRows) {
+      const group = companyToGroup[r.company_id] || 'Other';
+      if (owGroups.has(group)) owClosingCash += r.total;
+    }
     const groupBankCash: Record<string, number> = {};
     for (const r of bankCashRows) {
       const group = companyToGroup[r.company_id] || 'Other';
@@ -1634,6 +1650,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Prior cash
     let priorNonOWCash = 0;
     let priorOWCash = 0;
+    let priorOWClosingCash = 0;
     let priorXterioCash = xterioFoundationCash;
     let priorHoldingsCash = 0;
     if (priorSnap) {
@@ -1658,6 +1675,20 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const r of priorOWRows) {
         const group = companyToGroup[r.company_id] || 'Other';
         if (owGroups.has(group)) priorOWCash += r.cash;
+      }
+      // OW closing = net assets (all assets + all liabilities)
+      const priorOWClosingRows = db.prepare(`
+        SELECT company_id, SUM(balance) as total
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type IN (
+          'asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments', 'asset_fixed', 'asset_non_current',
+          'liability_current', 'liability_payable', 'liability_non_current', 'liability_credit_card'
+        )
+        GROUP BY company_id
+      `).all(priorSnap) as any[];
+      for (const r of priorOWClosingRows) {
+        const group = companyToGroup[r.company_id] || 'Other';
+        if (owGroups.has(group)) priorOWClosingCash += r.total;
       }
     }
 
@@ -1766,8 +1797,8 @@ export function dashboardRoutes(db: Database.Database): Router {
       foundation_cash_prior: xterioFoundationCash,
       holdings_cash: holdingsCash,
       holdings_cash_prior: priorHoldingsCash,
-      ow_total_cash: owCash,
-      ow_total_cash_prior: priorOWCash,
+      ow_total_cash: owClosingCash,
+      ow_total_cash_prior: priorOWClosingCash,
       monthly_burn: monthlyBurn,
       runway_months: runway,
       entity_cash: entityCash,
