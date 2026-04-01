@@ -108,6 +108,17 @@
         document.getElementById('monthlyBurn').textContent = fmt(summary.monthly_burn);
         document.getElementById('runway').textContent = summary.runway_months != null ? summary.runway_months : '--';
 
+        // Prior period change on available balance
+        if (snaps.length >= 2) {
+          var latest = snaps[snaps.length - 1];
+          var prior = snaps[snaps.length - 2];
+          var chg = latest.total - prior.total;
+          var pct = prior.total ? (chg / Math.abs(prior.total) * 100) : 0;
+          var chgText = (chg >= 0 ? '+' : '') + fmt(chg) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%) vs ' + prior.date;
+          var chgColor = chg >= 0 ? 'color:#22c55e' : 'color:#ef4444';
+          document.getElementById('availSub').innerHTML = 'As of ' + latest.date + '<br><span style="' + chgColor + ';font-size:13px">' + chgText + '</span>';
+        }
+
         var rows = [
           { key: 'cash', label: 'Cash' },
           { key: 'or_from_xterio', label: 'OR From Xterio' },
@@ -118,11 +129,18 @@
           { key: 'thrackle_loan', label: 'Thrackle Loan' },
         ];
 
+        // Show change column if we have at least 2 snapshots
+        var hasChange = snaps.length >= 2;
+        var latestSnap = snaps[snaps.length - 1];
+        var priorSnap = hasChange ? snaps[snaps.length - 2] : null;
+
         var html = '<div style="overflow-x:auto"><table>';
         html += '<thead><tr><th>OW & ReachRHG</th>';
-        snaps.forEach(function(s) {
-          html += '<th>' + s.date + '</th>';
+        snaps.forEach(function(s, i) {
+          var isLatest = i === snaps.length - 1;
+          html += '<th style="' + (isLatest ? 'color:#22c55e' : '') + '">' + s.date + '</th>';
         });
+        if (hasChange) html += '<th style="color:var(--accent)">Change</th>';
         html += '</tr></thead><tbody>';
 
         rows.forEach(function(row) {
@@ -130,6 +148,11 @@
           snaps.forEach(function(s) {
             html += '<td>' + fmtCell(s[row.key]) + '</td>';
           });
+          if (hasChange) {
+            var chg = (latestSnap[row.key] || 0) - (priorSnap[row.key] || 0);
+            var chgColor = Math.abs(chg) < 0.5 ? '' : chg > 0 ? 'color:#22c55e' : 'color:#ef4444';
+            html += '<td style="' + chgColor + '">' + (Math.abs(chg) < 0.5 ? '-' : fmtCell(chg)) + '</td>';
+          }
           html += '</tr>';
         });
 
@@ -138,6 +161,11 @@
         snaps.forEach(function(s) {
           html += '<td>' + fmtCell(s.total) + '</td>';
         });
+        if (hasChange) {
+          var totalChg = latestSnap.total - priorSnap.total;
+          var totalChgColor = Math.abs(totalChg) < 0.5 ? '' : totalChg > 0 ? 'color:#22c55e' : 'color:#ef4444';
+          html += '<td style="' + totalChgColor + '">' + fmtCell(totalChg) + '</td>';
+        }
         html += '</tr>';
 
         html += '</tbody></table></div>';
