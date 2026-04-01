@@ -1581,7 +1581,9 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const cid of g.company_ids) companyToGroup[cid] = g.name;
     }
 
-    const nonOWGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
+    const xterioGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK']);
+    const holdingsGroups = new Set(['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
+    const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
     const xterioFoundationCash = 5942149;
 
@@ -1614,9 +1616,19 @@ export function dashboardRoutes(db: Database.Database): Router {
       if (nonOWGroups.has(group)) nonOWCashBank += r.cash;
     }
 
+    // Closing balances by entity group
+    let xterioCash = xterioFoundationCash;
+    let holdingsCash = 0;
+    for (const [group, cash] of Object.entries(groupCash)) {
+      if (xterioGroups.has(group)) xterioCash += cash;
+      if (holdingsGroups.has(group)) holdingsCash += cash;
+    }
+
     // Prior cash
     let priorNonOWCash = 0;
     let priorOWCash = 0;
+    let priorXterioCash = xterioFoundationCash;
+    let priorHoldingsCash = 0;
     if (priorSnap) {
       const priorBankRows = db.prepare(`
         SELECT company_id, SUM(balance) as cash
@@ -1634,9 +1646,15 @@ export function dashboardRoutes(db: Database.Database): Router {
         WHERE snapshot_date = ? AND account_type = 'asset_cash'
         GROUP BY company_id
       `).all(priorSnap) as any[];
+      const priorGroupCash: Record<string, number> = {};
       for (const r of priorOWRows) {
         const group = companyToGroup[r.company_id] || 'Other';
+        priorGroupCash[group] = (priorGroupCash[group] || 0) + r.cash;
         if (owGroups.has(group)) priorOWCash += r.cash;
+      }
+      for (const [group, cash] of Object.entries(priorGroupCash)) {
+        if (xterioGroups.has(group)) priorXterioCash += cash;
+        if (holdingsGroups.has(group)) priorHoldingsCash += cash;
       }
     }
 
@@ -1725,6 +1743,12 @@ export function dashboardRoutes(db: Database.Database): Router {
       non_ow_cash_prior: priorNonOWCash + xterioFoundationCash,
       ow_cash: owCash,
       ow_cash_prior: priorOWCash,
+      xterio_cash: xterioCash,
+      xterio_cash_prior: priorXterioCash,
+      holdings_cash: holdingsCash,
+      holdings_cash_prior: priorHoldingsCash,
+      ow_total_cash: owCash,
+      ow_total_cash_prior: priorOWCash,
       monthly_burn: monthlyBurn,
       runway_months: runway,
       entity_cash: entityCash,
