@@ -156,7 +156,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
 
     // Non-OW entity groups (for the hero total)
-    const nonOWGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
+    const nonOWGroups = new Set(['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
 
     const isNonOW = (r: any) => nonOWGroups.has(companyToGroup[r.company_id] || '');
@@ -1586,13 +1586,98 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const cid of g.company_ids) companyToGroup[cid] = g.name;
     }
 
-    const xterioGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK']);
-    const holdingsGroups = new Set(['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
+    const xterioGroups = new Set(['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK']);
+    const holdingsGroups = new Set(['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
     const xterioFoundationCash = 5942149;
 
-    // Current cash by entity group (ALL asset_cash for chart)
+    // Helper: get all company IDs for a group set
+    const getCompanyIds = (groups: Set<string>) =>
+      ENTITY_GROUPS.filter(g => groups.has(g.name) && !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
+
+    const nonOWCompanyIds = getCompanyIds(nonOWGroups);
+    const owCompanyIds = getCompanyIds(owGroups);
+    const xterioCompanyIds = getCompanyIds(xterioGroups);
+    const holdingsCompanyIds = getCompanyIds(holdingsGroups);
+
+    // === NET ASSETS for each group ===
+    const netAssetTypes = `'asset_cash','asset_receivable','asset_current','asset_prepayments','asset_fixed','asset_non_current','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
+    // OW excludes fixed/non-current assets (project capitalization)
+    const owNetAssetTypes = `'asset_cash','asset_receivable','asset_current','asset_prepayments','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
+
+    const netAssetsRows = db.prepare(`
+      SELECT company_id, SUM(balance) as total
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type IN (${netAssetTypes})
+      GROUP BY company_id
+    `).all(currentSnap) as any[];
+
+    const owNetAssetsRows = db.prepare(`
+      SELECT company_id, SUM(balance) as total
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_type IN (${owNetAssetTypes})
+      GROUP BY company_id
+    `).all(currentSnap) as any[];
+
+    let xterioNetAssets = xterioFoundationCash;
+    let holdingsNetAssets = 0;
+    for (const r of netAssetsRows) {
+      const group = companyToGroup[r.company_id] || 'Other';
+      if (xterioGroups.has(group)) xterioNetAssets += r.total;
+      if (holdingsGroups.has(group)) holdingsNetAssets += r.total;
+    }
+
+    let owNetAssets = 0;
+    for (const r of owNetAssetsRows) {
+      const group = companyToGroup[r.company_id] || 'Other';
+      if (owGroups.has(group)) owNetAssets += r.total;
+    }
+
+    // === PRIOR NET ASSETS ===
+    let priorXterioNetAssets = xterioFoundationCash;
+    let priorHoldingsNetAssets = 0;
+    let priorOWNetAssets = 0;
+    if (priorSnap) {
+      const priorNARows = db.prepare(`
+        SELECT company_id, SUM(balance) as total
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type IN (${netAssetTypes})
+        GROUP BY company_id
+      `).all(priorSnap) as any[];
+      for (const r of priorNARows) {
+        const group = companyToGroup[r.company_id] || 'Other';
+        if (xterioGroups.has(group)) priorXterioNetAssets += r.total;
+        if (holdingsGroups.has(group)) priorHoldingsNetAssets += r.total;
+      }
+      const priorOWNARows = db.prepare(`
+        SELECT company_id, SUM(balance) as total
+        FROM account_balances
+        WHERE snapshot_date = ? AND account_type IN (${owNetAssetTypes})
+        GROUP BY company_id
+      `).all(priorSnap) as any[];
+      for (const r of priorOWNARows) {
+        const group = companyToGroup[r.company_id] || 'Other';
+        if (owGroups.has(group)) priorOWNetAssets += r.total;
+      }
+    }
+
+    // === WATERFALL: Net Assets → Cash breakdown (non-OW only) ===
+    const nonOWPlaceholders = nonOWCompanyIds.map(() => '?').join(',');
+    const waterfallQuery = (accountFilter: string) =>
+      nonOWCompanyIds.length > 0
+        ? (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${nonOWPlaceholders}) AND ${accountFilter}`).get(currentSnap, ...nonOWCompanyIds) as any)?.total || 0
+        : 0;
+
+    const totalReceivable = waterfallQuery(`account_type = 'asset_receivable'`);
+    const totalPayable = waterfallQuery(`account_type IN ('liability_payable', 'liability_current')`);
+    const totalIntercompany = waterfallQuery(`account_code LIKE '303%'`);
+    const totalDeposit = waterfallQuery(`account_code = '202000'`);
+    const totalCashFiat = waterfallQuery(`account_type = 'asset_cash' AND account_code LIKE '100%'`) + xterioFoundationCash;
+    const totalCashCrypto = waterfallQuery(`account_type = 'asset_cash' AND account_code LIKE '10W%'`);
+    const totalCashAll = totalCashFiat + totalCashCrypto;
+
+    // === BACKWARD COMPAT: cash by entity group for chart ===
     const cashRows = db.prepare(`
       SELECT company_id, SUM(balance) as cash
       FROM account_balances
@@ -1600,16 +1685,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       GROUP BY company_id
     `).all(currentSnap) as any[];
 
-    // Bank-only cash (100xxx codes) for Non-OW hero number
-    const bankCashRows = db.prepare(`
-      SELECT company_id, SUM(balance) as cash
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type = 'asset_cash' AND account_code LIKE '100%'
-      GROUP BY company_id
-    `).all(currentSnap) as any[];
-
     const groupCash: Record<string, number> = {};
-    let nonOWCashBank = 0;
     let owCash = 0;
     for (const r of cashRows) {
       const group = companyToGroup[r.company_id] || 'Other';
@@ -1617,87 +1693,11 @@ export function dashboardRoutes(db: Database.Database): Router {
       if (owGroups.has(group)) owCash += r.cash;
     }
 
-    // OW closing balance = net assets (all assets + all liabilities) for OW entities
-    const owClosingRows = db.prepare(`
-      SELECT company_id, SUM(balance) as total
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type IN (
-        'asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments', 'asset_fixed', 'asset_non_current',
-        'liability_current', 'liability_payable', 'liability_non_current', 'liability_credit_card'
-      )
-      GROUP BY company_id
-    `).all(currentSnap) as any[];
-    let owClosingCash = 0;
-    for (const r of owClosingRows) {
-      const group = companyToGroup[r.company_id] || 'Other';
-      if (owGroups.has(group)) owClosingCash += r.total;
-    }
-    const groupBankCash: Record<string, number> = {};
-    for (const r of bankCashRows) {
-      const group = companyToGroup[r.company_id] || 'Other';
-      groupBankCash[group] = (groupBankCash[group] || 0) + r.cash;
-      if (nonOWGroups.has(group)) nonOWCashBank += r.cash;
-    }
-
-    // Closing balances by entity group (bank-only to reconcile with Non-OW)
-    let xterioCash = xterioFoundationCash;
-    let holdingsCash = 0;
-    for (const [group, cash] of Object.entries(groupBankCash)) {
-      if (xterioGroups.has(group)) xterioCash += cash;
-      if (holdingsGroups.has(group)) holdingsCash += cash;
-    }
-
-    // Prior cash
-    let priorNonOWCash = 0;
-    let priorOWCash = 0;
-    let priorOWClosingCash = 0;
-    let priorXterioCash = xterioFoundationCash;
-    let priorHoldingsCash = 0;
-    if (priorSnap) {
-      const priorBankRows = db.prepare(`
-        SELECT company_id, SUM(balance) as cash
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type = 'asset_cash' AND account_code LIKE '100%'
-        GROUP BY company_id
-      `).all(priorSnap) as any[];
-      for (const r of priorBankRows) {
-        const group = companyToGroup[r.company_id] || 'Other';
-        if (nonOWGroups.has(group)) priorNonOWCash += r.cash;
-        if (xterioGroups.has(group)) priorXterioCash += r.cash;
-        if (holdingsGroups.has(group)) priorHoldingsCash += r.cash;
-      }
-      const priorOWRows = db.prepare(`
-        SELECT company_id, SUM(balance) as cash
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type = 'asset_cash'
-        GROUP BY company_id
-      `).all(priorSnap) as any[];
-      for (const r of priorOWRows) {
-        const group = companyToGroup[r.company_id] || 'Other';
-        if (owGroups.has(group)) priorOWCash += r.cash;
-      }
-      // OW closing = net assets (all assets + all liabilities)
-      const priorOWClosingRows = db.prepare(`
-        SELECT company_id, SUM(balance) as total
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type IN (
-          'asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments', 'asset_fixed', 'asset_non_current',
-          'liability_current', 'liability_payable', 'liability_non_current', 'liability_credit_card'
-        )
-        GROUP BY company_id
-      `).all(priorSnap) as any[];
-      for (const r of priorOWClosingRows) {
-        const group = companyToGroup[r.company_id] || 'Other';
-        if (owGroups.has(group)) priorOWClosingCash += r.total;
-      }
-    }
-
-    // Monthly burn (from current snapshot — sum of expense types)
+    // Monthly burn
     const burnRow = db.prepare(`
       SELECT SUM(ABS(balance)) as burn FROM account_balances
       WHERE snapshot_date = ? AND account_type IN ('expense', 'expense_direct_cost')
     `).get(currentSnap) as any;
-    // Approximate monthly burn from all-time expenses / months of data
     const entryDates = db.prepare(`SELECT MIN(date) as first, MAX(date) as last FROM journal_entries WHERE status = 'posted'`).get() as any;
     let monthlyBurn = 0;
     if (entryDates.first && entryDates.last) {
@@ -1707,7 +1707,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       monthlyBurn = (burnRow?.burn || 0) / months;
     }
 
-    const nonOWTotal = nonOWCashBank + xterioFoundationCash;
+    const nonOWTotal = totalCashFiat;
     const runway = monthlyBurn > 0 ? Math.round(nonOWTotal / monthlyBurn) : null;
 
     // Overdrawn accounts (alerts)
@@ -1787,18 +1787,28 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json({
       snapshot_date: currentSnap,
       prior_date: priorSnap,
+      // Net Assets per group
+      xterio_net_assets: xterioNetAssets,
+      xterio_net_assets_prior: priorXterioNetAssets,
+      foundation_net_assets: xterioFoundationCash,
+      foundation_net_assets_prior: xterioFoundationCash,
+      holdings_net_assets: holdingsNetAssets,
+      holdings_net_assets_prior: priorHoldingsNetAssets,
+      ow_net_assets: owNetAssets,
+      ow_net_assets_prior: priorOWNetAssets,
+      // Waterfall: Net Assets → Cash
+      total_net_assets: xterioNetAssets + holdingsNetAssets,
+      total_receivable: totalReceivable,
+      total_payable: totalPayable,
+      total_intercompany: totalIntercompany,
+      total_deposit: totalDeposit,
+      total_cash_fiat: totalCashFiat,
+      total_cash_crypto: totalCashCrypto,
+      total_cash_all: totalCashAll,
+      // Backward compat
       non_ow_cash: nonOWTotal,
-      non_ow_cash_prior: priorNonOWCash + xterioFoundationCash,
       ow_cash: owCash,
-      ow_cash_prior: priorOWCash,
-      xterio_cash: xterioCash,
-      xterio_cash_prior: priorXterioCash,
-      foundation_cash: xterioFoundationCash,
-      foundation_cash_prior: xterioFoundationCash,
-      holdings_cash: holdingsCash,
-      holdings_cash_prior: priorHoldingsCash,
-      ow_total_cash: owClosingCash,
-      ow_total_cash_prior: priorOWClosingCash,
+      // Burn & runway
       monthly_burn: monthlyBurn,
       runway_months: runway,
       entity_cash: entityCash,

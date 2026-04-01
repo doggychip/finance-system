@@ -8,18 +8,18 @@ export interface EntityGroup {
 
 export const ENTITY_GROUPS: EntityGroup[] = [
   { name: 'LTECH, LTECH W3', company_ids: [1, 23] },
+  { name: 'AOD', company_ids: [5, 6, 7, 10] },
   { name: 'XLABS, XLAB W3', company_ids: [17, 18] },
   { name: 'PRIVILEGE HK', company_ids: [21] },
   { name: 'Xterio Foundation', company_ids: [22], is_manual: true },
-  { name: 'Xterio Total', company_ids: [], is_subtotal: true, subtotal_groups: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation'] },
+  { name: 'Xterio Total', company_ids: [], is_subtotal: true, subtotal_groups: ['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation'] },
 
-  { name: 'AOD', company_ids: [5, 6, 7, 10] },
   { name: 'CS', company_ids: [2, 3, 4, 12, 13, 14] },
   { name: 'Palios', company_ids: [11, 9] },
   { name: 'LHOLDINGS', company_ids: [19, 20] },
   { name: 'QUANTUMMIND', company_ids: [8] },
 
-  { name: 'Lholding Total', company_ids: [], is_subtotal: true, subtotal_groups: ['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'] },
+  { name: 'Lholding Total', company_ids: [], is_subtotal: true, subtotal_groups: ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'] },
 
   { name: 'Non OW Total', company_ids: [], is_subtotal: true, subtotal_groups: ['Xterio Total', 'Lholding Total'] },
 

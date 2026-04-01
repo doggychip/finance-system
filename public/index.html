@@ -116,17 +116,62 @@
       <div class="health-meta" id="healthMeta"></div>
     </div>
 
-    <!-- Cash Overview -->
-    <div class="cash-overview">
-      <h2>Cash Overview</h2>
+    <!-- Net Assets Widgets -->
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <div class="hero-card">
+        <div class="label" title="Xterio Foundation — manual entry (CHF→USD)">Foundation Net Assets <span style="cursor:help;color:var(--text-dim)" title="Manual data. Entities: Xterio Foundation (22)">ⓘ</span></div>
+        <div class="value" id="heroFoundation" style="font-size:28px;color:var(--green)">--</div>
+        <div class="change" id="heroFoundationChange"></div>
+        <div class="sub" id="heroFoundationSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label" title="LTECH, AOD, XLABS, PRIVILEGE HK + Foundation">Xterio Net Assets <span style="cursor:help;color:var(--text-dim)" title="Entities: LTECH(1,23), AOD(5,6,7,10), XLABS(17,18), PRIVILEGE HK(21) + Foundation(22). Net Assets = Total Assets + Total Liabilities.">ⓘ</span></div>
+        <div class="value" id="heroXterio" style="font-size:28px;color:var(--green)">--</div>
+        <div class="change" id="heroXterioChange"></div>
+        <div class="sub" id="heroXterioSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label" title="CS, Palios, LHOLDINGS, QUANTUMMIND">Holdings Net Assets <span style="cursor:help;color:var(--text-dim)" title="Entities: CS(2,3,4,12,13,14), Palios(11,9), LHOLDINGS(19,20), QUANTUMMIND(8). Net Assets = Total Assets + Total Liabilities.">ⓘ</span></div>
+        <div class="value" id="heroHoldings" style="font-size:28px;color:var(--green)">--</div>
+        <div class="change" id="heroHoldingsChange"></div>
+        <div class="sub" id="heroHoldingsSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label" title="OW, Reach, Rough house, Keystone — excl. fixed assets">OW Net Assets <span style="cursor:help;color:var(--text-dim)" title="Entities: OW(15,16), Reach(30), Rough house(31), Keystone(28). Excludes asset_fixed & asset_non_current (project capitalization).">ⓘ</span></div>
+        <div class="value" id="heroOWClosing" style="font-size:28px;color:var(--green)">--</div>
+        <div class="change" id="heroOWClosingChange"></div>
+        <div class="sub" id="heroOWClosingSub"></div>
+      </div>
+    </div>
+
+    <div class="snap-info" style="margin-bottom:16px;font-size:11px;color:var(--text-dim)">
+      Net Assets = Total Assets + Total Liabilities (excl. Equity & P&L). Cash = Fiat (100xxx) + Crypto (10Wxxx). All figures from Odoo snapshots.
+    </div>
+
+    <!-- Net Assets → Cash Waterfall -->
+    <div class="card" style="margin-bottom:24px">
+      <h2>Net Assets → Cash Bridge (Non-OW) <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Shows adjustment items from Net Assets down to Cash+Crypto for Foundation + Xterio + Holdings groups.">ⓘ</span></h2>
+      <div id="waterfallTable"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Cash Breakdown: Fiat + Crypto -->
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr">
+      <div class="hero-card main">
+        <div class="label">Total Cash (Fiat) <span style="cursor:help;color:var(--text-dim)" title="Bank accounts (100xxx codes) for all non-OW entities + Foundation.">ⓘ</span></div>
+        <div class="value" id="heroCashFiat">--</div>
+        <div class="sub" id="heroCashFiatSub"></div>
+      </div>
+      <div class="hero-card">
+        <div class="label">Total Crypto <span style="cursor:help;color:var(--text-dim)" title="Digital token accounts (10Wxxx codes) for all non-OW entities.">ⓘ</span></div>
+        <div class="value" id="heroCashCrypto" style="font-size:28px;color:var(--cyan)">--</div>
+        <div class="sub" id="heroCashCryptoSub"></div>
+      </div>
+    </div>
+
+    <!-- Cash Flow Chart -->
+    <div class="cash-overview" style="margin-bottom:24px">
+      <h2>Cash Flow</h2>
       <div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
-        <!-- Total Assets big number -->
-        <div style="flex:1;min-width:240px">
-          <div class="cm-label">CASH & CRYPTO (Excl. Xterio Foundation)</div>
-          <div id="coTotalCash" style="font-size:40px;font-weight:800;color:var(--accent);letter-spacing:-1px;font-variant-numeric:tabular-nums">--</div>
-          <div id="coTreeBreakdown" style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.9;font-family:monospace"></div>
-        </div>
-        <!-- Net Flow -->
         <div style="min-width:180px">
           <div class="cm-label">Net Flow This Month</div>
           <div id="coNetFlow" style="font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px">--</div>
@@ -134,49 +179,6 @@
         </div>
       </div>
       <div class="cash-flow-chart"><canvas id="cashFlowChart"></canvas></div>
-    </div>
-
-    <!-- Closing Balance Widgets -->
-    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-      <div class="hero-card">
-        <div class="label">Xterio Closing Balance</div>
-        <div class="value" id="heroXterio" style="font-size:28px">--</div>
-        <div class="change" id="heroXterioChange"></div>
-        <div class="sub" id="heroXterioSub"></div>
-      </div>
-      <div class="hero-card">
-        <div class="label">Foundation Closing Balance</div>
-        <div class="value" id="heroFoundation" style="font-size:28px">--</div>
-        <div class="change" id="heroFoundationChange"></div>
-        <div class="sub" id="heroFoundationSub"></div>
-      </div>
-      <div class="hero-card">
-        <div class="label">Holdings Closing Balance</div>
-        <div class="value" id="heroHoldings" style="font-size:28px">--</div>
-        <div class="change" id="heroHoldingsChange"></div>
-        <div class="sub" id="heroHoldingsSub"></div>
-      </div>
-      <div class="hero-card">
-        <div class="label">OW Closing Balance</div>
-        <div class="value" id="heroOWClosing" style="font-size:28px">--</div>
-        <div class="change" id="heroOWClosingChange"></div>
-        <div class="sub" id="heroOWClosingSub"></div>
-      </div>
-    </div>
-
-    <!-- Hero KPIs -->
-    <div class="hero-grid" style="grid-template-columns:1fr 1fr">
-      <div class="hero-card main">
-        <div class="label">Non-OW Available Cash (Excl. Crypto)</div>
-        <div class="value" id="heroNonOW">--</div>
-        <div class="change" id="heroNonOWChange"></div>
-        <div class="sub" id="heroSub">Loading...</div>
-      </div>
-      <div class="hero-card">
-        <div class="label">OW & Reach Cash</div>
-        <div class="value" id="heroOW" style="font-size:28px">--</div>
-        <div class="change" id="heroOWChange"></div>
-      </div>
     </div>
 
     <!-- Key Alerts -->
@@ -246,55 +248,52 @@
         var data = await (await fetch('/api/dashboard/executive-summary' + getAsOfParam())).json();
         if (!data.snapshot_date) return;
 
-        document.getElementById('heroNonOW').textContent = fmt(data.non_ow_cash);
-        var nonOWChg = data.non_ow_cash - data.non_ow_cash_prior;
-        var nonOWPct = data.non_ow_cash_prior ? (nonOWChg / Math.abs(data.non_ow_cash_prior) * 100) : 0;
-        var chgEl = document.getElementById('heroNonOWChange');
-        chgEl.textContent = fmtShort(nonOWChg) + ' (' + fmtPct(nonOWPct) + ') vs prior';
-        chgEl.className = 'change ' + (nonOWChg >= 0 ? 'up' : 'down');
-        document.getElementById('heroSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
+        // Helper to populate a Net Assets widget
+        function fillWidget(idPrefix, value, prior, subText) {
+          document.getElementById(idPrefix).textContent = fmt(value);
+          var chg = value - prior;
+          var pct = prior ? (chg / Math.abs(prior) * 100) : 0;
+          var chgEl = document.getElementById(idPrefix + 'Change');
+          chgEl.textContent = fmtShort(chg) + ' (' + fmtPct(pct) + ') vs prior';
+          chgEl.className = 'change ' + (chg >= 0 ? 'up' : 'down');
+          document.getElementById(idPrefix + 'Sub').textContent = subText;
+        }
 
-        document.getElementById('heroOW').textContent = fmt(data.ow_cash);
-        var owChg = data.ow_cash - data.ow_cash_prior;
-        var owChgEl = document.getElementById('heroOWChange');
-        owChgEl.textContent = fmtShort(owChg) + ' vs prior';
-        owChgEl.className = 'change ' + (owChg >= 0 ? 'up' : 'down');
+        fillWidget('heroFoundation', data.foundation_net_assets, data.foundation_net_assets_prior, 'As of ' + data.snapshot_date + ' | Manual entry');
+        fillWidget('heroXterio', data.xterio_net_assets, data.xterio_net_assets_prior, 'As of ' + data.snapshot_date + ' | LTECH+AOD+XLABS+PRIVILEGE+Foundation');
+        fillWidget('heroHoldings', data.holdings_net_assets, data.holdings_net_assets_prior, 'As of ' + data.snapshot_date + ' | CS+Palios+LHOLDINGS+QM');
+        fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'As of ' + data.snapshot_date + ' | Excl. fixed assets');
 
-        // Xterio closing balance
-        document.getElementById('heroXterio').textContent = fmt(data.xterio_cash);
-        var xterioChg = data.xterio_cash - data.xterio_cash_prior;
-        var xterioPct = data.xterio_cash_prior ? (xterioChg / Math.abs(data.xterio_cash_prior) * 100) : 0;
-        var xterioChgEl = document.getElementById('heroXterioChange');
-        xterioChgEl.textContent = fmtShort(xterioChg) + ' (' + fmtPct(xterioPct) + ') vs prior';
-        xterioChgEl.className = 'change ' + (xterioChg >= 0 ? 'up' : 'down');
-        document.getElementById('heroXterioSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
+        // Waterfall table: Net Assets → Cash
+        var totalNA = data.total_net_assets || 0;
+        var cashCrypto = data.total_cash_all || 0;
+        var otherAdj = cashCrypto - totalNA - (data.total_receivable || 0) - (data.total_payable || 0) - (data.total_intercompany || 0) - (data.total_deposit || 0);
+        var wfRows = [
+          ['Net Assets Total (Xterio + Holdings)', totalNA, false, true],
+          ['Receivables', data.total_receivable, true, false],
+          ['Payables & Current Liabilities', data.total_payable, true, false],
+          ['Intercompany (303xxx)', data.total_intercompany, true, false],
+          ['Deposits (202000)', data.total_deposit, true, false],
+          ['Cash + Crypto Total', cashCrypto, false, true],
+          ['→ Cash (Fiat)', data.total_cash_fiat, true, false],
+          ['→ Crypto', data.total_cash_crypto, true, false],
+        ];
+        var wfHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+        wfRows.forEach(function(row) {
+          var label = row[0], val = row[1], indent = row[2], bold = row[3];
+          var style = bold ? 'font-weight:700;font-size:14px;' : '';
+          var color = val < 0 ? 'color:var(--red)' : val > 0 ? 'color:var(--green)' : '';
+          var pad = indent ? 'padding-left:24px;' : '';
+          wfHtml += '<tr style="border-bottom:1px solid var(--border);' + style + '"><td style="padding:8px 12px;' + pad + '">' + label + '</td><td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;' + color + '">' + fmt(val) + '</td></tr>';
+        });
+        wfHtml += '</table>';
+        document.getElementById('waterfallTable').innerHTML = wfHtml;
 
-        // Foundation closing balance
-        document.getElementById('heroFoundation').textContent = fmt(data.foundation_cash);
-        var foundationChg = data.foundation_cash - data.foundation_cash_prior;
-        var foundationPct = data.foundation_cash_prior ? (foundationChg / Math.abs(data.foundation_cash_prior) * 100) : 0;
-        var foundationChgEl = document.getElementById('heroFoundationChange');
-        foundationChgEl.textContent = fmtShort(foundationChg) + ' (' + fmtPct(foundationPct) + ') vs prior';
-        foundationChgEl.className = 'change ' + (foundationChg >= 0 ? 'up' : 'down');
-        document.getElementById('heroFoundationSub').textContent = 'As of ' + data.snapshot_date;
-
-        // Holdings closing balance
-        document.getElementById('heroHoldings').textContent = fmt(data.holdings_cash);
-        var holdingsChg = data.holdings_cash - data.holdings_cash_prior;
-        var holdingsPct = data.holdings_cash_prior ? (holdingsChg / Math.abs(data.holdings_cash_prior) * 100) : 0;
-        var holdingsChgEl = document.getElementById('heroHoldingsChange');
-        holdingsChgEl.textContent = fmtShort(holdingsChg) + ' (' + fmtPct(holdingsPct) + ') vs prior';
-        holdingsChgEl.className = 'change ' + (holdingsChg >= 0 ? 'up' : 'down');
-        document.getElementById('heroHoldingsSub').textContent = 'As of ' + data.snapshot_date;
-
-        // OW closing balance
-        document.getElementById('heroOWClosing').textContent = fmt(data.ow_total_cash);
-        var owClosingChg = data.ow_total_cash - data.ow_total_cash_prior;
-        var owClosingPct = data.ow_total_cash_prior ? (owClosingChg / Math.abs(data.ow_total_cash_prior) * 100) : 0;
-        var owClosingChgEl = document.getElementById('heroOWClosingChange');
-        owClosingChgEl.textContent = fmtShort(owClosingChg) + ' (' + fmtPct(owClosingPct) + ') vs prior';
-        owClosingChgEl.className = 'change ' + (owClosingChg >= 0 ? 'up' : 'down');
-        document.getElementById('heroOWClosingSub').textContent = 'As of ' + data.snapshot_date;
+        // Cash Fiat & Crypto cards
+        document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
+        document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Foundation';
+        document.getElementById('heroCashCrypto').textContent = fmt(data.total_cash_crypto);
+        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snapshot_date;
 
         // Cash trend chart
         if (data.cash_trend && data.cash_trend.length > 0) {
@@ -434,36 +433,6 @@
     async function loadCashSummary() {
       try {
         var asOf = getAsOfParam();
-        var b = await (await fetch('/api/dashboard/cash-balances' + asOf)).json();
-
-        // Calculate totals from existing API fields
-        var cashAccounts = b.cash ? b.cash.accounts || [] : [];
-        var owAccounts = b.overworld ? b.overworld.accounts || [] : [];
-        var reachAccounts = b.reach ? b.reach.accounts || [] : [];
-        var overdrawnAccounts = b.overdrawn ? b.overdrawn.accounts || [] : [];
-        var allAccounts = [].concat(cashAccounts, owAccounts, reachAccounts, overdrawnAccounts);
-
-        // Split into bank (100xxx) and crypto (10Wxxx)
-        var totalBank = 0, totalCrypto = 0;
-        allAccounts.forEach(function(a) {
-          if (a.code && a.code.startsWith('10W')) totalCrypto += a.balance;
-          else totalBank += a.balance;
-        });
-        var grandTotal = totalBank + totalCrypto;
-
-        document.getElementById('coTotalCash').textContent = fmtShort(grandTotal);
-
-        var owTotal = b.overworld ? b.overworld.total : 0;
-        var reachTotal = b.reach ? b.reach.total : 0;
-        var overdrawnTotal = b.overdrawn ? b.overdrawn.total : 0;
-
-        var tree = document.getElementById('coTreeBreakdown');
-        tree.innerHTML =
-          '<span style="color:var(--green)">Cash (Bank): ' + fmtShort(totalBank) + '</span><br>' +
-          '<span style="color:var(--cyan)">Crypto: ' + fmtShort(totalCrypto) + '</span><br>' +
-          '<span style="color:var(--yellow)">Overworld: ' + fmtShort(owTotal) + '</span>' +
-          ' &nbsp; <span style="color:var(--blue)">Reach: ' + fmtShort(reachTotal) + '</span>' +
-          (overdrawnTotal < -0.5 ? ' &nbsp; <span style="color:var(--red)">Overdrawn: ' + fmtShort(overdrawnTotal) + '</span>' : '');
 
         // Cash flow chart from reporting API
         var flow = await (await fetch('/api/reporting/cash-flow-series?period=monthly' + (asOf ? '&date_to=' + document.getElementById('asOfDate').value : ''))).json();
