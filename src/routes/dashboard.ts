@@ -157,7 +157,7 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     // Non-OW entity groups (for the hero total)
     const nonOWGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
-    const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
+    const owGroups = new Set(['OW', 'Reach', 'Rough house']);
 
     const isNonOW = (r: any) => nonOWGroups.has(companyToGroup[r.company_id] || '');
     const isOW = (r: any) => owGroups.has(companyToGroup[r.company_id] || '');
@@ -1584,7 +1584,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const xterioGroups = new Set(['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK']);
     const holdingsGroups = new Set(['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
-    const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
+    const owGroups = new Set(['OW', 'Reach', 'Rough house']);
     const xterioFoundationCash = 5942149;
 
     // Current cash by entity group (ALL asset_cash for chart)

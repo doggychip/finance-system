@@ -28,7 +28,7 @@ export const ENTITY_GROUPS: EntityGroup[] = [
   { name: 'Rough house', company_ids: [31] },
   { name: 'Keystone', company_ids: [28] },
 
-  { name: 'OW & Reach Total', company_ids: [], is_subtotal: true, subtotal_groups: ['OW', 'Reach', 'Rough house', 'Keystone'] },
+  { name: 'OW & Reach Total', company_ids: [], is_subtotal: true, subtotal_groups: ['OW', 'Reach', 'Rough house'] },
 
   { name: 'Total', company_ids: [], is_subtotal: true, subtotal_groups: ['Non OW Total', 'OW & Reach Total'] },
 ];
