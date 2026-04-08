@@ -98,9 +98,10 @@ export function chatRoutes(db: Database.Database): Router {
       context += `- Xterio: LTECH, LTECH W3, XLABS, XLABS W3, PRIVILEGE HK, Xterio Foundation (manual: $5,942,149 cash)\n`;
       context += `- AOD/Gamephilos: GAMEPHILOS, GAMEPHILOS W3, MAOFAN, DIFANHA\n`;
       context += `- CS/Shadowcay: SHADOWCAY, SHADOWCAY W3, CHAOYING, DIREWOLF, COS GAMES, COS GAMES W3\n`;
-      context += `- Palios: PALIO W3, BJ TUDONG, QUANTUMMIND SOLUTIONS HK\n`;
+      context += `- Palios: PALIO W3, BJ TUDONG\n`;
+      context += `- Quantummind: QUANTUMMIND SOLUTIONS HK\n`;
       context += `- Holdings: LHOLDINGS, LHOLDINGS W3\n`;
-      context += `- Overworld: OVERWORLD, OVERWORLD W3, REACH LABS, ROUGH HOUSE, PLAY ALGORITHM (BVI)\n\n`;
+      context += `- Overworld: OVERWORLD, OVERWORLD W3, REACH LABS, ROUGH HOUSE\n\n`;
 
       context += `Cash Balances by Company:\n`;
       const cashByCompany: Record<string, number> = {};

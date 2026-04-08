@@ -23,7 +23,6 @@ const COMPANIES = [
   { id: 8, name: 'QUANTUMMIND' },
   { id: 15, name: 'OVERWORLD' }, { id: 16, name: 'OVERWORLD W3' },
   { id: 30, name: 'REACH LABS' }, { id: 31, name: 'ROUGH HOUSE' },
-  { id: 28, name: 'PLAY ALGORITHM' },
 ];
 
 export async function syncBalances(

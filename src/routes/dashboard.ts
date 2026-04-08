@@ -143,7 +143,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const rows = db.prepare(`
       SELECT company_id, company_name, account_code as code, account_name as name, account_type as odoo_type, balance
       FROM account_balances
-      WHERE snapshot_date = ? AND (account_type = 'asset_cash' OR (account_type = 'asset_receivable' AND company_id IN (15, 16, 30, 31, 28)))
+      WHERE snapshot_date = ? AND (account_type = 'asset_cash' OR (account_type = 'asset_receivable' AND company_id IN (15, 16, 30, 31)))
       AND ABS(balance) > 0.01
       ORDER BY balance DESC
     `).all(snap.snapshot_date) as any[];
@@ -750,6 +750,8 @@ export function dashboardRoutes(db: Database.Database): Router {
         // Handle manual entities (e.g. Xterio Foundation)
         if (group.is_manual) {
           // Xterio Foundation — hardcoded from spreadsheet (as at 28.02.2026)
+          // Sign convention: Odoo debit-credit (assets positive, liabilities/equity negative)
+          // ASSETS + LIABILITIES + EQUITY must equal 0
           const balances: Record<string, number> = {
             'ASSETS': 5942149,
             'CURRENT_ASSETS': 5942149,
@@ -763,18 +765,18 @@ export function dashboardRoutes(db: Database.Database): Router {
             'FIXED_ASSETS': 0,
             'NON_CURRENT_ASSETS': 0,
             'A_200000': 0, 'A_202000': 0,
-            'LIABILITIES': 1369636,
-            'CURRENT_LIABILITIES': 165000,
+            'LIABILITIES': -1369636,
+            'CURRENT_LIABILITIES': -165000,
             'A_303010': 0, 'A_303011': 0, 'A_303040': 0, 'A_303041': 0,
-            'A_303050': 0, 'A_303100': 0, 'A_303031': 165000,
+            'A_303050': 0, 'A_303100': 0, 'A_303031': -165000,
             'A_301000': 0, 'A_302010': 0,
             'PAYABLES': 0, 'A_300030': 0,
-            'NON_CURRENT_LIABILITIES': 1204636,
-            'A_300040': 0, 'A_300050': 0, 'A_303030': 1204636,
-            'EQUITY': 4563853,
-            'EQUITY_RETAINED': -33889064,
-            'CURRENT_YEAR_PL': 12831 + 38452916, // Current Year + Share Capitals (38,452,916)
-            'LIAB_EQUITY': 5933488,
+            'NON_CURRENT_LIABILITIES': -1204636,
+            'A_300040': 0, 'A_300050': 0, 'A_303030': -1204636,
+            'EQUITY': -4572513,
+            'EQUITY_RETAINED': -4563852, // Share Capitals (-38,452,916) + Retained Earnings (+33,889,064)
+            'CURRENT_YEAR_PL': -8661, // Current Year P&L only
+            'LIAB_EQUITY': -5942149,
           };
           // Zero out any BS line not explicitly set
           for (const line of BS_LINES) {
