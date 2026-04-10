@@ -104,19 +104,16 @@
     function valCls(n) { return Math.abs(n) < 0.5 ? 'val zero' : n < 0 ? 'val neg' : 'val pos'; }
     function chgCls(n) { return n >= 0.5 ? 'val change-pos' : n <= -0.5 ? 'val change-neg' : 'val zero'; }
 
-    function row(label, cur, prior, cls) {
+    function row(label, cur, prior, cls, cashAmt, cryptoAmt) {
       var chg = cur - prior;
-      var pct = prior !== 0 ? (chg / Math.abs(prior) * 100) : 0;
-      var labelHtml = '<td>' + label + '</td>';
-      // Make company rows clickable to Odoo bank accounts
-      if (cls === 'company-row') {
-        labelHtml = '<td style="cursor:pointer;text-decoration:underline dotted" onclick="window.open(odooUrl(\'bank-accounts\'),\'_blank\')">' + label + '</td>';
-      }
-      return '<tr class="' + (cls || '') + '">' + labelHtml +
-        '<td class="' + valCls(cur) + '" style="cursor:pointer" onclick="window.open(odooUrl(\'bank-accounts\'),\'_blank\')">' + fmt(cur) + '</td>' +
+      var cash = cashAmt || cur;
+      var crypto = cryptoAmt || 0;
+      return '<tr class="' + (cls || '') + '"><td>' + label + '</td>' +
+        '<td class="' + valCls(cash) + '" style="color:var(--green)">' + fmt(cash) + '</td>' +
+        '<td class="' + valCls(crypto) + '" style="color:var(--cyan)">' + fmt(crypto) + '</td>' +
+        '<td class="' + valCls(cur) + '">' + fmt(cur) + '</td>' +
         '<td class="' + valCls(prior) + '">' + fmt(prior) + '</td>' +
-        '<td class="' + chgCls(chg) + '">' + fmt(chg) + '</td>' +
-        '<td class="' + chgCls(chg) + '">' + fmtPct(pct) + '</td></tr>';
+        '<td class="' + chgCls(chg) + '">' + fmt(chg) + '</td></tr>';
     }
 
     // Load available snapshots into dropdowns
@@ -166,13 +163,13 @@
         });
 
         var html = '<div class="date-label">Cash Position as at <strong>' + data.snapshot_date + '</strong> | Prior: ' + data.prior_date + '</div>';
-        html += '<table><thead><tr><th>Entity / Company</th><th class="val">Balance (USD)</th><th class="val">Prior Week</th><th class="val">Change</th><th class="val">%</th></tr></thead><tbody>';
+        html += '<table><thead><tr><th>Entity / Company</th><th class="val">Cash (Fiat)</th><th class="val">Crypto</th><th class="val">Total</th><th class="val">Prior</th><th class="val">Change</th></tr></thead><tbody>';
 
         var grandCur = 0, grandPrior = 0;
 
         LAYOUT.forEach(function(item) {
           if (item.type === 'parent') {
-            html += '<tr class="parent-row"><td colspan="5">' + item.name + '</td></tr>';
+            html += '<tr class="parent-row"><td colspan="6">' + item.name + '</td></tr>';
 
           } else if (item.type === 'entity') {
             // Entity total row

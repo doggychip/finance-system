@@ -188,7 +188,7 @@
         <div class="chart-box"><canvas id="revExpChart"></canvas></div>
       </div>
       <div class="card">
-        <h2>Cash Trend</h2>
+        <h2>Cash Trend (Weekly)</h2>
         <div class="chart-box"><canvas id="trendChart"></canvas></div>
       </div>
     </div>
@@ -310,21 +310,32 @@
           });
         }
 
-        // Entity cash bars
+        // Entity cash bars — split Cash vs Crypto
         var barsEl = document.getElementById('entityBars');
         var entities = data.entity_cash || [];
         if (entities.length === 0) {
           barsEl.innerHTML = '<div class="loading">No data</div>';
         } else {
           var maxCash = Math.max.apply(null, entities.map(function(e) { return Math.abs(e.cash); }));
-          barsEl.innerHTML = entities.map(function(e, i) {
-            var pct = maxCash > 0 ? (Math.abs(e.cash) / maxCash * 100) : 0;
-            var color = e.cash >= 0 ? palette[i % palette.length] : 'rgba(239,68,68,0.7)';
-            var bankStr = e.bank ? '<span style="color:var(--green)">Bank: ' + fmtShort(e.bank) + '</span>' : '';
-            var cryptoStr = e.crypto ? '<span style="color:var(--cyan)"> Crypto: ' + fmtShort(e.crypto) + '</span>' : '';
-            var detail = (bankStr || cryptoStr) ? '<div style="font-size:10px;color:var(--text-dim)">' + bankStr + cryptoStr + '</div>' : '';
+          barsEl.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:10px;font-size:11px;color:var(--text-dim)"><span style="color:var(--green)">■ Cash (Bank)</span><span style="color:var(--cyan)">■ Crypto</span></div>' +
+            entities.map(function(e, i) {
+            var total = Math.abs(e.cash);
+            var bankAbs = Math.abs(e.bank || 0);
+            var cryptoAbs = Math.abs(e.crypto || 0);
+            var bankPct = maxCash > 0 ? (bankAbs / maxCash * 100) : 0;
+            var cryptoPct = maxCash > 0 ? (cryptoAbs / maxCash * 100) : 0;
+            var bankFmt = e.bank ? fmtShort(e.bank) : '';
+            var cryptoFmt = e.crypto ? fmtShort(e.crypto) : '';
+            var detail = '<div style="font-size:10px;color:var(--text-dim)">' +
+              (bankFmt ? '<span style="color:var(--green)">Cash: ' + bankFmt + '</span>' : '') +
+              (cryptoFmt ? ' <span style="color:var(--cyan)">Crypto: ' + cryptoFmt + '</span>' : '') + '</div>';
             return '<div class="entity-bar"><div class="name">' + e.name + detail + '</div>' +
-              '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(pct,2) + '%;background:' + color + '"></div></div>' +
+              '<div class="bar-track">' +
+                '<div style="display:flex;height:100%">' +
+                  (bankPct > 0 ? '<div style="width:' + Math.max(bankPct,1) + '%;background:var(--green);border-radius:4px 0 0 4px;min-width:2px"></div>' : '') +
+                  (cryptoPct > 0 ? '<div style="width:' + Math.max(cryptoPct,1) + '%;background:var(--cyan);border-radius:0 4px 4px 0;min-width:2px"></div>' : '') +
+                '</div>' +
+              '</div>' +
               '<div class="amount" style="color:' + (e.cash >= 0 ? 'var(--text)' : 'var(--red)') + '">' + fmtShort(e.cash) + '</div></div>';
           }).join('');
         }

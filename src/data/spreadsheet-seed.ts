@@ -10,13 +10,13 @@ interface Entity {
   name: string;
   accounts: Account[];
   // Verified totals from spreadsheet (accounting convention)
-  verify: { assets: number; liabilities: number; equity: number; current_year_pl: number };
+  verify: { assets: number; liabilities: number; equity: number; current_year_pl: number; share_capitals?: number; capital_in_wallet?: number };
 }
 
 const ENTITIES: Entity[] = [
   {
     company_id: 1, name: 'LTECH, LTECH W3',
-    verify: { assets: 1929938, liabilities: -596318, equity: 2526257, current_year_pl: -121654 },
+    verify: { assets: 1929938, liabilities: -596318, equity: 2526257, current_year_pl: -121654, share_capitals: 1 },
     accounts: [
       { code: '100000', name: 'Cash', type: 'asset_cash', balance: 703043 },
       { code: '10W000', name: 'Digital Token', type: 'asset_cash', balance: 257791 },
@@ -109,7 +109,7 @@ const ENTITIES: Entity[] = [
   },
   {
     company_id: 19, name: 'LHOLDINGS',
-    verify: { assets: 7785077, liabilities: 4553231, equity: 3231847, current_year_pl: -212625 },
+    verify: { assets: 7785077, liabilities: 4553231, equity: 3231847, current_year_pl: -212625, share_capitals: 4712626, capital_in_wallet: 1652416 },
     accounts: [
       { code: '100000', name: 'Cash', type: 'asset_cash', balance: 603985 },
       { code: '10W000', name: 'Digital Token', type: 'asset_cash', balance: 7031090 },
@@ -142,7 +142,7 @@ const ENTITIES: Entity[] = [
   },
   {
     company_id: 15, name: 'OW',
-    verify: { assets: 4073918, liabilities: -7464052, equity: 11537970, current_year_pl: 270549 },
+    verify: { assets: 4073918, liabilities: -7464052, equity: 11537970, current_year_pl: 270549, share_capitals: 10885456 },
     accounts: [
       { code: '100000', name: 'Cash', type: 'asset_cash', balance: 4073918 },
       { code: '303010', name: 'Amount due to/from Holding (Non-trade)', type: 'liability_current', balance: -8870813 },
@@ -249,13 +249,28 @@ export function seedSpreadsheetBalances(db: Database.Database) {
         count++;
       }
 
-      // Equity from identity
+      // Equity from identity: ASSETS + LIABILITIES + EQUITY = 0
       const equitySystem = -(entity.verify.equity);
       const currentYearPLSystem = -(entity.verify.current_year_pl);
-      const retainedSystem = equitySystem - currentYearPLSystem;
+      const shareCapitals = entity.verify.share_capitals || 0;
+      const capitalInWallet = entity.verify.capital_in_wallet || 0;
+
+      // In system convention: share capitals/capital in wallet are negative (credit-normal)
+      const shareCapSystem = -shareCapitals;
+      const capWalletSystem = -capitalInWallet;
+      // Retained earnings = total equity - current year PL - share capitals - capital in wallet
+      const retainedSystem = equitySystem - currentYearPLSystem - shareCapSystem - capWalletSystem;
 
       if (Math.abs(retainedSystem) > 0.01) {
         insert.run(entity.company_id, entity.name, odooIdCounter++, '500000', 'Retained Earnings', 'equity', retainedSystem, snapshotDate);
+        count++;
+      }
+      if (Math.abs(shareCapSystem) > 0.01) {
+        insert.run(entity.company_id, entity.name, odooIdCounter++, '310000', 'Share Capitals', 'equity', shareCapSystem, snapshotDate);
+        count++;
+      }
+      if (Math.abs(capWalletSystem) > 0.01) {
+        insert.run(entity.company_id, entity.name, odooIdCounter++, '201000', 'Capital in Wallet', 'equity', capWalletSystem, snapshotDate);
         count++;
       }
       if (Math.abs(currentYearPLSystem) > 0.01) {
