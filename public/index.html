@@ -572,7 +572,16 @@
       loadTopExpenses();
     }
 
-    refreshData();
+    // Auto-detect latest snapshot date
+    fetch('/api/dashboard/snapshots').then(function(r) { return r.json(); }).then(function(snaps) {
+      if (snaps && snaps.length > 0) {
+        var dateInput = document.getElementById('asOfDate');
+        if (!dateInput.value) {
+          dateInput.value = snaps[0].snapshot_date;
+        }
+      }
+      refreshData();
+    }).catch(function() { refreshData(); });
     setInterval(refreshData, 5 * 60 * 1000);
   </script>
 <script src="/chat-widget.js"></script>
