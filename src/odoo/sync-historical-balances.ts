@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { OdooClient } from './client';
+import { ENTITY_GROUPS } from '../config/entity-groups';
 
 export interface HistoricalBalanceSyncResult {
   companies_synced: number;
@@ -50,50 +51,55 @@ export async function syncHistoricalBalances(
     try {
       console.log(`[sync-hist] Fetching ${company.name} (${company.id}) as of ${asOfDate}...`);
 
-      // Use read_group with debit/credit (more reliable than balance in Odoo 18)
-      const grouped = await odoo.execute('account.move.line', 'read_group',
+      // Use current_balance with strict single-company context
+      // This matches what Odoo's own balance sheet report shows
+      const accts = await odoo.execute('account.account', 'search_read',
+        [[['company_ids', 'in', [company.id]]]],
+        {
+          fields: ['id', 'code', 'name', 'current_balance', 'account_type'],
+          context: {
+            'allowed_company_ids': [company.id],
+            'company_id': company.id,
+            'date_to': asOfDate,
+          },
+          limit: 2000,
+        }
+      ) as any[];
+
+      // Build a set of account IDs that actually belong to this company
+      // to filter out shared accounts from other companies
+      const companyAccountIds = new Set<number>();
+      const jelines = await odoo.execute('account.move.line', 'read_group',
         [[
           ['company_id', '=', company.id],
           ['parent_state', '=', 'posted'],
           ['date', '<=', asOfDate],
         ]],
         {
-          fields: ['account_id', 'debit', 'credit'],
+          fields: ['account_id'],
           groupby: ['account_id'],
           lazy: false,
         }
       ) as any[];
-
-      // We also need account_type — fetch account details for accounts with balances
-      const accountIds = grouped
-        .filter(g => Math.abs((g.debit || 0) - (g.credit || 0)) > 0.01)
-        .map(g => g.account_id[0]);
-
-      let accountDetails: Record<number, { code: string; name: string; account_type: string }> = {};
-      if (accountIds.length > 0) {
-        // Batch fetch account details
-        const accts = await odoo.read('account.account', accountIds, ['id', 'code', 'name', 'account_type']);
-        for (const a of accts) {
-          accountDetails[a.id as number] = {
-            code: (a.code as string) || '',
-            name: (a.name as string) || '',
-            account_type: (a.account_type as string) || '',
-          };
-        }
+      for (const jl of jelines) {
+        if (jl.account_id) companyAccountIds.add(jl.account_id[0]);
       }
 
       const tx = db.transaction(() => {
-        for (const g of grouped) {
-          const balance = (g.debit || 0) - (g.credit || 0);
-          if (Math.abs(balance) < 0.01) continue;
-          const acctId = g.account_id[0];
-          const detail = accountDetails[acctId];
-          if (!detail || !detail.code) continue;
+        for (const a of accts) {
+          if (Math.abs(a.current_balance) < 0.01) continue;
+          const code = a.code || '';
+          const name = a.name || '';
+          const accountType = a.account_type || '';
+          if (!code) continue;
+
+          // Only include accounts that have actual journal entries for this company
+          if (!companyAccountIds.has(a.id)) continue;
 
           upsert.run(
             company.id, company.name,
-            acctId, detail.code, detail.name, detail.account_type,
-            balance, asOfDate
+            a.id, code, name, accountType,
+            a.current_balance, asOfDate
           );
           result.accounts_synced++;
         }
