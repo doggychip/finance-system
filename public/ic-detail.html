@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IC Detail — Current Liabilities Related</title>
+  <title>IC Detail — Liabilities Breakdown</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
@@ -29,7 +29,7 @@
     thead th.subtotal-col { background: #2d4a22; }
     thead th.total-col { background: #4a1d1d; }
 
-    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 320px; max-width: 320px; font-weight: 500; }
+    .row-label { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 360px; max-width: 360px; font-weight: 500; font-size: 11px; }
     .val { text-align: right; font-variant-numeric: tabular-nums; }
     .val.positive { color: var(--text); }
     .val.negative { color: var(--red); }
@@ -37,9 +37,12 @@
     .subtotal-val { background: rgba(34,197,94,0.04); }
     .total-val { background: rgba(239,68,68,0.04); }
 
-    .section-row td, .section-row .row-label { background: #1e293b; font-weight: 800; font-size: 12px; color: white; padding-top: 6px; padding-bottom: 6px; }
-    .total-row td { font-weight: 700; background: rgba(99,102,241,0.06); }
-    .total-row .row-label { background: rgba(99,102,241,0.06); font-weight: 700; }
+    .section-row td, .section-row .row-label { background: #1e293b; font-weight: 700; font-size: 11px; color: white; padding-top: 6px; padding-bottom: 6px; }
+    .total-row td { font-weight: 700; background: rgba(99,102,241,0.08); border-top: 2px solid var(--accent); }
+    .total-row .row-label { background: rgba(99,102,241,0.08); font-weight: 700; }
+    .grand-total td { font-weight: 800; font-size: 12px; background: rgba(234,179,8,0.08); border-top: 3px solid var(--yellow); }
+    .grand-total .row-label { background: rgba(234,179,8,0.08); font-weight: 800; font-size: 12px; }
+    .indent-1 .row-label { padding-left: 20px; font-weight: 400; }
 
     .loading { display: flex; align-items: center; justify-content: center; min-height: 400px; color: var(--text-dim); font-size: 14px; }
     .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
@@ -48,7 +51,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>IC Detail — Current Liabilities Related</h1>
+    <h1>Conso Balance Sheet — Liabilities Detail</h1>
     <div class="nav">
       <a href="/">Overview</a>
       <a href="/reports.html">Reports</a>
@@ -78,13 +81,13 @@
       return n < 0 ? '(' + s + ')' : s;
     }
 
-    function valClass(n, isSubtotal, isTotal) {
+    function valCls(n, col) {
       var cls = 'val';
       if (Math.abs(n) < 0.5) cls += ' zero';
       else if (n < 0) cls += ' negative';
       else cls += ' positive';
-      if (isTotal) cls += ' total-val';
-      else if (isSubtotal) cls += ' subtotal-val';
+      if (col.name === 'Total') cls += ' total-val';
+      else if (col.is_subtotal) cls += ' subtotal-val';
       return cls;
     }
 
@@ -93,45 +96,49 @@
       var asOf = document.getElementById('asOfDate').value;
       try {
         var data = await (await fetch('/api/dashboard/ic-detail?as_of_date=' + asOf)).json();
-        if (!data.columns || !data.rows || data.rows.length === 0) {
-          el.innerHTML = '<div class="loading">No IC data found.</div>';
+        if (!data.columns || !data.sections || data.sections.length === 0) {
+          el.innerHTML = '<div class="loading">No data found.</div>';
           return;
         }
 
         var cols = data.columns;
-
-        // Build header
-        var html = '<table><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left;min-width:320px">Account</th>';
+        var html = '<table><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left;min-width:360px">Conso Balance sheet as at ' + data.snapshot_date + '</th>';
         cols.forEach(function(col) {
           var cls = col.name === 'Total' ? 'total-col' : col.is_subtotal ? 'subtotal-col' : '';
           html += '<th class="' + cls + '">' + col.name + '</th>';
         });
         html += '</tr></thead><tbody>';
 
-        // Section header
-        html += '<tr class="section-row"><td class="row-label">CURRENT LIABILITIES — RELATED PARTIES</td>';
-        cols.forEach(function() { html += '<td></td>'; });
-        html += '</tr>';
-
-        // Data rows
-        data.rows.forEach(function(row) {
-          html += '<tr><td class="row-label" style="padding-left:16px">' + row.code + ' ' + row.name + '</td>';
-          row.values.forEach(function(val, i) {
-            var col = cols[i];
-            html += '<td class="' + valClass(val, col.is_subtotal, col.name === 'Total') + '">' + fmt(val) + '</td>';
-          });
-          html += '</tr>';
+        data.sections.forEach(function(row) {
+          if (row.type === 'section') {
+            // Section header
+            html += '<tr class="section-row"><td class="row-label">' + row.label + '</td>';
+            cols.forEach(function() { html += '<td></td>'; });
+            html += '</tr>';
+          } else if (row.code === 'TOTAL_LIABILITIES') {
+            // Grand total
+            html += '<tr class="grand-total"><td class="row-label">' + row.label + '</td>';
+            row.values.forEach(function(val, i) {
+              html += '<td class="' + valCls(val, cols[i]) + '">' + fmt(val) + '</td>';
+            });
+            html += '</tr>';
+          } else if (row.is_total) {
+            // Subtotal row
+            html += '<tr class="total-row"><td class="row-label">' + row.label + '</td>';
+            row.values.forEach(function(val, i) {
+              html += '<td class="' + valCls(val, cols[i]) + '">' + fmt(val) + '</td>';
+            });
+            html += '</tr>';
+          } else {
+            // Data row
+            var indentCls = row.indent ? 'indent-' + row.indent : '';
+            html += '<tr class="' + indentCls + '"><td class="row-label">' + row.label + '</td>';
+            row.values.forEach(function(val, i) {
+              html += '<td class="' + valCls(val, cols[i]) + '">' + fmt(val) + '</td>';
+            });
+            html += '</tr>';
+          }
         });
-
-        // Total row
-        if (data.total) {
-          html += '<tr class="total-row"><td class="row-label" style="font-weight:700">Total Current Liabilities — Related</td>';
-          data.total.values.forEach(function(val, i) {
-            var col = cols[i];
-            html += '<td class="' + valClass(val, col.is_subtotal, col.name === 'Total') + '" style="font-weight:700">' + fmt(val) + '</td>';
-          });
-          html += '</tr>';
-        }
 
         html += '</tbody></table>';
         el.innerHTML = html;

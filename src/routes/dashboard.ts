@@ -1189,7 +1189,7 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
 
-  // ====== IC Detail - Related Party Balances per Entity Group ======
+  // ====== IC Detail - Full Liabilities Breakdown per Entity Group ======
   router.get('/ic-detail', (req, res) => {
     const requestedDate = (req.query.as_of_date as string) || '';
     const latestSnap = db.prepare(
@@ -1198,7 +1198,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
-    if (!latestSnap?.snapshot_date) return res.json({ columns: [], rows: [], snapshot_date: null });
+    if (!latestSnap?.snapshot_date) return res.json({ columns: [], sections: [], snapshot_date: null });
     const snapDate = latestSnap.snapshot_date;
 
     // Company to group mapping
@@ -1208,67 +1208,176 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const cid of g.company_ids) companyToGroup[cid] = g.name;
     }
 
-    // Get all 303xxx accounts with balances
+    // Get ALL liability accounts with balances
     const rows = db.prepare(`
-      SELECT company_id, account_code, account_name, SUM(balance) as balance
+      SELECT company_id, account_code, account_name, account_type, SUM(balance) as balance
       FROM account_balances
-      WHERE snapshot_date = ? AND account_code LIKE '303%'
-      GROUP BY company_id, account_code, account_name
+      WHERE snapshot_date = ? AND (
+        account_code LIKE '303%' OR account_code LIKE '300%' OR account_code LIKE '301%' OR account_code LIKE '302%'
+        OR account_type IN ('liability_current', 'liability_credit_card', 'liability_payable', 'liability_non_current')
+      )
+      GROUP BY company_id, account_code, account_name, account_type
       ORDER BY account_code
     `).all(snapDate) as any[];
 
-    // Collect unique account codes
-    const accountCodes = new Map<string, string>();
-    for (const r of rows) {
-      if (!accountCodes.has(r.account_code)) {
-        accountCodes.set(r.account_code, r.account_name);
-      }
-    }
-
     // Build per-group balances for each account code
     const groupBalances: Record<string, Record<string, number>> = {};
+    const accountMeta = new Map<string, { name: string; type: string }>();
+
     for (const r of rows) {
       const group = companyToGroup[r.company_id];
       if (!group) continue;
       if (!groupBalances[group]) groupBalances[group] = {};
       groupBalances[group][r.account_code] = (groupBalances[group][r.account_code] || 0) + r.balance;
+      if (!accountMeta.has(r.account_code)) {
+        accountMeta.set(r.account_code, { name: r.account_name, type: r.account_type });
+      }
     }
 
     // Compute subtotals
     for (const g of ENTITY_GROUPS) {
       if (!g.is_subtotal || !g.subtotal_groups) continue;
       groupBalances[g.name] = {};
-      for (const [code] of accountCodes) {
+      for (const [code] of accountMeta) {
         groupBalances[g.name][code] = g.subtotal_groups.reduce((sum, gname) => {
           return sum + (groupBalances[gname]?.[code] || 0);
         }, 0);
       }
     }
 
-    // Build columns (entity groups)
+    // Add Foundation hardcoded IC liabilities
+    const foundationLiab: Record<string, number> = { '303031': -165000, '303030': -1204636 };
+    groupBalances['Xterio Foundation'] = groupBalances['Xterio Foundation'] || {};
+    for (const [code, bal] of Object.entries(foundationLiab)) {
+      groupBalances['Xterio Foundation'][code] = bal;
+      if (!accountMeta.has(code)) {
+        accountMeta.set(code, { name: code === '303031' ? 'Amount due to/from Xterio' : 'Amount due to/from Xterio Fdn', type: 'liability_current' });
+      }
+    }
+    // Recompute subtotals including Foundation
+    for (const g of ENTITY_GROUPS) {
+      if (!g.is_subtotal || !g.subtotal_groups) continue;
+      groupBalances[g.name] = {};
+      for (const [code] of accountMeta) {
+        groupBalances[g.name][code] = g.subtotal_groups.reduce((sum, gname) => {
+          return sum + (groupBalances[gname]?.[code] || 0);
+        }, 0);
+      }
+    }
+
+    // Categorize accounts
+    const relatedIC = ['303010','303011','303040','303041','303050','303051',
+      '303160','303161','303170','303171','303060','303061','303140',
+      '303070','303071','303080','303081','303090','303091','303110',
+      '303120','303150','303020','303021','303180','303181'];
+    const nonRelatedIC = ['303100','303031'];
+    const otherCurrentLiab = ['301000','302010'];
+    const payables = ['300000','300030'];
+    const nonCurrentLiab = ['300040','300050','303030'];
+
+    // Build columns
     const columns = ENTITY_GROUPS.map(g => ({
       name: g.name,
       is_subtotal: g.is_subtotal || false,
     }));
 
-    // Build rows (one per account code + subtotal row)
-    const dataRows = Array.from(accountCodes.entries()).map(([code, name]) => ({
-      code,
-      name,
-      values: ENTITY_GROUPS.map(g => groupBalances[g.name]?.[code] || 0),
-    }));
+    // Helper to build a row
+    function makeRow(code: string, label: string, indent: number) {
+      return {
+        code, label, indent,
+        values: ENTITY_GROUPS.map(g => groupBalances[g.name]?.[code] || 0),
+      };
+    }
 
-    // Add total row
-    const totalRow = {
-      code: 'TOTAL_IC',
-      name: 'Total Current Liabilities - Related',
-      values: ENTITY_GROUPS.map(g => {
-        const gb = groupBalances[g.name] || {};
-        return Object.values(gb).reduce((s: number, v: any) => s + (v || 0), 0);
-      }),
-    };
+    // Helper to build a total row from a list of codes
+    function makeTotalRow(code: string, label: string, indent: number, codes: string[]) {
+      return {
+        code, label, indent, is_total: true,
+        values: ENTITY_GROUPS.map(g => {
+          const gb = groupBalances[g.name] || {};
+          return codes.reduce((s, c) => s + (gb[c] || 0), 0);
+        }),
+      };
+    }
 
-    res.json({ columns, rows: dataRows, total: totalRow, snapshot_date: snapDate });
+    // Get all liability types for grand total
+    function makeTypeTotalRow(code: string, label: string, indent: number, types: string[]) {
+      const allLiabCodes = Array.from(accountMeta.entries())
+        .filter(([_, meta]) => types.includes(meta.type))
+        .map(([c]) => c);
+      // Also add Foundation hardcoded
+      return {
+        code, label, indent, is_total: true,
+        values: ENTITY_GROUPS.map(g => {
+          const gb = groupBalances[g.name] || {};
+          return allLiabCodes.reduce((s, c) => s + (gb[c] || 0), 0);
+        }),
+      };
+    }
+
+    // Sort related IC accounts
+    const sortedRelated = relatedIC.filter(c => accountMeta.has(c)).sort();
+    const sortedNonRelated = nonRelatedIC.filter(c => accountMeta.has(c)).sort();
+    const sortedOther = otherCurrentLiab.filter(c => accountMeta.has(c)).sort();
+    const sortedPayables = payables.filter(c => accountMeta.has(c)).sort();
+    const sortedNonCurrent = nonCurrentLiab.filter(c => accountMeta.has(c)).sort();
+
+    // Also include any 303xxx accounts not in our predefined lists
+    const allKnown = new Set([...relatedIC, ...nonRelatedIC, ...otherCurrentLiab, ...payables, ...nonCurrentLiab]);
+    const extraAccounts = Array.from(accountMeta.keys())
+      .filter(c => c.startsWith('303') && !allKnown.has(c))
+      .sort();
+
+    const allRelated = [...sortedRelated, ...extraAccounts];
+    const allCurrentLiabCodes = [...allRelated, ...sortedNonRelated, ...sortedOther, ...sortedPayables];
+
+    // Build sections
+    const sections: any[] = [];
+
+    // Section: Current Liabilities - Related
+    sections.push({ type: 'section', label: 'Current Liabilities - Related entities', indent: 0 });
+    for (const code of allRelated) {
+      const meta = accountMeta.get(code);
+      sections.push(makeRow(code, `${code} ${meta?.name || ''}`, 1));
+    }
+    sections.push(makeTotalRow('TOTAL_RELATED', 'Total Related', 0, allRelated));
+
+    // Section: Current Liabilities - Non-Related
+    sections.push({ type: 'section', label: 'Current Liabilities - Non-Related entities', indent: 0 });
+    for (const code of sortedNonRelated) {
+      const meta = accountMeta.get(code);
+      sections.push(makeRow(code, `${code} ${meta?.name || ''}`, 1));
+    }
+
+    // Section: Current Liabilities - Other
+    sections.push({ type: 'section', label: 'Current Liabilities - Other', indent: 0 });
+    for (const code of sortedOther) {
+      const meta = accountMeta.get(code);
+      sections.push(makeRow(code, `${code} ${meta?.name || ''}`, 1));
+    }
+
+    // Section: Payables
+    sections.push({ type: 'section', label: 'Payables', indent: 0 });
+    for (const code of sortedPayables) {
+      const meta = accountMeta.get(code);
+      sections.push(makeRow(code, `${code} ${meta?.name || ''}`, 1));
+    }
+
+    // Total Current Liabilities
+    sections.push(makeTotalRow('TOTAL_CURRENT', 'Total Current Liabilities', 0, allCurrentLiabCodes));
+
+    // Section: Non-current Liabilities
+    sections.push({ type: 'section', label: 'Plus Non-current Liabilities', indent: 0 });
+    for (const code of sortedNonCurrent) {
+      const meta = accountMeta.get(code);
+      sections.push(makeRow(code, `${code} ${meta?.name || ''}`, 1));
+    }
+
+    // TOTAL LIABILITIES
+    const allLiabCodes = [...allCurrentLiabCodes, ...sortedNonCurrent];
+    sections.push(makeTotalRow('TOTAL_LIABILITIES', 'LIABILITIES', 0, allLiabCodes));
+
+    res.json({ columns, sections, snapshot_date: snapDate });
   });
 
   // ====== Cash Position Report ======
