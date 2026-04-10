@@ -1,13 +1,11 @@
 import Database from 'better-sqlite3';
 import { OdooClient } from './client';
-import { ENTITY_GROUPS } from '../config/entity-groups';
 
 export interface BalanceSyncResult {
   companies_synced: number;
   accounts_synced: number;
   snapshot_date: string;
   errors: string[];
-  warnings: string[];
 }
 
 // All company IDs and names
@@ -25,6 +23,7 @@ const COMPANIES = [
   { id: 8, name: 'QUANTUMMIND' },
   { id: 15, name: 'OVERWORLD' }, { id: 16, name: 'OVERWORLD W3' },
   { id: 30, name: 'REACH LABS' }, { id: 31, name: 'ROUGH HOUSE' },
+  { id: 28, name: 'PLAY ALGORITHM' },
 ];
 
 export async function syncBalances(
@@ -37,7 +36,6 @@ export async function syncBalances(
     accounts_synced: 0,
     snapshot_date: snapshotDate,
     errors: [],
-    warnings: [],
   };
 
   const upsert = db.prepare(`
@@ -54,50 +52,28 @@ export async function syncBalances(
     try {
       console.log(`[sync-balances] Fetching balances for ${company.name} (${company.id})...`);
 
-      // Step 1: Get account metadata (code, name, type)
+      // Use Odoo's current_balance with company context
       const accts = await odoo.execute('account.account', 'search_read',
         [[['company_ids', 'in', [company.id]]]],
         {
-          fields: ['id', 'code', 'name', 'account_type'],
+          fields: ['id', 'code', 'name', 'current_balance', 'account_type'],
           context: { 'allowed_company_ids': [company.id] },
           limit: 2000,
         }
       ) as any[];
 
-      const acctMap: Record<number, { code: string; name: string; type: string }> = {};
-      for (const a of accts) {
-        acctMap[a.id] = { code: a.code || '', name: a.name || '', type: a.account_type || '' };
-      }
-
-      // Step 2: Get balances from account.move.line with explicit company_id filter
-      // This avoids the cross-company leaking issue with current_balance
-      const balanceRows = await odoo.execute('account.move.line', 'read_group',
-        [[
-          ['company_id', '=', company.id],
-          ['parent_state', '=', 'posted'],
-        ]],
-        {
-          fields: ['account_id', 'balance'],
-          groupby: ['account_id'],
-          lazy: false,
-        }
-      ) as any[];
-
       const tx = db.transaction(() => {
-        for (const row of balanceRows) {
-          const balance = row.balance || 0;
-          if (Math.abs(balance) < 0.01) continue;
-
-          const accountId = row.account_id?.[0];
-          if (!accountId) continue;
-
-          const acct = acctMap[accountId];
-          if (!acct || !acct.code) continue;
+        for (const a of accts) {
+          if (Math.abs(a.current_balance) < 0.01) continue;
+          const code = a.code || '';
+          const name = a.name || '';
+          const accountType = a.account_type || '';
+          if (!code) continue;
 
           upsert.run(
             company.id, company.name,
-            accountId, acct.code, acct.name, acct.type,
-            balance, snapshotDate
+            a.id, code, name, accountType,
+            a.current_balance, snapshotDate
           );
           result.accounts_synced++;
         }
@@ -111,36 +87,5 @@ export async function syncBalances(
   }
 
   console.log(`[sync-balances] Done: ${result.companies_synced} companies, ${result.accounts_synced} accounts`);
-
-  // Post-sync validation: check ASSETS + LIABILITIES + EQUITY = 0 per entity group
-  const assetTypes = ['asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments', 'asset_fixed', 'asset_non_current'];
-  const liabilityTypes = ['liability_current', 'liability_credit_card', 'liability_payable', 'liability_non_current'];
-  const equityTypes = ['equity', 'equity_unaffected', 'income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation'];
-
-  for (const group of ENTITY_GROUPS) {
-    if (group.is_subtotal || group.is_manual || group.company_ids.length === 0) continue;
-    const placeholders = group.company_ids.map(() => '?').join(',');
-    const row = db.prepare(`
-      SELECT
-        COALESCE(SUM(CASE WHEN account_type IN (${assetTypes.map(() => '?').join(',')}) THEN balance ELSE 0 END), 0) as assets,
-        COALESCE(SUM(CASE WHEN account_type IN (${liabilityTypes.map(() => '?').join(',')}) THEN balance ELSE 0 END), 0) as liabilities,
-        COALESCE(SUM(CASE WHEN account_type IN (${equityTypes.map(() => '?').join(',')}) THEN balance ELSE 0 END), 0) as equity
-      FROM account_balances
-      WHERE company_id IN (${placeholders}) AND snapshot_date = ?
-    `).get(...assetTypes, ...liabilityTypes, ...equityTypes, ...group.company_ids, snapshotDate) as any;
-
-    if (!row) continue;
-    const check = row.assets + row.liabilities + row.equity;
-    if (Math.abs(check) > 1) {
-      const msg = `${group.name}: balance sheet does not balance (A+L+E = ${check.toFixed(2)}, assets=${row.assets.toFixed(0)}, liab=${row.liabilities.toFixed(0)}, equity=${row.equity.toFixed(0)})`;
-      console.warn(`[sync-balances] WARNING: ${msg}`);
-      result.warnings.push(msg);
-    }
-  }
-
-  if (result.warnings.length > 0) {
-    console.warn(`[sync-balances] ${result.warnings.length} entity group(s) have unbalanced balance sheets`);
-  }
-
   return result;
 }

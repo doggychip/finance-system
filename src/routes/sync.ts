@@ -118,13 +118,12 @@ export function syncRoutes(db: Database.Database): Router {
     }
   });
 
-  // Sync account balances — uses historical method for accurate per-company data
-  router.post('/balances', async (req, res) => {
+  // Sync account balances using Odoo's current_balance (authoritative)
+  router.post('/balances', async (_req, res) => {
     try {
       const odoo = createOdooClient();
       await odoo.authenticate();
-      const asOfDate = req.body.as_of_date || new Date().toISOString().slice(0, 10);
-      const result = await syncHistoricalBalances(odoo, db, asOfDate);
+      const result = await syncBalances(odoo, db);
       res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -143,73 +142,6 @@ export function syncRoutes(db: Database.Database): Router {
       await odoo.authenticate();
       const result = await syncHistoricalBalances(odoo, db, asOfDate);
       res.json(result);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      res.status(500).json({ error: message });
-    }
-  });
-
-  // Direct import of balance data (bypasses Odoo API)
-  // Accepts array of {company_id, company_name, account_code, account_name, account_type, balance}
-  router.post('/balances/import', (req, res) => {
-    try {
-      const { snapshot_date, accounts } = req.body;
-      if (!snapshot_date || !accounts || !Array.isArray(accounts)) {
-        return res.status(400).json({ error: 'Required: snapshot_date (YYYY-MM-DD) and accounts array' });
-      }
-
-      // Delete old data for this snapshot
-      db.prepare('DELETE FROM account_balances WHERE snapshot_date = ?').run(snapshot_date);
-
-      const upsert = db.prepare(`
-        INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, snapshot_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      let imported = 0;
-      const tx = db.transaction(() => {
-        for (const a of accounts) {
-          if (Math.abs(a.balance || 0) < 0.01) continue;
-          upsert.run(
-            a.company_id, a.company_name || '',
-            a.account_odoo_id || 0, a.account_code || '', a.account_name || '', a.account_type || '',
-            a.balance, snapshot_date
-          );
-          imported++;
-        }
-      });
-      tx();
-
-      res.json({ imported, snapshot_date });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      res.status(500).json({ error: message });
-    }
-  });
-
-  // Re-sync ALL existing snapshots with the fixed per-company method
-  router.post('/balances/resync-all', async (req, res) => {
-    req.socket.setTimeout(600000); // 10 minutes
-    try {
-      const odoo = createOdooClient();
-      await odoo.authenticate();
-
-      // Get all existing snapshot dates
-      const snapshots = db.prepare(
-        'SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date'
-      ).all() as any[];
-
-      const results: any[] = [];
-      for (const snap of snapshots) {
-        console.log(`[resync-all] Re-syncing snapshot ${snap.snapshot_date}...`);
-        // Delete old data for this snapshot
-        db.prepare('DELETE FROM account_balances WHERE snapshot_date = ?').run(snap.snapshot_date);
-        // Re-sync with corrected method
-        const result = await syncHistoricalBalances(odoo, db, snap.snapshot_date);
-        results.push({ date: snap.snapshot_date, ...result });
-      }
-
-      res.json({ snapshots_resynced: results.length, results });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });

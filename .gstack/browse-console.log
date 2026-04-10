@@ -1,0 +1,2 @@
+[2026-04-10T15:10:10.672Z] [error] TypeError: Cannot read properties of null (reading 'style')
+    at loadHealth (http://localhost:3001/:439:14)

@@ -90,18 +90,36 @@ export function chatRoutes(db: Database.Database): Router {
         ORDER BY ABS(balance) DESC LIMIT 20
       `).all(snapDate) as any[];
 
-      // Build context string
+      // Build context string with proper data definitions
       let context = `Financial data as of ${snapDate}.\n\n`;
-      context += `Companies: ${companies.map((c: any) => c.company_name).join(', ')}\n\n`;
 
-      context += `Entity Groups:\n`;
-      context += `- Xterio: LTECH, LTECH W3, XLABS, XLABS W3, PRIVILEGE HK, Xterio Foundation (manual entry)\n`;
-      context += `- AOD/Gamephilos: GAMEPHILOS, GAMEPHILOS W3, MAOFAN, DIFANHA\n`;
-      context += `- CS/Shadowcay: SHADOWCAY, SHADOWCAY W3, CHAOYING, DIREWOLF, COS GAMES, COS GAMES W3\n`;
-      context += `- Palios: PALIO W3, BJ TUDONG\n`;
-      context += `- Quantummind: QUANTUMMIND SOLUTIONS HK\n`;
-      context += `- Holdings: LHOLDINGS, LHOLDINGS W3\n`;
-      context += `- Overworld: OVERWORLD, OVERWORLD W3, REACH LABS, ROUGH HOUSE\n\n`;
+      context += `=== DATA DEFINITIONS ===\n`;
+      context += `Cash: Always means Fiat + Crypto combined (法币+加密币).\n`;
+      context += `- Fiat (法币): Bank accounts with code prefix 100xxx\n`;
+      context += `- Crypto (加密币): Digital token accounts with code prefix 10Wxxx\n`;
+      context += `Net Assets: Total Assets + Total Liabilities (excluding Equity & P&L accounts).\n`;
+      context += `Closing Balance: Same as Net Assets for a given period.\n\n`;
+
+      context += `=== FOUR ENTITY GROUPS ===\n`;
+      context += `1. Foundation (Xterio Foundation): Company ID 22, manual entry, assets = $5,942,149, liabilities = $1,369,636, net assets = $4,572,513\n`;
+      context += `2. Xterio: LTECH(1,23) + AOD/Gamephilos(5,6,7,10) + XLABS(17,18) + PRIVILEGE HK(21) + Foundation(22)\n`;
+      context += `   - Note: AOD was moved under Xterio because shareholders restructured AOD into Xterio equity\n`;
+      context += `3. Holdings: CS/Shadowcay(2,3,4,12,13,14) + Palios(11,9) + LHOLDINGS(19,20) + QUANTUMMIND(8)\n`;
+      context += `4. Overworld (OW): OW(15,16) + Reach(30) + Rough house(31) + Keystone(28)\n`;
+      context += `   - OW Net Assets excludes fixed assets (asset_fixed) and non-current assets (asset_non_current) to remove project capitalization\n`;
+      context += `   - OW Monthly Burn: $250,000\n\n`;
+
+      context += `=== OW CLOSING BALANCE LINE ITEMS ===\n`;
+      context += `Cash: All asset_cash accounts (100xxx + 10Wxxx)\n`;
+      context += `OR From Xterio: IC receivables from Xterio entities (303030, 303031, 303010, 303011, 303040, 303041, 303020, 303021)\n`;
+      context += `AR: 101000 Accounts Receivable\n`;
+      context += `NoteReceivable: 101010 Other Receivable\n`;
+      context += `Payables: 300030 Trade Payables\n`;
+      context += `Accrual exp: 301000 Accrued Expenses\n`;
+      context += `Thrackle Loan: 300040 Other Payables (non-trade)\n`;
+      context += `OWGroupClosing = sum of all above\n\n`;
+
+      context += `Companies: ${companies.map((c: any) => `${c.company_name}(${c.company_id})`).join(', ')}\n\n`;
 
       context += `Cash Balances by Company:\n`;
       const cashByCompany: Record<string, number> = {};
