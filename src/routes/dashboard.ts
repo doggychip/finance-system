@@ -144,7 +144,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const snap = db.prepare(
       requestedDate
         ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     if (!snap?.snapshot_date) {
@@ -518,7 +518,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const latestSnap = db.prepare(
       requestedDate
         ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     const snapDate = latestSnap?.snapshot_date;
@@ -738,7 +738,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const latestSnap = db.prepare(
       snapshotDate
         ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(snapshotDate ? [snapshotDate] : [])) as any;
 
     const useBalanceTable = !!latestSnap?.snapshot_date;
@@ -1195,7 +1195,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const latestSnap = db.prepare(
       requestedDate
         ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     if (!latestSnap?.snapshot_date) return res.json({ columns: [], sections: [], snapshot_date: null });
@@ -1539,7 +1539,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const snap = db.prepare(
       requestedDate
         ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     const priorSnap = db.prepare(
@@ -1760,6 +1760,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const snaps = db.prepare(`
       SELECT DISTINCT snapshot_date, COUNT(*) as account_count
       FROM account_balances
+      WHERE snapshot_date < '9999-01-01'
       GROUP BY snapshot_date
       ORDER BY snapshot_date DESC
     `).all();
@@ -1820,7 +1821,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const latestSnap = db.prepare(
       snapDate
         ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(snapDate ? [snapDate] : [])) as any;
 
     if (!latestSnap?.snapshot_date) return res.json({ error: 'No snapshots found' });
@@ -1887,7 +1888,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Find matching snapshot
     const snapQuery = requestedDate
       ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate) as any
-      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`).get() as any;
+      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get() as any;
     const currentSnap = snapQuery?.snapshot_date;
     if (!currentSnap) return res.json({});
 
@@ -2047,7 +2048,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     entityCash.sort((a, b) => b.cash - a.cash);
 
     // Cash trend from snapshots
-    const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
+    const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9999-01-01' ORDER BY snapshot_date`).all() as any[];
     const cashTrend = allSnaps.map((s: any) => {
       const row = db.prepare(`
         SELECT SUM(CASE WHEN company_id IN (${Array.from(nonOWGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as non_ow,
