@@ -17,7 +17,7 @@ function mapOdooState(state: string): 'draft' | 'posted' | 'void' {
   }
 }
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = 200;
 
 export async function syncJournalEntries(
   odoo: OdooClient,
@@ -177,6 +177,11 @@ export async function syncJournalEntries(
     result.total += odooEntries.length;
     offset += odooEntries.length;
     remaining -= odooEntries.length;
+
+    // Brief pause between batches to avoid Odoo connection drops
+    if (remaining > 0) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
 
   console.log(`[sync-journal] Done: ${result.created} created, ${result.updated} updated, ${result.errors.length} errors`);

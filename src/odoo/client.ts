@@ -11,7 +11,7 @@ interface XmlRpcClient {
   methodCall(method: string, params: unknown[], callback: (err: Error | null, result: unknown) => void): void;
 }
 
-const RPC_TIMEOUT_MS = 30000; // 30 seconds
+const RPC_TIMEOUT_MS = 120000; // 120 seconds
 
 function rpcCall(client: XmlRpcClient, method: string, params: unknown[]): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -30,8 +30,8 @@ function rpcCall(client: XmlRpcClient, method: string, params: unknown[]): Promi
 export class OdooClient {
   private config: OdooConfig;
   private uid: number | null = null;
-  private commonClient: XmlRpcClient;
-  private objectClient: XmlRpcClient;
+  private clientOptions: { host: string; port: number; rejectUnauthorized: boolean };
+  private createFn: typeof createClient;
 
   constructor(config: OdooConfig) {
     this.config = config;
@@ -39,27 +39,25 @@ export class OdooClient {
     const urlObj = new URL(config.url);
     const isSecure = urlObj.protocol === 'https:';
     const port = urlObj.port ? parseInt(urlObj.port) : (isSecure ? 443 : 80);
-    const createFn = isSecure ? createSecureClient : createClient;
+    this.createFn = (isSecure ? createSecureClient : createClient) as typeof createClient;
 
-    const clientOptions = {
+    this.clientOptions = {
       host: urlObj.hostname,
       port,
       rejectUnauthorized: true,
     };
+  }
 
-    this.commonClient = createFn({
-      ...clientOptions,
-      path: '/xmlrpc/2/common',
-    }) as unknown as XmlRpcClient;
-
-    this.objectClient = createFn({
-      ...clientOptions,
-      path: '/xmlrpc/2/object',
+  private makeClient(path: string): XmlRpcClient {
+    return this.createFn({
+      ...this.clientOptions,
+      path,
     }) as unknown as XmlRpcClient;
   }
 
   async authenticate(): Promise<number> {
-    const uid = await rpcCall(this.commonClient, 'authenticate', [
+    const client = this.makeClient('/xmlrpc/2/common');
+    const uid = await rpcCall(client, 'authenticate', [
       this.config.db,
       this.config.username,
       this.config.password,
@@ -79,7 +77,8 @@ export class OdooClient {
       await this.authenticate();
     }
 
-    return rpcCall(this.objectClient, 'execute_kw', [
+    const client = this.makeClient('/xmlrpc/2/object');
+    return rpcCall(client, 'execute_kw', [
       this.config.db,
       this.uid,
       this.config.password,
@@ -115,7 +114,8 @@ export class OdooClient {
   }
 
   async version(): Promise<Record<string, unknown>> {
-    return await rpcCall(this.commonClient, 'version', []) as Record<string, unknown>;
+    const client = this.makeClient('/xmlrpc/2/common');
+    return await rpcCall(client, 'version', []) as Record<string, unknown>;
   }
 
   getUid(): number | null {
