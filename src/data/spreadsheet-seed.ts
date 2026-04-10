@@ -192,18 +192,16 @@ const ENTITIES: Entity[] = [
 
 export function seedSpreadsheetBalances(db: Database.Database) {
   const snapshotDate = '2026-02-28';
+  const SEED_VERSION = 5; // Increment this to force re-seed
 
-  // Check if ALL data is present (check multiple entities)
-  const totalAccounts = db.prepare(
-    "SELECT COUNT(*) as c FROM account_balances WHERE snapshot_date = ?"
-  ).get(snapshotDate) as any;
-  const owIC = db.prepare(
-    "SELECT balance FROM account_balances WHERE snapshot_date = ? AND company_id = 15 AND account_code = '303010'"
-  ).get(snapshotDate) as any;
+  // Check seed version
+  const versionCheck = db.prepare(
+    "SELECT COUNT(*) as c FROM account_balances WHERE snapshot_date = '9999-01-01'"
+  ).get() as any;
+  const currentVersion = versionCheck?.c || 0;
 
-  // Need at least 140 accounts AND OW must have 303010
-  if (totalAccounts?.c >= 140 && owIC && Math.abs(owIC.balance - (-8870813)) < 1) {
-    console.log('[seed-bs] Spreadsheet balance data already correct (' + totalAccounts.c + ' accounts), skipping');
+  if (currentVersion >= SEED_VERSION) {
+    console.log('[seed-bs] Seed version ' + SEED_VERSION + ' already applied, skipping');
     return;
   }
 
@@ -332,4 +330,18 @@ export function seedSpreadsheetBalances(db: Database.Database) {
     console.log(`[seed-bs] Created ${historicalMonths.length} historical snapshots (${histCount} entries)`);
   });
   histTx();
+
+  // Store seed version marker
+  db.prepare("DELETE FROM account_balances WHERE snapshot_date = '9999-01-01'").run();
+  const versionInsert = db.prepare(`
+    INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, snapshot_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const vt = db.transaction(() => {
+    for (let i = 0; i < SEED_VERSION; i++) {
+      versionInsert.run(0, 'SEED_VERSION', 800000 + i, 'VERSION', 'Seed Version Marker', 'system', i, '9999-01-01');
+    }
+  });
+  vt();
+  console.log(`[seed-bs] Seed version ${SEED_VERSION} applied`);
 }
