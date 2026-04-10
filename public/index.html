@@ -404,9 +404,13 @@
       btn.disabled = true; btn.textContent = 'Syncing...';
       try {
         await fetch('/api/sync/accounts', { method: 'POST' });
-        await fetch('/api/sync/balances', { method: 'POST' });
+        var asOf = document.getElementById('asOfDate').value || new Date().toISOString().slice(0,10);
+        var r = await fetch('/api/sync/balances', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({as_of_date: asOf}) });
+        var result = await r.json();
+        if (result.error) { alert('Sync error: ' + result.error); }
+        else { alert('Synced: ' + (result.companies_synced||0) + ' companies, ' + (result.accounts_synced||0) + ' accounts for ' + asOf + (result.errors && result.errors.length ? '\nErrors: ' + result.errors.join(', ') : '')); }
         await refreshData();
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error(e); alert('Sync failed: ' + e.message); }
       btn.disabled = false; btn.textContent = 'Sync Odoo';
     }
 

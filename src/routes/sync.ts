@@ -118,12 +118,14 @@ export function syncRoutes(db: Database.Database): Router {
     }
   });
 
-  // Sync account balances using Odoo's current_balance (authoritative)
-  router.post('/balances', async (_req, res) => {
+  // Sync account balances — uses historical method for accurate per-company data
+  router.post('/balances', async (req, res) => {
     try {
       const odoo = createOdooClient();
       await odoo.authenticate();
-      const result = await syncBalances(odoo, db);
+      // Use as_of_date if provided, otherwise today
+      const asOfDate = req.body.as_of_date || new Date().toISOString().slice(0, 10);
+      const result = await syncHistoricalBalances(odoo, db, asOfDate);
       res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -142,6 +144,35 @@ export function syncRoutes(db: Database.Database): Router {
       await odoo.authenticate();
       const result = await syncHistoricalBalances(odoo, db, asOfDate);
       res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Re-sync ALL existing snapshots with the fixed per-company method
+  router.post('/balances/resync-all', async (req, res) => {
+    req.socket.setTimeout(600000); // 10 minutes
+    try {
+      const odoo = createOdooClient();
+      await odoo.authenticate();
+
+      // Get all existing snapshot dates
+      const snapshots = db.prepare(
+        'SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date'
+      ).all() as any[];
+
+      const results: any[] = [];
+      for (const snap of snapshots) {
+        console.log(`[resync-all] Re-syncing snapshot ${snap.snapshot_date}...`);
+        // Delete old data for this snapshot
+        db.prepare('DELETE FROM account_balances WHERE snapshot_date = ?').run(snap.snapshot_date);
+        // Re-sync with corrected method
+        const result = await syncHistoricalBalances(odoo, db, snap.snapshot_date);
+        results.push({ date: snap.snapshot_date, ...result });
+      }
+
+      res.json({ snapshots_resynced: results.length, results });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
