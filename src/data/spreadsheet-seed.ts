@@ -192,7 +192,7 @@ const ENTITIES: Entity[] = [
 
 export function seedSpreadsheetBalances(db: Database.Database) {
   const snapshotDate = '2026-02-28';
-  const SEED_VERSION = 5; // Increment this to force re-seed
+  const SEED_VERSION = 6; // Increment this to force re-seed
 
   // Check seed version
   const versionCheck = db.prepare(
@@ -286,13 +286,8 @@ export function seedSpreadsheetBalances(db: Database.Database) {
 
   console.log(`[seed-bs] Imported ${count} balance entries for ${snapshotDate}`);
 
-  // Create monthly snapshots for cash trend chart (2025-05 through 2026-01)
-  // Uses Feb 2026 data as baseline with Foundation cash varying by month
-  const historicalMonths = [
-    '2025-05-31', '2025-06-30', '2025-07-31', '2025-08-31',
-    '2025-09-30', '2025-10-31', '2025-11-30', '2025-12-31',
-    '2026-01-31',
-  ];
+  // Create quarterly historical snapshots for cash trend (lighter than monthly)
+  const historicalMonths = ['2025-06-30', '2025-09-30', '2025-12-31', '2026-01-31'];
 
   const existingHistorical = db.prepare(
     "SELECT COUNT(DISTINCT snapshot_date) as c FROM account_balances WHERE snapshot_date < ?"
@@ -309,9 +304,9 @@ export function seedSpreadsheetBalances(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  // Get all Feb 2026 rows as baseline
+  // Get only cash accounts for historical trend (not full BS — saves memory)
   const febRows = db.prepare(
-    "SELECT * FROM account_balances WHERE snapshot_date = ?"
+    "SELECT * FROM account_balances WHERE snapshot_date = ? AND account_type = 'asset_cash'"
   ).all(snapshotDate) as any[];
 
   const histTx = db.transaction(() => {
