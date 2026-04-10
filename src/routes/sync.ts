@@ -123,8 +123,9 @@ export function syncRoutes(db: Database.Database): Router {
     try {
       const odoo = createOdooClient();
       await odoo.authenticate();
-      // Use as_of_date if provided, otherwise today
       const asOfDate = req.body.as_of_date || new Date().toISOString().slice(0, 10);
+      // Delete old data for this date first to remove stale cross-company entries
+      db.prepare('DELETE FROM account_balances WHERE snapshot_date = ?').run(asOfDate);
       const result = await syncHistoricalBalances(odoo, db, asOfDate);
       res.json(result);
     } catch (err: unknown) {
