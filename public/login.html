@@ -30,7 +30,7 @@
     <button onclick="login()">Sign In</button>
     <div class="error" id="loginError"></div>
     <div style="margin-top:16px;font-size:13px;color:var(--text-dim)">
-      忘记密码？请联系管理员 (Ryan) 重置
+      Forgot password? Contact admin (Ryan) to reset
     </div>
   </div>
 
@@ -52,7 +52,7 @@
     async function login() {
       var username = document.getElementById('loginUser').value;
       var password = document.getElementById('loginPass').value;
-      if (!password) { document.getElementById('loginError').textContent = '请输入密码'; return; }
+      if (!password) { document.getElementById('loginError').textContent = 'Please enter password'; return; }
 
       var res = await fetch('/api/tasks/login', {
         method: 'POST',
@@ -61,7 +61,7 @@
       });
 
       if (!res.ok) {
-        document.getElementById('loginError').textContent = '密码错误';
+        document.getElementById('loginError').textContent = 'Incorrect password';
         return;
       }
 
