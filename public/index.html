@@ -434,9 +434,10 @@
         var overdrawnAccounts = b.overdrawn ? b.overdrawn.accounts || [] : [];
         var allAccounts = [].concat(cashAccounts, owAccounts, reachAccounts, overdrawnAccounts);
 
-        // Split into bank (100xxx) and crypto (10Wxxx)
+        // Split into bank (100xxx) and crypto (10Wxxx) — only asset_cash, exclude receivables
         var totalBank = 0, totalCrypto = 0;
         allAccounts.forEach(function(a) {
+          if (a.odoo_type && a.odoo_type !== 'asset_cash') return; // skip receivables
           if (a.code && a.code.startsWith('10W')) totalCrypto += a.balance;
           else totalBank += a.balance;
         });
