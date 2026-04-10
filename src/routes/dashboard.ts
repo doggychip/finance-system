@@ -1621,6 +1621,74 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+  // Debug: raw account_balances breakdown per entity group
+  router.get('/debug-balances', (req, res) => {
+    const entityName = req.query.entity as string;
+    const snapDate = (req.query.as_of_date as string) || '';
+
+    const latestSnap = db.prepare(
+      snapDate
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(...(snapDate ? [snapDate] : [])) as any;
+
+    if (!latestSnap?.snapshot_date) return res.json({ error: 'No snapshots found' });
+
+    const group = ENTITY_GROUPS.find(g => g.name === entityName);
+    if (!group || group.company_ids.length === 0) return res.json({ error: 'Entity not found', available: ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).map(g => g.name) });
+
+    const placeholders = group.company_ids.map(() => '?').join(',');
+
+    // Raw balances by account_type
+    const byType = db.prepare(`
+      SELECT account_type, SUM(balance) as balance, COUNT(*) as account_count
+      FROM account_balances
+      WHERE company_id IN (${placeholders}) AND snapshot_date = ?
+      GROUP BY account_type
+      ORDER BY account_type
+    `).all(...group.company_ids, latestSnap.snapshot_date) as any[];
+
+    // Per-company breakdown
+    const perCompany = db.prepare(`
+      SELECT company_id, company_name, account_type, SUM(balance) as balance
+      FROM account_balances
+      WHERE company_id IN (${placeholders}) AND snapshot_date = ?
+      GROUP BY company_id, company_name, account_type
+      ORDER BY company_id, account_type
+    `).all(...group.company_ids, latestSnap.snapshot_date) as any[];
+
+    // Compute BS totals
+    const typeMap: Record<string, number> = {};
+    for (const r of byType) typeMap[r.account_type] = r.balance;
+
+    const assets = (typeMap['asset_cash'] || 0) + (typeMap['asset_receivable'] || 0) + (typeMap['asset_current'] || 0) + (typeMap['asset_prepayments'] || 0) + (typeMap['asset_fixed'] || 0) + (typeMap['asset_non_current'] || 0);
+    const liabilities = (typeMap['liability_current'] || 0) + (typeMap['liability_credit_card'] || 0) + (typeMap['liability_payable'] || 0) + (typeMap['liability_non_current'] || 0);
+    const equityAccounts = typeMap['equity'] || 0;
+    const equityUnaffected = typeMap['equity_unaffected'] || 0;
+    const income = (typeMap['income'] || 0) + (typeMap['income_other'] || 0);
+    const expenses = (typeMap['expense'] || 0) + (typeMap['expense_direct_cost'] || 0) + (typeMap['expense_depreciation'] || 0);
+    const equityTotal = equityAccounts + equityUnaffected + income + expenses;
+    const check = assets + liabilities + equityTotal;
+
+    res.json({
+      entity: entityName,
+      company_ids: group.company_ids,
+      snapshot_date: latestSnap.snapshot_date,
+      by_type: byType,
+      per_company: perCompany,
+      summary: {
+        assets,
+        liabilities,
+        equity_accounts: equityAccounts,
+        equity_unaffected: equityUnaffected,
+        income,
+        expenses,
+        equity_total: equityTotal,
+        check_should_be_zero: check,
+      },
+    });
+  });
+
   // Executive summary for CEO dashboard
   router.get('/executive-summary', (req, res) => {
     const requestedDate = (req.query.as_of_date as string) || '';
