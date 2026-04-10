@@ -45,7 +45,7 @@
   sidebar.id = 'chat-sidebar';
   sidebar.innerHTML = `
     <div id="chat-sidebar-header">
-      <h3>AI Finance Assistant</h3>
+      <h3>Claude Finance Assistant</h3>
       <button onclick="toggleChat()">&times;</button>
     </div>
     <div id="chat-messages">
