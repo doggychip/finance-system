@@ -54,28 +54,50 @@ export async function syncBalances(
     try {
       console.log(`[sync-balances] Fetching balances for ${company.name} (${company.id})...`);
 
-      // Use Odoo's current_balance with company context
+      // Step 1: Get account metadata (code, name, type)
       const accts = await odoo.execute('account.account', 'search_read',
         [[['company_ids', 'in', [company.id]]]],
         {
-          fields: ['id', 'code', 'name', 'current_balance', 'account_type'],
+          fields: ['id', 'code', 'name', 'account_type'],
           context: { 'allowed_company_ids': [company.id] },
           limit: 2000,
         }
       ) as any[];
 
+      const acctMap: Record<number, { code: string; name: string; type: string }> = {};
+      for (const a of accts) {
+        acctMap[a.id] = { code: a.code || '', name: a.name || '', type: a.account_type || '' };
+      }
+
+      // Step 2: Get balances from account.move.line with explicit company_id filter
+      // This avoids the cross-company leaking issue with current_balance
+      const balanceRows = await odoo.execute('account.move.line', 'read_group',
+        [[
+          ['company_id', '=', company.id],
+          ['parent_state', '=', 'posted'],
+        ]],
+        {
+          fields: ['account_id', 'balance'],
+          groupby: ['account_id'],
+          lazy: false,
+        }
+      ) as any[];
+
       const tx = db.transaction(() => {
-        for (const a of accts) {
-          if (Math.abs(a.current_balance) < 0.01) continue;
-          const code = a.code || '';
-          const name = a.name || '';
-          const accountType = a.account_type || '';
-          if (!code) continue;
+        for (const row of balanceRows) {
+          const balance = row.balance || 0;
+          if (Math.abs(balance) < 0.01) continue;
+
+          const accountId = row.account_id?.[0];
+          if (!accountId) continue;
+
+          const acct = acctMap[accountId];
+          if (!acct || !acct.code) continue;
 
           upsert.run(
             company.id, company.name,
-            a.id, code, name, accountType,
-            a.current_balance, snapshotDate
+            accountId, acct.code, acct.name, acct.type,
+            balance, snapshotDate
           );
           result.accounts_synced++;
         }
