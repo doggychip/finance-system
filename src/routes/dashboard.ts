@@ -1189,6 +1189,88 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
 
+  // ====== IC Detail - Related Party Balances per Entity Group ======
+  router.get('/ic-detail', (req, res) => {
+    const requestedDate = (req.query.as_of_date as string) || '';
+    const latestSnap = db.prepare(
+      requestedDate
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+
+    if (!latestSnap?.snapshot_date) return res.json({ columns: [], rows: [], snapshot_date: null });
+    const snapDate = latestSnap.snapshot_date;
+
+    // Company to group mapping
+    const companyToGroup: Record<number, string> = {};
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal || g.is_manual) continue;
+      for (const cid of g.company_ids) companyToGroup[cid] = g.name;
+    }
+
+    // Get all 303xxx accounts with balances
+    const rows = db.prepare(`
+      SELECT company_id, account_code, account_name, SUM(balance) as balance
+      FROM account_balances
+      WHERE snapshot_date = ? AND account_code LIKE '303%'
+      GROUP BY company_id, account_code, account_name
+      ORDER BY account_code
+    `).all(snapDate) as any[];
+
+    // Collect unique account codes
+    const accountCodes = new Map<string, string>();
+    for (const r of rows) {
+      if (!accountCodes.has(r.account_code)) {
+        accountCodes.set(r.account_code, r.account_name);
+      }
+    }
+
+    // Build per-group balances for each account code
+    const groupBalances: Record<string, Record<string, number>> = {};
+    for (const r of rows) {
+      const group = companyToGroup[r.company_id];
+      if (!group) continue;
+      if (!groupBalances[group]) groupBalances[group] = {};
+      groupBalances[group][r.account_code] = (groupBalances[group][r.account_code] || 0) + r.balance;
+    }
+
+    // Compute subtotals
+    for (const g of ENTITY_GROUPS) {
+      if (!g.is_subtotal || !g.subtotal_groups) continue;
+      groupBalances[g.name] = {};
+      for (const [code] of accountCodes) {
+        groupBalances[g.name][code] = g.subtotal_groups.reduce((sum, gname) => {
+          return sum + (groupBalances[gname]?.[code] || 0);
+        }, 0);
+      }
+    }
+
+    // Build columns (entity groups)
+    const columns = ENTITY_GROUPS.map(g => ({
+      name: g.name,
+      is_subtotal: g.is_subtotal || false,
+    }));
+
+    // Build rows (one per account code + subtotal row)
+    const dataRows = Array.from(accountCodes.entries()).map(([code, name]) => ({
+      code,
+      name,
+      values: ENTITY_GROUPS.map(g => groupBalances[g.name]?.[code] || 0),
+    }));
+
+    // Add total row
+    const totalRow = {
+      code: 'TOTAL_IC',
+      name: 'Total Current Liabilities - Related',
+      values: ENTITY_GROUPS.map(g => {
+        const gb = groupBalances[g.name] || {};
+        return Object.values(gb).reduce((s: number, v: any) => s + (v || 0), 0);
+      }),
+    };
+
+    res.json({ columns, rows: dataRows, total: totalRow, snapshot_date: snapDate });
+  });
+
   // ====== Cash Position Report ======
   // Entity group cash composition over time (monthly snapshots)
   router.get('/cash-position', (req, res) => {
