@@ -157,7 +157,7 @@
 
     <!-- Charts -->
     <div class="card fullwidth">
-      <div class="card-header"><h2 id="balanceChartTitle">Cash Balance — Monthly</h2></div>
+      <div class="card-header"><h2 id="balanceChartTitle">Cumulative Net Cash Flow — Monthly</h2></div>
       <div class="chart-container"><canvas id="balanceTimeChart"></canvas></div>
     </div>
     <div class="grid-2">
@@ -165,7 +165,7 @@
         <div class="card-header"><h2 id="flowChartTitle">Inflows vs Outflows — Monthly</h2></div>
         <div class="chart-container"><canvas id="flowChart"></canvas></div>
       </div>
-      <div class="card"><h2>Cash Distribution</h2><div class="chart-container"><canvas id="distributionChart"></canvas></div></div>
+      <div class="card"><h2>Bank Account Distribution (Fiat)</h2><div class="chart-container"><canvas id="distributionChart"></canvas></div></div>
     </div>
     <div class="card fullwidth">
       <div class="card-header"><h2 id="accountHistoryTitle">Per-Account Balance — Monthly</h2></div>
@@ -281,18 +281,27 @@
         return { Code: a.code, Name: a.name, Company: a.company_name, Balance: a.balance };
       });
 
+      // Set date picker to reflect loaded snapshot date
+      if (data.snapshot_date && !document.getElementById('cashAsOfDate').value) {
+        document.getElementById('cashAsOfDate').value = data.snapshot_date;
+      }
+
       var heroEl = document.getElementById('heroTotal');
       heroEl.textContent = fmt(grandTotal);
       heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
-      document.getElementById('heroSub').textContent =
-        'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
-        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0) +
-        ' | ' + (data.snapshot_date || '');
+      var overdrawnTotal = data.overdrawn?.total || 0;
+      var breakdownParts = 'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
+        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0);
+      if (overdrawnTotal < -0.5) breakdownParts += ' | Overdrawn: ' + fmtShort(overdrawnTotal);
+      breakdownParts += ' | ' + (data.snapshot_date || '');
+      document.getElementById('heroSub').textContent = breakdownParts;
 
-      var positiveCount = cashCurrentAccs.length + cashFixedAccs.length + cryptoHotAccs.length + cryptoColdAccs.length + cryptoDefiAccs.length + cryptoOtherAccs.length;
-      document.getElementById('statCount').textContent = fmtNum(positiveCount);
+      var totalAccountCount = allAccs.length;
+      var positiveCount = allAccs.filter(function(a) { return a.balance > 0; }).length;
+      var negativeCount = allAccs.filter(function(a) { return a.balance < 0; }).length;
+      document.getElementById('statCount').textContent = fmtNum(totalAccountCount);
       document.getElementById('statPositive').textContent = fmtNum(positiveCount);
-      document.getElementById('statNegative').textContent = fmtNum(overAccs.length);
+      document.getElementById('statNegative').textContent = fmtNum(negativeCount);
       var posAccs = allAccs.filter(function(a) { return a.balance > 0; });
       if (posAccs.length > 0) {
         var largest = posAccs.reduce(function(a, b) { return Math.abs(a.balance) > Math.abs(b.balance) ? a : b; });
@@ -320,18 +329,30 @@
       var sorted = accounts.slice().sort(function(a,b){ return Math.abs(b.balance) - Math.abs(a.balance); });
       listEl.innerHTML = sorted.map(function(a) {
         var balColor = a.balance >= 0 ? 'var(--green)' : 'var(--red)';
-        return '<div class="box-item"><div class="item-code">' + a.code + '</div><div class="item-name">' + (a.name.length > 35 ? a.name.slice(0,35) + '...' : a.name) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
+        var cleanName = a.name.replace(/\s+/g, ' ').trim();
+        return '<div class="box-item"><div class="item-code">' + a.code + '</div><div class="item-name">' + (cleanName.length > 35 ? cleanName.slice(0,35) + '...' : cleanName) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
       }).join('');
     }
 
     function renderDistribution(accounts) {
-      var top = accounts.filter(function(a) { return a.balance > 0; }).slice(0, 10);
+      var positive = accounts.filter(function(a) { return a.balance > 0; });
       var ctx = document.getElementById('distributionChart').getContext('2d');
       if (charts.dist) charts.dist.destroy();
-      if (top.length === 0) return;
+      if (positive.length === 0) return;
+      var top = positive.slice(0, 10);
+      var labels = top.map(function(a) { var n = a.name.replace(/\s+/g, ' ').trim(); return n.length > 25 ? n.slice(0,25) + '...' : n; });
+      var values = top.map(function(a) { return a.balance; });
+      var colors = top.map(function(_,i) { return palette[i % palette.length]; });
+      // Add "Others" slice for remaining accounts
+      if (positive.length > 10) {
+        var othersTotal = positive.slice(10).reduce(function(s, a) { return s + a.balance; }, 0);
+        labels.push('Others (' + (positive.length - 10) + ')');
+        values.push(othersTotal);
+        colors.push('#475569');
+      }
       charts.dist = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels: top.map(function(a) { return a.name.length > 25 ? a.name.slice(0,25) + '...' : a.name; }), datasets: [{ data: top.map(function(a) { return a.balance; }), backgroundColor: top.map(function(_,i) { return palette[i % palette.length]; }), borderWidth: 0 }] },
+        data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { color: '#8b8fa3', padding: 10, font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': ' + fmt(ctx.parsed); } } } } }
       });
     }
@@ -339,7 +360,7 @@
     async function loadTimeCharts() {
       var limit = periodLimit(currentPeriod);
       var label = periodLabel(currentPeriod);
-      document.getElementById('balanceChartTitle').textContent = 'Cash Balance — ' + label;
+      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow — ' + label;
       document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows — ' + label;
       document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance — ' + label;
 
@@ -479,7 +500,7 @@
               });
             }
           } else if (item.type === 'manual') {
-            html += posRow(item.label, item.value, item.value, 'company-row');
+            html += posRow(item.label + ' (manual)', item.value, item.value, 'subtotal-row');
             grandCur += item.value; grandPrior += item.value;
           } else if (item.type === 'subtotal') {
             var cur = item.manualAdd || 0, pr = item.manualAdd || 0;

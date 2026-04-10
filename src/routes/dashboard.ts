@@ -250,7 +250,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         break;
     }
 
-    const cashFilter = `(a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')`;
+    const cashFilter = `(a.odoo_type = 'asset_cash')`;
 
     const rows = db.prepare(`
       SELECT
@@ -296,7 +296,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       case 'monthly': default: groupExpr = "strftime('%Y-%m', je.date)"; break;
     }
 
-    const cashFilter = `(a.odoo_type IN ('asset_cash', 'asset_current') OR a.odoo_type LIKE '%cash%' OR a.odoo_type LIKE '%bank%')`;
+    const cashFilter = `(a.odoo_type = 'asset_cash')`;
 
     const rows = db.prepare(`
       SELECT

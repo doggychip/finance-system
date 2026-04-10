@@ -38,7 +38,7 @@
     div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:8px;';
     var adminLink = user.role === 'admin' ? '<a href="/admin.html" style="padding:4px 10px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#8b8fa3;font-size:11px;cursor:pointer;text-decoration:none">Admin</a>' : '';
     div.innerHTML = '<span style="font-size:12px;color:#8b8fa3">' + user.display_name + '</span>' +
-      '<button onclick="openPasswordModal()" style="padding:4px 10px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#8b8fa3;font-size:11px;cursor:pointer">修改密码</button>' +
+      '<button onclick="openPasswordModal()" style="padding:4px 10px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#8b8fa3;font-size:11px;cursor:pointer">Change Password</button>' +
       adminLink +
       '<button onclick="logout()" style="padding:4px 10px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#8b8fa3;font-size:11px;cursor:pointer">Logout</button>';
     header.appendChild(div);
@@ -50,7 +50,7 @@
       modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;';
       modal.innerHTML =
         '<div style="background:#1a1d27;border:1px solid #2e3344;border-radius:12px;padding:24px;width:400px;max-width:90vw">' +
-          '<h2 style="font-size:16px;margin-bottom:16px;color:#e4e6ef">修改密码</h2>' +
+          '<h2 style="font-size:16px;margin-bottom:16px;color:#e4e6ef">Change Password</h2>' +
           '<div id="pwMsg" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px"></div>' +
           '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">Current Password</label>' +
           '<input type="password" id="pwCurrent" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:12px">' +
