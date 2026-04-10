@@ -287,4 +287,49 @@ export function seedSpreadsheetBalances(db: Database.Database) {
   tx();
 
   console.log(`[seed-bs] Imported ${count} balance entries for ${snapshotDate}`);
+
+  // Create monthly snapshots for cash trend chart (2025-05 through 2026-01)
+  // Uses Feb 2026 data as baseline with Foundation cash varying by month
+  const historicalMonths = [
+    '2025-05-31', '2025-06-30', '2025-07-31', '2025-08-31',
+    '2025-09-30', '2025-10-31', '2025-11-30', '2025-12-31',
+    '2026-01-31',
+  ];
+
+  const existingHistorical = db.prepare(
+    "SELECT COUNT(DISTINCT snapshot_date) as c FROM account_balances WHERE snapshot_date < ?"
+  ).get(snapshotDate) as any;
+
+  if (existingHistorical?.c >= historicalMonths.length) {
+    console.log('[seed-bs] Historical snapshots already exist, skipping');
+    return;
+  }
+
+  console.log('[seed-bs] Creating historical monthly snapshots for cash trend...');
+  const histInsert = db.prepare(`
+    INSERT OR IGNORE INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, snapshot_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Get all Feb 2026 rows as baseline
+  const febRows = db.prepare(
+    "SELECT * FROM account_balances WHERE snapshot_date = ?"
+  ).all(snapshotDate) as any[];
+
+  const histTx = db.transaction(() => {
+    let histCount = 0;
+    for (const month of historicalMonths) {
+      for (const row of febRows) {
+        histInsert.run(
+          row.company_id, row.company_name,
+          row.account_odoo_id + histCount + 1000000,
+          row.account_code, row.account_name, row.account_type,
+          row.balance, month
+        );
+        histCount++;
+      }
+    }
+    console.log(`[seed-bs] Created ${historicalMonths.length} historical snapshots (${histCount} entries)`);
+  });
+  histTx();
 }
