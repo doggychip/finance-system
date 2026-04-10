@@ -50,7 +50,7 @@ export async function syncHistoricalBalances(
     try {
       console.log(`[sync-hist] Fetching ${company.name} (${company.id}) as of ${asOfDate}...`);
 
-      // Use read_group to get grouped balances by account
+      // Use read_group with debit/credit (more reliable than balance in Odoo 18)
       const grouped = await odoo.execute('account.move.line', 'read_group',
         [[
           ['company_id', '=', company.id],
@@ -58,14 +58,16 @@ export async function syncHistoricalBalances(
           ['date', '<=', asOfDate],
         ]],
         {
-          fields: ['account_id', 'balance'],
+          fields: ['account_id', 'debit', 'credit'],
           groupby: ['account_id'],
           lazy: false,
         }
       ) as any[];
 
       // We also need account_type — fetch account details for accounts with balances
-      const accountIds = grouped.filter(g => Math.abs(g.balance) > 0.01).map(g => g.account_id[0]);
+      const accountIds = grouped
+        .filter(g => Math.abs((g.debit || 0) - (g.credit || 0)) > 0.01)
+        .map(g => g.account_id[0]);
 
       let accountDetails: Record<number, { code: string; name: string; account_type: string }> = {};
       if (accountIds.length > 0) {
@@ -82,7 +84,8 @@ export async function syncHistoricalBalances(
 
       const tx = db.transaction(() => {
         for (const g of grouped) {
-          if (Math.abs(g.balance) < 0.01) continue;
+          const balance = (g.debit || 0) - (g.credit || 0);
+          if (Math.abs(balance) < 0.01) continue;
           const acctId = g.account_id[0];
           const detail = accountDetails[acctId];
           if (!detail || !detail.code) continue;
@@ -90,7 +93,7 @@ export async function syncHistoricalBalances(
           upsert.run(
             company.id, company.name,
             acctId, detail.code, detail.name, detail.account_type,
-            g.balance, asOfDate
+            balance, asOfDate
           );
           result.accounts_synced++;
         }
