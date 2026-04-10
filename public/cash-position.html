@@ -64,34 +64,36 @@
     <div id="content"><div class="loading">Loading...</div></div>
   </div>
   <script>
-    // Entity group layout with individual companies
-    var LAYOUT = [
-      { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
-      { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
-      { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs', companies: ['XLABS', 'XLABS W3'] },
-      { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK', companies: ['PRIVILEGE HK'] },
-      { type: 'manual', label: 'Xterio Foundation', value: 5933488 },
-      { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], manualAdd: 5933488 },
-
-      { type: 'parent', name: 'Gamephilos' },
-      { type: 'entity', key: 'AOD', label: 'AOD', companies: ['GAMEPHILOS', 'GAMEPHILOS W3', 'MAOFAN', 'DIFANHA'] },
-
-      { type: 'parent', name: 'CS' },
-      { type: 'entity', key: 'CS', label: 'CS', companies: ['SHADOWCAY', 'SHADOWCAY W3', 'CHAOYING', 'DIREWOLF', 'COS GAMES', 'COS GAMES W3'] },
-
-      { type: 'parent', name: 'Palios' },
-      { type: 'entity', key: 'Palios', label: 'Palios', companies: ['PALIO W3', 'BJ TUDONG'] },
-      { type: 'entity', key: 'QUANTUMMIND', label: 'Quantummind', companies: ['QUANTUMMIND SOLUTIONS HK'] },
-
-      { type: 'parent', name: 'Holdings' },
-      { type: 'entity', key: 'LHOLDINGS', label: 'Holdings', companies: ['LHOLDINGS', 'LHOLDINGS W3'] },
-
-      { type: 'parent', name: 'Overworld Inc' },
-      { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
-      { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
-      { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
-      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'] },
-    ];
+    // Entity group layout - Foundation cash fetched from API
+    var FOUNDATION_CASH = 5942149; // fallback
+    function buildLayout(fc) {
+      return [
+        { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
+        { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
+        { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs', companies: ['XLABS', 'XLABS W3'] },
+        { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK', companies: ['PRIVILEGE HK'] },
+        { type: 'manual', label: 'Xterio Foundation', value: fc },
+        { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], manualAdd: fc },
+        { type: 'parent', name: 'Gamephilos' },
+        { type: 'entity', key: 'AOD', label: 'AOD', companies: ['GAMEPHILOS', 'GAMEPHILOS W3', 'MAOFAN', 'DIFANHA'] },
+        { type: 'parent', name: 'CS' },
+        { type: 'entity', key: 'CS', label: 'CS', companies: ['SHADOWCAY', 'SHADOWCAY W3', 'CHAOYING', 'DIREWOLF', 'COS GAMES', 'COS GAMES W3'] },
+        { type: 'parent', name: 'Palios' },
+        { type: 'entity', key: 'Palios', label: 'Palios', companies: ['PALIO W3', 'BJ TUDONG'] },
+        { type: 'entity', key: 'QUANTUMMIND', label: 'Quantummind', companies: ['QUANTUMMIND SOLUTIONS HK'] },
+        { type: 'parent', name: 'Holdings' },
+        { type: 'entity', key: 'LHOLDINGS', label: 'Holdings', companies: ['LHOLDINGS', 'LHOLDINGS W3'] },
+        { type: 'parent', name: 'Overworld Inc' },
+        { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
+        { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
+        { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
+        { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'] },
+      ];
+    }
+    var LAYOUT = buildLayout(FOUNDATION_CASH);
+    fetch('/api/dashboard/entity-groups').then(function(r) { return r.json(); }).then(function(data) {
+      if (data.foundation_cash) { FOUNDATION_CASH = data.foundation_cash; LAYOUT = buildLayout(FOUNDATION_CASH); }
+    }).catch(function() {});
 
     function fmt(n) {
       if (n == null || isNaN(n)) return '-';

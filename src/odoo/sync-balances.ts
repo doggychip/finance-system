@@ -1,11 +1,13 @@
 import Database from 'better-sqlite3';
 import { OdooClient } from './client';
+import { ENTITY_GROUPS } from '../config/entity-groups';
 
 export interface BalanceSyncResult {
   companies_synced: number;
   accounts_synced: number;
   snapshot_date: string;
   errors: string[];
+  warnings: string[];
 }
 
 // All company IDs and names
@@ -35,6 +37,7 @@ export async function syncBalances(
     accounts_synced: 0,
     snapshot_date: snapshotDate,
     errors: [],
+    warnings: [],
   };
 
   const upsert = db.prepare(`
@@ -86,5 +89,36 @@ export async function syncBalances(
   }
 
   console.log(`[sync-balances] Done: ${result.companies_synced} companies, ${result.accounts_synced} accounts`);
+
+  // Post-sync validation: check ASSETS + LIABILITIES + EQUITY = 0 per entity group
+  const assetTypes = ['asset_cash', 'asset_receivable', 'asset_current', 'asset_prepayments', 'asset_fixed', 'asset_non_current'];
+  const liabilityTypes = ['liability_current', 'liability_credit_card', 'liability_payable', 'liability_non_current'];
+  const equityTypes = ['equity', 'equity_unaffected', 'income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation'];
+
+  for (const group of ENTITY_GROUPS) {
+    if (group.is_subtotal || group.is_manual || group.company_ids.length === 0) continue;
+    const placeholders = group.company_ids.map(() => '?').join(',');
+    const row = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN account_type IN (${assetTypes.map(() => '?').join(',')}) THEN balance ELSE 0 END), 0) as assets,
+        COALESCE(SUM(CASE WHEN account_type IN (${liabilityTypes.map(() => '?').join(',')}) THEN balance ELSE 0 END), 0) as liabilities,
+        COALESCE(SUM(CASE WHEN account_type IN (${equityTypes.map(() => '?').join(',')}) THEN balance ELSE 0 END), 0) as equity
+      FROM account_balances
+      WHERE company_id IN (${placeholders}) AND snapshot_date = ?
+    `).get(...assetTypes, ...liabilityTypes, ...equityTypes, ...group.company_ids, snapshotDate) as any;
+
+    if (!row) continue;
+    const check = row.assets + row.liabilities + row.equity;
+    if (Math.abs(check) > 1) {
+      const msg = `${group.name}: balance sheet does not balance (A+L+E = ${check.toFixed(2)}, assets=${row.assets.toFixed(0)}, liab=${row.liabilities.toFixed(0)}, equity=${row.equity.toFixed(0)})`;
+      console.warn(`[sync-balances] WARNING: ${msg}`);
+      result.warnings.push(msg);
+    }
+  }
+
+  if (result.warnings.length > 0) {
+    console.warn(`[sync-balances] ${result.warnings.length} entity group(s) have unbalanced balance sheets`);
+  }
+
   return result;
 }

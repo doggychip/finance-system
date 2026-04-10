@@ -5,6 +5,17 @@ import { ENTITY_GROUPS, BS_LINES, EntityGroup, BSLineItem } from '../config/enti
 export function dashboardRoutes(db: Database.Database): Router {
   const router = Router();
 
+  // Dynamic lookup for Foundation cash from manual_balances (with hardcoded fallback)
+  function getFoundationCash(): number {
+    const row = db.prepare(`
+      SELECT SUM(amount_usd) as total FROM manual_balances
+      WHERE entity = 'Xterio Foundation' AND period = (
+        SELECT MAX(period) FROM manual_balances WHERE entity = 'Xterio Foundation'
+      )
+    `).get() as any;
+    return row?.total ? Math.round(row.total) : 5942149;
+  }
+
   // Overview stats
   router.get('/stats', (_req, res) => {
     const accountCount = (db.prepare('SELECT COUNT(*) as count FROM accounts WHERE is_active = 1').get() as any).count;
@@ -179,7 +190,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Non-OW Total "Cash" = bank accounts only (100xxx codes) + Xterio Foundation
     // This excludes Digital Token (10Wxxx) — matches the "Cash" sub-line in consolidated BS
     const nonOWBankCash = nonOWRows.filter((r: any) => r.code.startsWith('100')).reduce((s: number, r: any) => s + r.balance, 0);
-    const xterioFoundationCash = 5942149;
+    const xterioFoundationCash = getFoundationCash();
     const nonOWCash = nonOWBankCash + xterioFoundationCash;
 
     // Split cash into bank (100xxx) vs crypto (10Wxxx) sub-categories
@@ -749,14 +760,17 @@ export function dashboardRoutes(db: Database.Database): Router {
 
         // Handle manual entities (e.g. Xterio Foundation)
         if (group.is_manual) {
-          // Xterio Foundation — hardcoded from spreadsheet (as at 28.02.2026)
+          // Xterio Foundation — cash from manual_balances, liabilities/equity hardcoded
           // Sign convention: Odoo debit-credit (assets positive, liabilities/equity negative)
           // ASSETS + LIABILITIES + EQUITY must equal 0
+          const foundationCash = getFoundationCash();
+          const foundationLiab = -1369636; // IC balances (303xxx)
+          const foundationEquity = -(foundationCash + foundationLiab); // derived to balance
           const balances: Record<string, number> = {
-            'ASSETS': 5942149,
-            'CURRENT_ASSETS': 5942149,
-            'BANK_CASH': 5942149,
-            'CASH': 5942149,
+            'ASSETS': foundationCash,
+            'CURRENT_ASSETS': foundationCash,
+            'BANK_CASH': foundationCash,
+            'CASH': foundationCash,
             'DIGITAL_TOKEN': 0,
             'RECEIVABLES': 0,
             'A_107010': 0, 'A_101000': 0, 'A_101010': 0,
@@ -765,7 +779,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             'FIXED_ASSETS': 0,
             'NON_CURRENT_ASSETS': 0,
             'A_200000': 0, 'A_202000': 0,
-            'LIABILITIES': -1369636,
+            'LIABILITIES': foundationLiab,
             'CURRENT_LIABILITIES': -165000,
             'A_303010': 0, 'A_303011': 0, 'A_303040': 0, 'A_303041': 0,
             'A_303050': 0, 'A_303100': 0, 'A_303031': -165000,
@@ -773,10 +787,10 @@ export function dashboardRoutes(db: Database.Database): Router {
             'PAYABLES': 0, 'A_300030': 0,
             'NON_CURRENT_LIABILITIES': -1204636,
             'A_300040': 0, 'A_300050': 0, 'A_303030': -1204636,
-            'EQUITY': -4572513,
-            'EQUITY_RETAINED': -4563852, // Share Capitals (-38,452,916) + Retained Earnings (+33,889,064)
-            'CURRENT_YEAR_PL': -8661, // Current Year P&L only
-            'LIAB_EQUITY': -5942149,
+            'EQUITY': foundationEquity,
+            'EQUITY_RETAINED': foundationEquity + 8661, // Equity minus current year P&L
+            'CURRENT_YEAR_PL': -8661,
+            'LIAB_EQUITY': -foundationCash,
           };
           // Zero out any BS line not explicitly set
           for (const line of BS_LINES) {
@@ -1561,6 +1575,52 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(snaps);
   });
 
+  // Entity groups configuration — single source of truth for frontends
+  router.get('/entity-groups', (_req, res) => {
+    // Build the cash-position layout from ENTITY_GROUPS
+    const xterioGroups = ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'];
+    const holdingsGroups = ['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
+    const owGroups = ['OW', 'Reach', 'Rough house'];
+
+    // Company name mapping from entity groups
+    const companyNames: Record<string, string[]> = {};
+    const companyIds: Record<string, number[]> = {};
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal || g.is_manual) continue;
+      companyIds[g.name] = g.company_ids;
+    }
+
+    // Lookup company names from account_balances (or use defaults)
+    const companyRows = db.prepare(`
+      SELECT DISTINCT company_id, company_name FROM account_balances ORDER BY company_name
+    `).all() as any[];
+    const idToName: Record<number, string> = {};
+    for (const r of companyRows) idToName[r.company_id] = r.company_name;
+
+    for (const g of ENTITY_GROUPS) {
+      if (g.is_subtotal || g.is_manual) continue;
+      companyNames[g.name] = g.company_ids.map(id => idToName[id] || `Company ${id}`);
+    }
+
+    // Get Foundation cash from manual_balances
+    const foundationRow = db.prepare(`
+      SELECT SUM(amount_usd) as total FROM manual_balances
+      WHERE entity = 'Xterio Foundation' AND period = (
+        SELECT MAX(period) FROM manual_balances WHERE entity = 'Xterio Foundation'
+      )
+    `).get() as any;
+    const foundationCash = foundationRow?.total || 5942149; // fallback to hardcoded
+
+    res.json({
+      groups: ENTITY_GROUPS,
+      company_names: companyNames,
+      xterio_groups: xterioGroups,
+      holdings_groups: holdingsGroups,
+      ow_groups: owGroups,
+      foundation_cash: Math.round(foundationCash),
+    });
+  });
+
   // Executive summary for CEO dashboard
   router.get('/executive-summary', (req, res) => {
     const requestedDate = (req.query.as_of_date as string) || '';
@@ -1587,7 +1647,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const holdingsGroups = new Set(['AOD', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
     const owGroups = new Set(['OW', 'Reach', 'Rough house']);
-    const xterioFoundationCash = 5942149;
+    const xterioFoundationCash = getFoundationCash();
 
     // Current cash by entity group (ALL asset_cash for chart)
     const cashRows = db.prepare(`
