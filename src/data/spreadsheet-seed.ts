@@ -161,7 +161,8 @@ export function seedSpreadsheetBalances(db: Database.Database) {
   }
 
   console.log('[seed-bs] Importing verified spreadsheet balances for ' + snapshotDate + '...');
-  db.prepare('DELETE FROM account_balances WHERE snapshot_date = ?').run(snapshotDate);
+  // Delete ALL snapshots to prevent stale Odoo sync data from showing
+  db.prepare('DELETE FROM account_balances').run();
 
   const insert = db.prepare(`
     INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, snapshot_date)
