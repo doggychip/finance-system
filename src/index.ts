@@ -15,6 +15,7 @@ import { alertsTasksRoutes } from './routes/alerts-tasks';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
 import { seedXterioFoundation } from './data/xterio-seed';
 import { seedMeetingTasks } from './data/meeting-tasks-seed';
+import { seedSpreadsheetBalances } from './data/spreadsheet-seed';
 
 const app = express();
 
@@ -57,6 +58,7 @@ const dbPath = process.env.DB_PATH || 'finance.db';
 const db = initDb(dbPath);
 seedXterioFoundation(db);
 seedMeetingTasks(db);
+seedSpreadsheetBalances(db);
 
 app.use('/api/accounts', accountRoutes(db));
 app.use('/api/journal', journalRoutes(db));
