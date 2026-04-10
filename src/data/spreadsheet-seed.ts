@@ -193,16 +193,17 @@ const ENTITIES: Entity[] = [
 export function seedSpreadsheetBalances(db: Database.Database) {
   const snapshotDate = '2026-02-28';
 
-  // Check if data is already correct
-  const check = db.prepare(
-    "SELECT balance FROM account_balances WHERE snapshot_date = ? AND company_id = 11 AND account_code = '303010'"
+  // Check if ALL data is present (check multiple entities)
+  const totalAccounts = db.prepare(
+    "SELECT COUNT(*) as c FROM account_balances WHERE snapshot_date = ?"
   ).get(snapshotDate) as any;
-  const eqCheck = db.prepare(
-    "SELECT balance FROM account_balances WHERE snapshot_date = ? AND company_id = 11 AND account_type = 'equity'"
+  const owIC = db.prepare(
+    "SELECT balance FROM account_balances WHERE snapshot_date = ? AND company_id = 15 AND account_code = '303010'"
   ).get(snapshotDate) as any;
 
-  if (check && Math.abs(check.balance - 1942566) < 1 && eqCheck && Math.abs(eqCheck.balance - (-412299)) < 100) {
-    console.log('[seed-bs] Spreadsheet balance data already correct, skipping');
+  // Need at least 140 accounts AND OW must have 303010
+  if (totalAccounts?.c >= 140 && owIC && Math.abs(owIC.balance - (-8870813)) < 1) {
+    console.log('[seed-bs] Spreadsheet balance data already correct (' + totalAccounts.c + ' accounts), skipping');
     return;
   }
 
