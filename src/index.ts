@@ -14,6 +14,9 @@ import { taskRoutes } from './routes/tasks';
 import { alertsTasksRoutes } from './routes/alerts-tasks';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
 import { seedXterioFoundation } from './data/xterio-seed';
+import { migrateHistoricalCash } from './db/migrate-historical-cash';
+import { seedHistoricalCash } from './db/seed-historical-cash';
+import { historicalCashRoutes } from './routes/historical-cash';
 
 const app = express();
 
@@ -55,6 +58,8 @@ app.use(express.static(devPublicDir, staticOpts));
 const dbPath = process.env.DB_PATH || 'finance.db';
 const db = initDb(dbPath);
 seedXterioFoundation(db);
+migrateHistoricalCash(db);
+seedHistoricalCash(db);
 
 app.use('/api/accounts', accountRoutes(db));
 app.use('/api/journal', journalRoutes(db));
@@ -66,6 +71,7 @@ app.use('/api/reporting', reportingRoutes(db));
 app.use('/api/chat', chatRoutes(db));
 app.use('/api/tasks', taskRoutes(db));
 app.use('/api/alerts-tasks', alertsTasksRoutes(db));
+app.use('/api/historical-cash', historicalCashRoutes(db));
 
 const PORT = process.env.PORT || 3000;
 app.listen(Number(PORT), '0.0.0.0', () => {

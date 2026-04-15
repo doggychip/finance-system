@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historical Cash — Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232734;
+      --border: #2e3344;
+      --text: #e4e6ef;
+      --text-dim: #8b8fa3;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --yellow: #eab308;
+      --cyan: #06b6d4;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .header h1 { font-size: 18px; font-weight: 600; white-space: nowrap; }
+    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
+    .nav a:hover { background: var(--surface2); color: var(--text); }
+    .nav a.active { background: var(--accent); color: white; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px 28px; }
+
+    /* KPI row */
+    .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .kpi .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .kpi .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi .positive { color: var(--green); }
+    .kpi .negative { color: var(--red); }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+    .tabs button { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; font-size: 13px; transition: all 0.15s; }
+    .tabs button:hover { background: var(--surface2); color: var(--text); }
+    .tabs button.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Chart containers */
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .chart-wrap { position: relative; height: 350px; }
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* P&L sidebar */
+    .pl-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+    .metrics-sidebar .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 10px; }
+    .metrics-sidebar .metric .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .metrics-sidebar .metric .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 4px; }
+
+    /* Snapshot cards */
+    .snapshot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .snapshot-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .snapshot-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--accent); }
+    .snapshot-card .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .snapshot-card .row:last-child { border-bottom: none; }
+    .snapshot-card .row .lbl { color: var(--text-dim); }
+    .snapshot-card .row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+
+    @media (max-width: 900px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .chart-row, .pl-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+  <script src="/odoo-links.js"></script>
+  <script src="/auth.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>Historical Cash</h1>
+    <div class="nav">
+      <a href="/">Overview</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/cash.html">Cash</a>
+      <a href="/historical-cash.html" class="active">Historical Cash</a>
+      <a href="/ow-closing.html">OW Closing</a>
+      <a href="/kanban.html">Tasks</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- KPI Row -->
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi"><div class="label">Current Total</div><div class="value" id="kpiCurrent">—</div></div>
+      <div class="kpi"><div class="label">Fiat Deposits</div><div class="value" id="kpiFiat">—</div></div>
+      <div class="kpi"><div class="label">Fixed Crypto</div><div class="value" id="kpiCrypto">—</div></div>
+      <div class="kpi"><div class="label">WoW Change</div><div class="value" id="kpiWow">—</div></div>
+      <div class="kpi"><div class="label">From Peak</div><div class="value" id="kpiPeak">—</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="active" onclick="switchTab('timeline')">Cash Timeline</button>
+      <button onclick="switchTab('bs')">Monthly BS</button>
+      <button onclick="switchTab('pl')">P&L</button>
+      <button onclick="switchTab('snapshot')">Latest Snapshot</button>
+    </div>
+
+    <!-- Cash Timeline Tab -->
+    <div class="tab-content active" id="tab-timeline">
+      <div class="chart-card">
+        <h3>Weekly Cash — Grand Total</h3>
+        <div class="chart-wrap"><canvas id="chartTotal"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Weekly Cash — By Project</h3>
+        <div class="chart-wrap"><canvas id="chartProjects"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Monthly BS Tab -->
+    <div class="tab-content" id="tab-bs">
+      <div class="chart-card">
+        <h3>Monthly Total Closing Balance</h3>
+        <div class="chart-wrap"><canvas id="chartBsClosing"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Monthly Cash by Entity</h3>
+        <div class="chart-wrap"><canvas id="chartBsEntities"></canvas></div>
+      </div>
+    </div>
+
+    <!-- P&L Tab -->
+    <div class="tab-content" id="tab-pl">
+      <div class="pl-layout">
+        <div class="chart-card">
+          <h3>2024 Monthly Net Profit</h3>
+          <div class="chart-wrap"><canvas id="chartPl"></canvas></div>
+        </div>
+        <div class="metrics-sidebar" id="plMetrics"></div>
+      </div>
+    </div>
+
+    <!-- Latest Snapshot Tab -->
+    <div class="tab-content" id="tab-snapshot">
+      <div class="snapshot-grid" id="snapshotGrid"></div>
+    </div>
+  </div>
+
+  <script src="/chat-widget.js"></script>
+  <script>
+    let DATA = null;
+
+    function fmt(n) {
+      if (n == null) return '—';
+      const abs = Math.abs(n);
+      if (abs >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+      if (abs >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+      return '$' + n.toLocaleString();
+    }
+
+    function fmtFull(n) {
+      if (n == null) return '—';
+      return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch('/api/historical-cash/summary');
+        DATA = await res.json();
+        renderKPIs();
+        renderTimeline();
+        renderBS();
+        renderPL();
+        renderSnapshot();
+      } catch (e) {
+        console.error('Failed to load historical cash data:', e);
+      }
+    }
+
+    function renderKPIs() {
+      const k = DATA.kpis;
+      document.getElementById('kpiCurrent').textContent = fmt(k.current_total);
+      document.getElementById('kpiFiat').textContent = fmt(k.fiat_total);
+      document.getElementById('kpiCrypto').textContent = fmt(k.crypto_total);
+
+      const wowEl = document.getElementById('kpiWow');
+      wowEl.textContent = (k.wow_change >= 0 ? '+' : '') + fmt(k.wow_change);
+      wowEl.className = 'value ' + (k.wow_change >= 0 ? 'positive' : 'negative');
+
+      const peakEl = document.getElementById('kpiPeak');
+      peakEl.textContent = fmt(k.from_peak);
+      peakEl.className = 'value ' + (k.from_peak >= 0 ? 'positive' : 'negative');
+    }
+
+    function chartColors() {
+      return { grid: '#2e3344', text: '#8b8fa3' };
+    }
+
+    function renderTimeline() {
+      const w = DATA.weekly;
+      const labels = w.map(r => r.snapshot_date);
+      const c = chartColors();
+
+      new Chart(document.getElementById('chartTotal'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Grand Total',
+            data: w.map(r => r.grand_total),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 3,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: c.text } } },
+          scales: {
+            x: { ticks: { color: c.text, maxRotation: 45 }, grid: { color: c.grid } },
+            y: { ticks: { color: c.text, callback: v => fmt(v) }, grid: { color: c.grid } }
+          }
+        }
+      });
+
+      new Chart(document.getElementById('chartProjects'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Overworld', data: w.map(r => r.overworld_total), borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
+            { label: 'Lholding', data: w.map(r => r.lholding_total), borderColor: '#22c55e', tension: 0.3, pointRadius: 2 },
+            { label: 'Platform', data: w.map(r => r.platform_total), borderColor: '#eab308', tension: 0.3, pointRadius: 2 },
+            { label: 'AOD', data: w.map(r => r.aod_total), borderColor: '#ef4444', tension: 0.3, pointRadius: 2 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: c.text } } },
+          scales: {
+            x: { ticks: { color: c.text, maxRotation: 45 }, grid: { color: c.grid } },
+            y: { ticks: { color: c.text, callback: v => fmt(v) }, grid: { color: c.grid } }
+          }
+        }
+      });
+    }
+
+    function renderBS() {
+      const bs = DATA.monthly_bs;
+      const labels = bs.map(r => r.month_end);
+      const c = chartColors();
+
+      new Chart(document.getElementById('chartBsClosing'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Total Closing',
+            data: bs.map(r => r.total_closing),
+            backgroundColor: 'rgba(99,102,241,0.6)',
+            borderColor: '#6366f1',
+            borderWidth: 1,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: c.text } } },
+          scales: {
+            x: { ticks: { color: c.text, maxRotation: 45 }, grid: { color: c.grid } },
+            y: { ticks: { color: c.text, callback: v => fmt(v) }, grid: { color: c.grid } }
+          }
+        }
+      });
+
+      new Chart(document.getElementById('chartBsEntities'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Platform', data: bs.map(r => r.platform_cash), borderColor: '#eab308', tension: 0.3, pointRadius: 2 },
+            { label: 'Lholding', data: bs.map(r => r.lholding_cash), borderColor: '#22c55e', tension: 0.3, pointRadius: 2 },
+            { label: 'Overworld', data: bs.map(r => r.overworld_cash), borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: c.text } } },
+          scales: {
+            x: { ticks: { color: c.text, maxRotation: 45 }, grid: { color: c.grid } },
+            y: { ticks: { color: c.text, callback: v => fmt(v) }, grid: { color: c.grid } }
+          }
+        }
+      });
+    }
+
+    function renderPL() {
+      const pl = DATA.pl;
+      const labels = pl.monthly.map(r => r.month_start);
+      const c = chartColors();
+
+      const colors = pl.monthly.map(r => r.net_profit >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)');
+      const borders = pl.monthly.map(r => r.net_profit >= 0 ? '#22c55e' : '#ef4444');
+
+      new Chart(document.getElementById('chartPl'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Net Profit',
+            data: pl.monthly.map(r => r.net_profit),
+            backgroundColor: colors,
+            borderColor: borders,
+            borderWidth: 1,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: c.text } } },
+          scales: {
+            x: { ticks: { color: c.text, maxRotation: 45 }, grid: { color: c.grid } },
+            y: { ticks: { color: c.text, callback: v => fmt(v) }, grid: { color: c.grid } }
+          }
+        }
+      });
+
+      const a = pl.annual;
+      const salaryPct = '65.4%';
+      document.getElementById('plMetrics').innerHTML = `
+        <div class="metric"><div class="label">Total Revenue (2024)</div><div class="val">${fmt(a.total_revenue)}</div></div>
+        <div class="metric"><div class="label">Total Expenses (2024)</div><div class="val">${fmt(a.total_expenses)}</div></div>
+        <div class="metric"><div class="label">Net Profit (2024)</div><div class="val" style="color:${a.total_net_profit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(a.total_net_profit)}</div></div>
+        <div class="metric"><div class="label">Salary % of Expenses</div><div class="val">${salaryPct}</div></div>
+      `;
+    }
+
+    function renderSnapshot() {
+      const d = DATA.deposits;
+      const w = DATA.weekly;
+      const latest = w.length > 0 ? w[w.length - 1] : null;
+
+      let html = '';
+
+      // Fiat deposits card
+      if (d.fiat) {
+        html += `<div class="snapshot-card"><h4>Fiat Deposits</h4>
+          <div class="row"><span class="lbl">SVB MMA</span><span class="val">${fmtFull(d.fiat.svb_mma)}</span></div>
+          <div class="row"><span class="lbl">Foundation USD</span><span class="val">${fmtFull(d.fiat.foundation_usd)}</span></div>
+          <div class="row"><span class="lbl">Foundation EUR</span><span class="val">${fmtFull(d.fiat.foundation_eur)}</span></div>
+          <div class="row"><span class="lbl">Total Fiat</span><span class="val" style="color:var(--accent)">${fmt(d.fiat.fiat_total)}</span></div>
+        </div>`;
+      }
+
+      // Crypto deposits card
+      if (d.crypto) {
+        html += `<div class="snapshot-card"><h4>Fixed Crypto</h4>
+          <div class="row"><span class="lbl">USDC</span><span class="val">${fmtFull(d.crypto.usdc_amount)}</span></div>
+          <div class="row"><span class="lbl">USDT</span><span class="val">${fmtFull(d.crypto.usdt_amount)}</span></div>
+          <div class="row"><span class="lbl">Total Fixed</span><span class="val" style="color:var(--accent)">${fmt(d.crypto.total_fixed)}</span></div>
+        </div>`;
+      }
+
+      // Headcount card
+      html += `<div class="snapshot-card"><h4>Headcount</h4>
+        <div class="row"><span class="lbl">Total</span><span class="val" style="font-size:28px;color:var(--accent)">28</span></div>
+      </div>`;
+
+      // Project allocation cards
+      if (latest) {
+        const projects = [
+          { name: 'Overworld', val: latest.overworld_total, color: '#3b82f6' },
+          { name: 'Lholding', val: latest.lholding_total, color: '#22c55e' },
+          { name: 'Platform', val: latest.platform_total, color: '#eab308' },
+          { name: 'AOD', val: latest.aod_total, color: '#ef4444' },
+          { name: 'Reach', val: latest.reach_total, color: '#06b6d4' },
+          { name: 'XLabs', val: latest.xlabs_total, color: '#a855f7' },
+          { name: 'CS', val: latest.cs_total, color: '#f97316' },
+        ].filter(p => p.val > 0);
+
+        html += `<div class="snapshot-card"><h4>Project Allocation (${latest.snapshot_date})</h4>`;
+        for (const p of projects) {
+          const pct = ((p.val / latest.grand_total) * 100).toFixed(1);
+          html += `<div class="row"><span class="lbl">${p.name}</span><span class="val">${fmt(p.val)} <span style="color:var(--text-dim);font-size:11px">(${pct}%)</span></span></div>`;
+        }
+        html += `<div class="row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px"><span class="lbl" style="font-weight:600">Grand Total</span><span class="val" style="color:var(--accent)">${fmt(latest.grand_total)}</span></div>`;
+        html += `</div>`;
+      }
+
+      document.getElementById('snapshotGrid').innerHTML = html;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
