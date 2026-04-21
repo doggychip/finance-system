@@ -133,20 +133,21 @@
     var currentUser = window.getUser();
 
     async function init() {
-      // Re-fetch user role from server to avoid stale local session
       if (!currentUser) {
         document.getElementById('accessDenied').style.display = 'block';
         return;
       }
+      // Always verify role from server (in case local session is stale)
       try {
         var users = await (await fetch('/api/tasks/users')).json();
-        var me = users.find(function(u) { return u.username === currentUser.username || u.id === currentUser.id; });
-        if (!me || me.role !== 'admin') {
+        var me = users.find(function(u) { return u.id === currentUser.id; });
+        var isAdmin = me ? me.role === 'admin' : currentUser.role === 'admin';
+        if (!isAdmin) {
           document.getElementById('accessDenied').style.display = 'block';
           return;
         }
       } catch(e) {
-        // fallback to local token role
+        // Network error: fall back to local session role
         if (currentUser.role !== 'admin') {
           document.getElementById('accessDenied').style.display = 'block';
           return;
