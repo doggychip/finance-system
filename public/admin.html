@@ -133,30 +133,33 @@
     var currentUser = window.getUser();
 
     async function init() {
+      // Step 1: must be logged in
       if (!currentUser) {
         document.getElementById('accessDenied').style.display = 'block';
         return;
       }
-      // Verify role from server using loose == to avoid string/number mismatch
+      // Step 2: verify admin from server by matching username (most reliable)
+      var isAdmin = false;
       try {
         var users = await (await fetch('/api/tasks/users')).json();
-        var me = users.find(function(u) { return u.id == currentUser.id; });
+        // Match by username OR id (loose ==), whichever field is available
+        var me = users.find(function(u) {
+          return (currentUser.username && u.username === currentUser.username) ||
+                 (currentUser.id != null && u.id == currentUser.id);
+        });
         if (me && me.role === 'admin') {
-          // Update localStorage with fresh role
-          var fresh = JSON.parse(localStorage.getItem('finance_user') || '{}');
-          fresh.role = 'admin';
-          localStorage.setItem('finance_user', JSON.stringify(fresh));
-        }
-        var isAdmin = me ? me.role === 'admin' : currentUser.role === 'admin';
-        if (!isAdmin) {
-          document.getElementById('accessDenied').style.display = 'block';
-          return;
+          isAdmin = true;
+          // Refresh localStorage so future checks work
+          currentUser.role = 'admin';
+          localStorage.setItem('finance_user', JSON.stringify(currentUser));
         }
       } catch(e) {
-        if (currentUser.role !== 'admin') {
-          document.getElementById('accessDenied').style.display = 'block';
-          return;
-        }
+        console.warn('Could not verify role from server:', e);
+      }
+      // Step 3: show content or denied
+      if (!isAdmin) {
+        document.getElementById('accessDenied').style.display = 'block';
+        return;
       }
       document.getElementById('adminContent').style.display = 'block';
       loadUsers();
