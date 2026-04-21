@@ -109,7 +109,7 @@
         }
 
         var cols = data.columns;
-        var html = '<table><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left;min-width:360px">Conso Balance sheet as at ' + data.snapshot_date + '</th>';
+        var html = '<table><thead><tr><th class="row-label" style="background:#1a365d;color:white;text-align:left;min-width:360px">Conso Balance sheet as at ' + (document.getElementById('asOfDate').value || data.snapshot_date) + '</th>';
         cols.forEach(function(col) {
           var cls = col.name === 'Total' ? 'total-col' : col.is_subtotal ? 'subtotal-col' : '';
           html += '<th class="' + cls + '">' + col.name + '</th>';
@@ -149,7 +149,7 @@
 
         html += '</tbody></table>';
         el.innerHTML = html;
-        document.getElementById('snapInfo').textContent = 'Data as of ' + data.snapshot_date;
+        document.getElementById('snapInfo').textContent = 'Data as of ' + (document.getElementById('asOfDate').value || data.snapshot_date);
       } catch (err) {
         el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
       }

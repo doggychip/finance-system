@@ -162,7 +162,7 @@
           });
         });
 
-        var html = '<div class="date-label">Cash Position as at <strong>' + data.snapshot_date + '</strong> | Prior: ' + data.prior_date + '</div>';
+        var html = '<div class="date-label">Cash Position as at <strong>' + (document.getElementById('asOfDate').value || data.snapshot_date) + '</strong> | Prior: ' + data.prior_date + '</div>';
         html += '<table><thead><tr><th>Entity / Company</th><th class="val">Cash (Fiat)</th><th class="val">Crypto</th><th class="val">Total</th><th class="val">Prior</th><th class="val">Change</th></tr></thead><tbody>';
 
         var grandCur = 0, grandPrior = 0;
