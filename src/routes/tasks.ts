@@ -34,11 +34,12 @@ export function taskRoutes(db: Database.Database): Router {
   // Update user (change password or display name)
   router.patch('/users/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const { password, display_name } = req.body;
+    const { password, display_name, role } = req.body;
     const updates: string[] = [];
     const values: any[] = [];
     if (password) { updates.push('password = ?'); values.push(password); }
     if (display_name) { updates.push('display_name = ?'); values.push(display_name); }
+    if (role && ['admin', 'finance'].includes(role)) { updates.push('role = ?'); values.push(role); }
     if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(id);
     db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
