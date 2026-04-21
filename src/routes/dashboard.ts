@@ -1553,6 +1553,55 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+
+  // ── Foundation Manual Balances: GET all rows for a period ──
+  router.get('/foundation-balances', (req, res) => {
+    try {
+      const period = (req.query.period as string) || '';
+      let rows: any[];
+      if (period) {
+        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ? ORDER BY category, account_code`).all(period) as any[];
+      } else {
+        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = 'Xterio Foundation' ORDER BY period DESC, category, account_code`).all() as any[];
+      }
+      const periods = [...new Set((db.prepare("SELECT DISTINCT period FROM manual_balances WHERE entity = 'Xterio Foundation' ORDER BY period DESC").all() as any[]).map((r: any) => r.period))];
+      res.json({ rows, periods });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Foundation Manual Balances: PATCH a single row ──
+  router.patch('/foundation-balances/:id', (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { amount_local, exchange_rate } = req.body as { amount_local: number; exchange_rate: number };
+      const amount_usd = amount_local * exchange_rate;
+      db.prepare(`UPDATE manual_balances SET amount_local = ?, exchange_rate = ?, amount_usd = ? WHERE id = ? AND entity = 'Xterio Foundation'`).run(amount_local, exchange_rate, amount_usd, id);
+      res.json({ ok: true, id, amount_local, exchange_rate, amount_usd });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Foundation Manual Balances: POST new period rows ──
+  router.post('/foundation-balances', (req, res) => {
+    try {
+      const { period, rows } = req.body as { period: string; rows: Array<{ account_code: string; account_name: string; category: string; amount_local: number; currency: string; exchange_rate: number }> };
+      if (!period || !rows || !rows.length) return res.status(400).json({ error: 'period and rows required' }) as any;
+      const insert = db.prepare(`INSERT INTO manual_balances (entity, account_code, account_name, period, amount_local, currency, exchange_rate, amount_usd, category) VALUES ('Xterio Foundation', ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const tx = db.transaction(() => {
+        for (const r of rows) {
+          insert.run(r.account_code, r.account_name, period, r.amount_local, r.currency || 'CHF', r.exchange_rate, r.amount_local * r.exchange_rate, r.category);
+        }
+      });
+      tx();
+      res.json({ ok: true, period, count: rows.length });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // List available balance snapshots
   router.get('/snapshots', (_req, res) => {
     const snaps = db.prepare(`

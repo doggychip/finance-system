@@ -44,6 +44,17 @@
     .access-denied { text-align: center; padding: 80px 20px; }
     .access-denied h2 { font-size: 24px; margin-bottom: 12px; color: var(--red); }
     .access-denied p { color: var(--text-dim); }
+
+    .foundation-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .foundation-table th { text-align: left; padding: 8px 10px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+    .foundation-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .foundation-table tr:last-child td { border-bottom: none; }
+    .foundation-table input[type=number] { width: 130px; padding: 4px 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; }
+    .foundation-table input[type=number]:focus { outline: none; border-color: var(--accent); }
+    .cat-header td { background: var(--surface2); font-weight: 600; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .total-row td { font-weight: 700; color: var(--green); border-top: 2px solid var(--border); }
+    .period-selector { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .period-selector select { padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; }
   </style>
   <script src="/auth.js"></script>
 </head>
@@ -103,6 +114,20 @@
     <p>Admin privileges required. <a href="/" style="color:var(--accent)">Back to dashboard</a></p>
   </div>
 
+
+    <!-- Foundation Manual Balances -->
+    <div class="card">
+      <h2>Xterio Foundation — Manual Balances</h2>
+      <div id="foundationMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="foundationPeriod" onchange="loadFoundation()"></select>
+        <button class="btn primary" onclick="saveFoundation()">Save Changes</button>
+        <span id="foundationTotal" style="font-size:13px;color:var(--green);font-weight:700;margin-left:12px"></span>
+      </div>
+      <div id="foundationTable"><p style="color:var(--text-dim)">Loading...</p></div>
+    </div>
+
   <script>
     var currentUser = window.getUser();
 
@@ -113,6 +138,7 @@
       }
       document.getElementById('adminContent').style.display = 'block';
       loadUsers();
+      loadFoundationPeriods();
     }
 
     async function loadUsers() {
@@ -224,6 +250,113 @@
     }
 
     init();
+
+    // ── Foundation Manual Balances ──
+    var foundationRows = [];
+
+    async function loadFoundationPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances')).json();
+        var sel = document.getElementById('foundationPeriod');
+        sel.innerHTML = data.periods.map(function(p) {
+          return '<option value="' + p + '">' + p + '</option>';
+        }).join('');
+        if (data.periods.length) loadFoundation();
+      } catch(e) {
+        showMsg('foundationMsg', 'Failed to load periods', 'error');
+      }
+    }
+
+    async function loadFoundation() {
+      var period = document.getElementById('foundationPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + period)).json();
+        foundationRows = data.rows;
+        renderFoundationTable(foundationRows);
+      } catch(e) {
+        showMsg('foundationMsg', 'Failed to load data', 'error');
+      }
+    }
+
+    function renderFoundationTable(rows) {
+      if (!rows.length) {
+        document.getElementById('foundationTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+        return;
+      }
+      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
+      var totalUSD = 0;
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>CHF Amount</th><th>FX Rate (CHF/USD)</th><th>USD Amount</th></tr></thead><tbody>';
+      cats.forEach(function(cat) {
+        html += '<tr class="cat-header"><td colspan="5">' + cat + '</td></tr>';
+        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
+          totalUSD += r.amount_local * r.exchange_rate;
+          html += '<tr data-id="' + r.id + '">' +
+            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
+            '<td>' + r.account_name + '</td>' +
+            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcRow(this,' + r.id + ')" style="width:140px"></td>' +
+            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcRow(this,' + r.id + ')" style="width:90px"></td>' +
+            '<td id="usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '</tr>';
+        });
+      });
+      html += '<tr class="total-row"><td colspan="4">Total USD</td><td id="foundationTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('foundationTable').innerHTML = html;
+      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(totalUSD);
+    }
+
+    function fmt(n) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
+
+    function recalcRow(input, id) {
+      var row = foundationRows.find(function(r) { return r.id === id; });
+      if (!row) return;
+      var tr = input.closest('tr');
+      var chf = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
+      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
+      var usd = chf * fx;
+      document.getElementById('usd_' + id).textContent = fmt(usd);
+      // update total
+      var total = 0;
+      foundationRows.forEach(function(r) {
+        var t = document.querySelector('tr[data-id="' + r.id + '"]');
+        if (!t) return;
+        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
+        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
+        total += c * f;
+      });
+      var tc = document.getElementById('foundationTotalCell');
+      if (tc) tc.textContent = fmt(total);
+      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(total);
+    }
+
+    async function saveFoundation() {
+      var saved = 0, failed = 0;
+      for (var r of foundationRows) {
+        var tr = document.querySelector('tr[data-id="' + r.id + '"]');
+        if (!tr) continue;
+        var chf = parseFloat(tr.querySelectorAll('input')[0].value);
+        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        try {
+          var res = await fetch('/api/dashboard/foundation-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount_local: chf, exchange_rate: fx })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) {
+        showMsg('foundationMsg', saved + ' rows saved successfully', 'success');
+      } else {
+        showMsg('foundationMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      }
+      loadFoundation();
+    }
+
   </script>
 <script src="/chat-widget.js"></script>
 </body>
