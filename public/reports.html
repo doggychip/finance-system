@@ -256,6 +256,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     var currentTab = 'balanceSheet';
     var currentPeriod = 'monthly';
     var charts = {};
@@ -329,14 +335,14 @@
     });
 
     var now = new Date();
-    document.getElementById('dateTo').value = now.toISOString().slice(0, 10);
-    document.getElementById('dateFrom').value = (now.getFullYear() - 1) + now.toISOString().slice(4, 10);
+    document.getElementById('dateTo').value = lastDayOfPrevMonth();
+    document.getElementById('dateFrom').value = (new Date(new Date().getFullYear() - 1, new Date().getMonth(), 0).toISOString().slice(0, 8) + '01').slice(0,8) + '01';
     fetch('/api/dashboard/companies').then(function(r) { return r.json(); }).then(function(data) {
       var sel = document.getElementById('companySelect');
       data.forEach(function(c) { var o = document.createElement('option'); o.value = c.company_id; o.textContent = c.company_name; sel.appendChild(o); });
     });
 
-    function getAsOf() { return document.getElementById('asOfDate').value || ''; }
+    function getAsOf() { if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth(); return document.getElementById('asOfDate').value || ''; }
     function getPnlParams() {
       var p = '?period=' + currentPeriod;
       var df = document.getElementById('dateFrom').value;

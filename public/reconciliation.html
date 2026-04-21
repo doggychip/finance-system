@@ -58,7 +58,7 @@
   </div>
   <div class="controls">
     <label>As of:</label>
-    <input type="date" id="asOfDate" value="2026-02-28">
+    <input type="date" id="asOfDate" value="">
     <label>Entity:</label>
     <select id="entitySelect"></select>
     <button class="btn primary" onclick="loadData()">Compare</button>
@@ -71,6 +71,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     // Spreadsheet reference data (as at 28.02.2026)
     // Format: { entity: { account_code: value, ... } }
     var SPREADSHEET = {
@@ -216,6 +222,7 @@
     });
 
     async function loadData() {
+      if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth();
       var entity = document.getElementById('entitySelect').value;
       var asOf = document.getElementById('asOfDate').value;
       var ssData = SPREADSHEET[entity] || {};

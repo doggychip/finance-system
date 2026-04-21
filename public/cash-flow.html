@@ -126,6 +126,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     function fmt(n) {
       if (n == null || isNaN(n)) return '-';
       if (Math.abs(n) < 0.01) return '-';
@@ -286,6 +292,7 @@
     }
 
     async function loadData() {
+      if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth();
       var el = document.getElementById('content');
       try {
         var res = await fetch('/api/dashboard/cash-flow-statement');

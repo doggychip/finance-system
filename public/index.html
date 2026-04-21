@@ -217,6 +217,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     var charts = {};
     function fmt(n) {
       if (n == null || isNaN(n)) return '--';
@@ -234,6 +240,7 @@
     var palette = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e','#a855f7','#64748b','#0ea5e9'];
 
     async function loadAll() {
+      if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth();
       try {
         var data = await (await fetch('/api/dashboard/executive-summary' + getAsOfParam())).json();
         if (!data.snapshot_date) return;

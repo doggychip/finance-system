@@ -86,6 +86,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     function fmt(n) {
       if (Math.abs(n) < 0.5) return '-';
       var s = Math.abs(Math.round(n)).toLocaleString('en-US');
@@ -110,6 +116,7 @@
     }
 
     async function loadData() {
+      if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth();
       var res = await fetch('/api/dashboard/ic-reconciliation');
       var data = await res.json();
 

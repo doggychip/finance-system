@@ -122,6 +122,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     function fmt(n) {
       if (n == null || isNaN(n) || n === 0) return '-';
       return new Intl.NumberFormat('en-US', {
@@ -182,6 +188,7 @@
     }
 
     async function loadData() {
+      if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth();
       const el = document.getElementById('content');
       try {
         var asOf = document.getElementById('asOfDate').value || '';

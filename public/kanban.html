@@ -212,6 +212,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     var allTasks = [];
     var allUsers = [];
     var filters = { assignee: 'all', priority: 'all', thisWeek: false };
@@ -475,7 +481,8 @@
     async function loadAlerts() {
       try {
         // Executive summary alerts
-        var data = await (await fetch('/api/dashboard/executive-summary')).json();
+        var _asOf = lastDayOfPrevMonth();
+        var data = await (await fetch('/api/dashboard/executive-summary?as_of_date=' + _asOf)).json();
 
         var odEl = document.getElementById('overdrawnAlerts');
         var overdrawn = data.alerts?.overdrawn || [];
