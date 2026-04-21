@@ -212,6 +212,12 @@
   </div>
 
   <script>
+    // 返回上个月最后一天，格式 YYYY-MM-DD
+    function lastDayOfPrevMonth() {
+      var d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+    }
+
     var charts = {};
     var currentPeriod = 'monthly';
     var exportAccounts = [];
@@ -516,6 +522,7 @@
     }
 
     async function loadAll() {
+      if (!document.getElementById('cashAsOfDate').value) document.getElementById('cashAsOfDate').value = lastDayOfPrevMonth();
       await Promise.all([loadCashBalances(), loadTimeCharts(), loadPosition()]);
     }
 
