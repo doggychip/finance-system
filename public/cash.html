@@ -282,7 +282,20 @@
       var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
       var totalBank = data.total_cash || 0;
       var totalCrypto = data.total_crypto || 0;
-      var grandTotal = totalBank + totalCrypto + (data.overworld?.total || 0) + (data.reach?.total || 0) + (data.overdrawn?.total || 0);
+
+      // Fetch Foundation total for the selected period
+      var asOfDate = document.getElementById('cashAsOfDate').value || data.snapshot_date || lastDayOfPrevMonth();
+      var asOfParts = asOfDate.split('-');
+      var foundationPeriod = asOfParts[0] + '-' + asOfParts[1];
+      var foundationTotal = 0;
+      try {
+        var fData = await (await fetch('/api/dashboard/foundation-balances?period=' + foundationPeriod)).json();
+        foundationTotal = (fData.rows || []).reduce(function(sum, r) { return sum + (r.amount_local * r.exchange_rate); }, 0);
+      } catch(e) { foundationTotal = 5933488; /* fallback */ }
+      // Store globally so LAYOUT rendering can access it
+      window._foundationCashTotal = foundationTotal;
+
+      var grandTotal = totalBank + totalCrypto + (data.overworld?.total || 0) + (data.reach?.total || 0) + (data.overdrawn?.total || 0) + foundationTotal;
 
       exportAccounts = allAccs.map(function(a) {
         return { Code: a.code, Name: a.name, Company: a.company_name, Balance: a.balance };
@@ -298,7 +311,8 @@
       heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
       var overdrawnTotal = data.overdrawn?.total || 0;
       var breakdownParts = 'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
-        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0);
+        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0) +
+        ' | Foundation: ' + fmtShort(foundationTotal);
       if (overdrawnTotal < -0.5) breakdownParts += ' | Overdrawn: ' + fmtShort(overdrawnTotal);
       breakdownParts += ' | ' + (document.getElementById('cashAsOfDate').value || data.snapshot_date || '');
       document.getElementById('heroSub').textContent = breakdownParts;
@@ -426,8 +440,8 @@
       { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
       { type: 'entity', key: 'XLABS, XLAB W3', label: 'Xterio Labs', companies: ['XLABS', 'XLABS W3'] },
       { type: 'entity', key: 'PRIVILEGE HK', label: 'Privilege HK', companies: ['PRIVILEGE HK'] },
-      { type: 'manual', label: 'Xterio Foundation', value: 5933488 },
-      { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], manualAdd: 5933488 },
+      { type: 'manual', label: 'Xterio Foundation', get value() { return window._foundationCashTotal || 5933488; } },
+      { type: 'subtotal', label: 'Xterio Total', keys: ['LTECH, LTECH W3', 'XLABS, XLAB W3', 'PRIVILEGE HK'], get manualAdd() { return window._foundationCashTotal || 5933488; } },
       { type: 'parent', name: 'Gamephilos' },
       { type: 'entity', key: 'AOD', label: 'AOD', companies: ['GAMEPHILOS', 'GAMEPHILOS W3', 'MAOFAN', 'DIFANHA'] },
       { type: 'parent', name: 'CS' },
