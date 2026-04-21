@@ -123,6 +123,7 @@
         <label style="font-size:12px;color:var(--text-dim)">Period:</label>
         <select id="foundationPeriod" onchange="loadFoundation()"></select>
         <button class="btn primary" onclick="saveFoundation()">Save Changes</button>
+        <button class="btn" onclick="addNewPeriod()" id="btnAddPeriod" style="border-color:var(--green);color:var(--green)">+ Add Month</button>
         <span id="foundationTotal" style="font-size:13px;color:var(--green);font-weight:700;margin-left:12px"></span>
       </div>
       <div id="foundationTable"><p style="color:var(--text-dim)">Loading...</p></div>
@@ -257,11 +258,31 @@
     async function loadFoundationPeriods() {
       try {
         var data = await (await fetch('/api/dashboard/foundation-balances')).json();
+        var existingPeriods = data.periods; // already in DB, desc order
+        // Generate all months from earliest existing to current month
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        if (existingPeriods.length) {
+          var earliest = existingPeriods[existingPeriods.length - 1]; // e.g. "2025-05"
+          var cur = earliest;
+          while (cur <= currentPeriod) {
+            allPeriods.push(cur);
+            var parts = cur.split('-');
+            var y = parseInt(parts[0]), m = parseInt(parts[1]);
+            m++; if (m > 12) { m = 1; y++; }
+            cur = y + '-' + String(m).padStart(2, '0');
+          }
+          allPeriods.reverse(); // desc
+        }
         var sel = document.getElementById('foundationPeriod');
-        sel.innerHTML = data.periods.map(function(p) {
-          return '<option value="' + p + '">' + p + '</option>';
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
         }).join('');
-        if (data.periods.length) loadFoundation();
+        // Default to current month
+        sel.value = currentPeriod;
+        loadFoundation();
       } catch(e) {
         showMsg('foundationMsg', 'Failed to load periods', 'error');
       }
@@ -273,7 +294,16 @@
       try {
         var data = await (await fetch('/api/dashboard/foundation-balances?period=' + period)).json();
         foundationRows = data.rows;
-        renderFoundationTable(foundationRows);
+        if (!foundationRows.length) {
+          document.getElementById('foundationTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
+            'No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevMonth('' + period + '')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('foundationTotal').textContent = '';
+        } else {
+          renderFoundationTable(foundationRows);
+        }
       } catch(e) {
         showMsg('foundationMsg', 'Failed to load data', 'error');
       }
@@ -355,6 +385,56 @@
         showMsg('foundationMsg', saved + ' saved, ' + failed + ' failed', 'error');
       }
       loadFoundation();
+    }
+
+    function addNewPeriod() {
+      var sel = document.getElementById('foundationPeriod');
+      var now = new Date();
+      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      sel.value = currentPeriod;
+      loadFoundation();
+    }
+
+    async function copyFromPrevMonth(period) {
+      // Calculate previous month
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + prevPeriod)).json();
+        if (!data.rows.length) {
+          showMsg('foundationMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
+          return;
+        }
+        // Post new rows for current period based on prev month
+        var newRows = data.rows.map(function(r) {
+          return {
+            account_code: r.account_code,
+            account_name: r.account_name,
+            category: r.category,
+            amount_local: r.amount_local,
+            currency: r.currency || 'CHF',
+            exchange_rate: r.exchange_rate
+          };
+        });
+        var res = await fetch('/api/dashboard/foundation-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('foundationMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
+          await loadFoundationPeriods();
+          document.getElementById('foundationPeriod').value = period;
+          loadFoundation();
+        } else {
+          showMsg('foundationMsg', 'Failed to copy data', 'error');
+        }
+      } catch(e) {
+        showMsg('foundationMsg', 'Error: ' + e.message, 'error');
+      }
     }
 
   </script>
