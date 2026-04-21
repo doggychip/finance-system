@@ -179,7 +179,13 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Non-OW Total "Cash" = bank accounts only (100xxx codes) + Xterio Foundation
     // This excludes Digital Token (10Wxxx) — matches the "Cash" sub-line in consolidated BS
     const nonOWBankCash = nonOWRows.filter((r: any) => r.code.startsWith('100')).reduce((s: number, r: any) => s + r.balance, 0);
-    const foundationCashLegacy = 5942149;
+    const foundationPeriodCash = snap.snapshot_date ? snap.snapshot_date.slice(0, 7) : '';
+    const foundationRowsCash = foundationPeriodCash
+      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(foundationPeriodCash) as any[])
+      : [];
+    const foundationCashLegacy = foundationRowsCash.length
+      ? foundationRowsCash.reduce((s: number, r: any) => s + r.amount_local * r.exchange_rate, 0)
+      : 5942149;  // fallback
     const nonOWCash = nonOWBankCash + foundationCashLegacy;
 
     // Split cash into bank (100xxx) vs crypto (10Wxxx) sub-categories
@@ -1639,10 +1645,16 @@ export function dashboardRoutes(db: Database.Database): Router {
     const holdingsGroups = new Set(['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
     const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
-    // Foundation: manual entry
-    const foundationAssets = 5942149;       // Cash (CHF→USD)
+    // Foundation: dynamic from manual_balances table, keyed by period (YYYY-MM)
+    const foundationPeriod = currentSnap ? currentSnap.slice(0, 7) : '';
+    const foundationRows = foundationPeriod
+      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(foundationPeriod) as any[])
+      : [];
+    const foundationAssets = foundationRows.length
+      ? foundationRows.reduce((s: number, r: any) => s + r.amount_local * r.exchange_rate, 0)
+      : 5942149;  // fallback to hardcoded if no data
     const foundationLiabilities = 1369636;  // IC payables to Xterio entities
-    const foundationNetAssets = foundationAssets - foundationLiabilities; // 4,572,513
+    const foundationNetAssets = foundationAssets - foundationLiabilities;
 
     // Helper: get all company IDs for a group set
     const getCompanyIds = (groups: Set<string>) =>
