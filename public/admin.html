@@ -258,22 +258,21 @@
     async function loadFoundationPeriods() {
       try {
         var data = await (await fetch('/api/dashboard/foundation-balances')).json();
-        var existingPeriods = data.periods; // already in DB, desc order
+        var existingPeriods = (data.periods || []);
         // Generate all months from earliest existing to current month
         var now = new Date();
         var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         var allPeriods = [];
-        if (existingPeriods.length) {
-          var earliest = existingPeriods[existingPeriods.length - 1]; // e.g. "2025-05"
-          var cur = earliest;
-          while (cur <= currentPeriod) {
-            allPeriods.push(cur);
-            var parts = cur.split('-');
-            var y = parseInt(parts[0]), m = parseInt(parts[1]);
-            m++; if (m > 12) { m = 1; y++; }
-            cur = y + '-' + String(m).padStart(2, '0');
-          }
-          allPeriods.reverse(); // desc
+        // Find earliest: existingPeriods is desc, so last element is earliest
+        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
+        var parts = earliest.split('-');
+        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = cy * 12 + cm;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
         }
         var sel = document.getElementById('foundationPeriod');
         sel.innerHTML = allPeriods.map(function(p) {
@@ -284,7 +283,8 @@
         sel.value = currentPeriod;
         loadFoundation();
       } catch(e) {
-        showMsg('foundationMsg', 'Failed to load periods', 'error');
+        console.error(e);
+        showMsg('foundationMsg', 'Failed to load periods: ' + e.message, 'error');
       }
     }
 
