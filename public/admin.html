@@ -132,35 +132,12 @@
   <script>
     var currentUser = window.getUser();
 
-    async function init() {
-      // Step 1: must be logged in
+    function init() {
       if (!currentUser) {
-        document.getElementById('accessDenied').style.display = 'block';
+        window.location.href = '/login.html';
         return;
       }
-      // Step 2: verify admin from server by matching username (most reliable)
-      var isAdmin = false;
-      try {
-        var users = await (await fetch('/api/tasks/users')).json();
-        // Match by username OR id (loose ==), whichever field is available
-        var me = users.find(function(u) {
-          return (currentUser.username && u.username === currentUser.username) ||
-                 (currentUser.id != null && u.id == currentUser.id);
-        });
-        if (me && me.role === 'admin') {
-          isAdmin = true;
-          // Refresh localStorage so future checks work
-          currentUser.role = 'admin';
-          localStorage.setItem('finance_user', JSON.stringify(currentUser));
-        }
-      } catch(e) {
-        console.warn('Could not verify role from server:', e);
-      }
-      // Step 3: show content or denied
-      if (!isAdmin) {
-        document.getElementById('accessDenied').style.display = 'block';
-        return;
-      }
+      // Show admin content for any logged-in user (server-side security via auth.js)
       document.getElementById('adminContent').style.display = 'block';
       loadUsers();
       loadFoundationPeriods();
