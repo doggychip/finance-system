@@ -266,9 +266,13 @@
     }
 
     async function loadCashBalances() {
-      var data = await (await fetch('/api/dashboard/cash-balances' + getCashAsOfParam())).json();
+      // Fetch both APIs in parallel
+      var [data, execData] = await Promise.all([
+        fetch('/api/dashboard/cash-balances' + getCashAsOfParam()).then(function(r) { return r.json(); }),
+        fetch('/api/dashboard/executive-summary' + getCashAsOfParam()).then(function(r) { return r.json(); })
+      ]);
 
-      // Use new split fields
+      // Use new split fields (for account list display)
       var cashCurrentAccs = data.cash_current?.accounts || [];
       var cashFixedAccs = data.cash_fixed?.accounts || [];
       var cryptoHotAccs = data.crypto_hot?.accounts || [];
@@ -280,42 +284,36 @@
       var reachAccs = data.reach?.accounts || [];
 
       var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
-      var totalBank = data.total_cash || 0;
-      var totalCrypto = data.total_crypto || 0;
 
-      // Fetch Foundation total for the selected period
-      var asOfDate = document.getElementById('cashAsOfDate').value || lastDayOfPrevMonth();
-      // 9999-xx-xx is a sentinel date — fall back to current month
-      if (!asOfDate || asOfDate > '9000') asOfDate = lastDayOfPrevMonth();
-      var asOfParts = asOfDate.split('-');
-      var foundationPeriod = asOfParts[0] + '-' + asOfParts[1];
-      var foundationTotal = 0;
-      try {
-        var fData = await (await fetch('/api/dashboard/foundation-balances?period=' + foundationPeriod)).json();
-        foundationTotal = (fData.rows || []).reduce(function(sum, r) { return sum + (r.amount_local * r.exchange_rate); }, 0);
-      } catch(e) { foundationTotal = 5933488; /* fallback */ }
-      // Store globally so LAYOUT rendering can access it
+      // Hero total: use executive-summary (会计口径, same as Overview Cash Breakdown)
+      // total_cash_fiat + total_cash_crypto already includes Foundation from manual_balances
+      var totalFiat = execData.total_cash_fiat || 0;
+      var totalCrypto = execData.total_cash_crypto || 0;
+      var grandTotal = totalFiat + totalCrypto;
+
+      // Foundation total for the detail table rows (store globally)
+      var wfFoundation = (execData.waterfall || {}).foundation || {};
+      var foundationTotal = (wfFoundation.cash_fiat || 0) + (wfFoundation.cash_crypto || 0);
       window._foundationCashTotal = foundationTotal;
-
-      var grandTotal = totalBank + totalCrypto + (data.overworld?.total || 0) + (data.reach?.total || 0) + (data.overdrawn?.total || 0) + foundationTotal;
 
       exportAccounts = allAccs.map(function(a) {
         return { Code: a.code, Name: a.name, Company: a.company_name, Balance: a.balance };
       });
 
-      // Set date picker to reflect loaded snapshot date
-      if (data.snapshot_date && !document.getElementById('cashAsOfDate').value) {
+      // Set date picker
+      if (data.snapshot_date && data.snapshot_date < '9000' && !document.getElementById('cashAsOfDate').value) {
         document.getElementById('cashAsOfDate').value = data.snapshot_date;
       }
 
       var heroEl = document.getElementById('heroTotal');
       heroEl.textContent = fmt(grandTotal);
       heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
-      var overdrawnTotal = data.overdrawn?.total || 0;
-      var breakdownParts = 'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
-        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0) +
+      var wf = execData.waterfall || {};
+      var breakdownParts =
+        'Xterio: ' + fmtShort((wf.xterio?.cash_fiat||0)+(wf.xterio?.cash_crypto||0)) +
+        ' | Holdings: ' + fmtShort((wf.holdings?.cash_fiat||0)+(wf.holdings?.cash_crypto||0)) +
+        ' | OW: ' + fmtShort((wf.ow?.cash_fiat||0)+(wf.ow?.cash_crypto||0)) +
         ' | Foundation: ' + fmtShort(foundationTotal);
-      if (overdrawnTotal < -0.5) breakdownParts += ' | Overdrawn: ' + fmtShort(overdrawnTotal);
       breakdownParts += ' | ' + (document.getElementById('cashAsOfDate').value || data.snapshot_date || '');
       document.getElementById('heroSub').textContent = breakdownParts;
 
