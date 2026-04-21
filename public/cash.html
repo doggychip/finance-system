@@ -284,7 +284,9 @@
       var totalCrypto = data.total_crypto || 0;
 
       // Fetch Foundation total for the selected period
-      var asOfDate = document.getElementById('cashAsOfDate').value || data.snapshot_date || lastDayOfPrevMonth();
+      var asOfDate = document.getElementById('cashAsOfDate').value || lastDayOfPrevMonth();
+      // 9999-xx-xx is a sentinel date — fall back to current month
+      if (!asOfDate || asOfDate > '9000') asOfDate = lastDayOfPrevMonth();
       var asOfParts = asOfDate.split('-');
       var foundationPeriod = asOfParts[0] + '-' + asOfParts[1];
       var foundationTotal = 0;

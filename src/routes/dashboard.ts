@@ -179,7 +179,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Non-OW Total "Cash" = bank accounts only (100xxx codes) + Xterio Foundation
     // This excludes Digital Token (10Wxxx) — matches the "Cash" sub-line in consolidated BS
     const nonOWBankCash = nonOWRows.filter((r: any) => r.code.startsWith('100')).reduce((s: number, r: any) => s + r.balance, 0);
-    const foundationPeriodCash = snap.snapshot_date ? snap.snapshot_date.slice(0, 7) : '';
+    const _snapDateCash = (snap.snapshot_date && snap.snapshot_date < '9000') ? snap.snapshot_date : new Date().toISOString().slice(0, 10);
+    const foundationPeriodCash = _snapDateCash.slice(0, 7);
     const foundationRowsCash = foundationPeriodCash
       ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(foundationPeriodCash) as any[])
       : [];
@@ -1646,7 +1647,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
     const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
     // Foundation: dynamic from manual_balances table, keyed by period (YYYY-MM)
-    const foundationPeriod = currentSnap ? currentSnap.slice(0, 7) : '';
+    const _snapDateExec = (currentSnap && currentSnap < '9000') ? currentSnap : new Date().toISOString().slice(0, 10);
+    const foundationPeriod = _snapDateExec.slice(0, 7);
     const foundationRows = foundationPeriod
       ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(foundationPeriod) as any[])
       : [];
