@@ -107,14 +107,6 @@
       <div id="resetMsg" class="msg"></div>
       <div id="userTable"><p style="color:var(--text-dim)">Loading...</p></div>
     </div>
-  </div>
-
-  <div id="accessDenied" class="access-denied" style="display:none">
-    <h2>Access Denied</h2>
-    <p>Admin privileges required. <a href="/" style="color:var(--accent)">Back to dashboard</a></p>
-  </div>
-
-
     <!-- Foundation Manual Balances -->
     <div class="card">
       <h2>Xterio Foundation — Manual Balances</h2>
@@ -129,13 +121,36 @@
       <div id="foundationTable"><p style="color:var(--text-dim)">Loading...</p></div>
     </div>
 
+  </div>
+
+  <div id="accessDenied" class="access-denied" style="display:none">
+    <h2>Access Denied</h2>
+    <p>Admin privileges required. <a href="/" style="color:var(--accent)">Back to dashboard</a></p>
+  </div>
+
+
   <script>
     var currentUser = window.getUser();
 
-    function init() {
-      if (!currentUser || currentUser.role !== 'admin') {
+    async function init() {
+      // Re-fetch user role from server to avoid stale local session
+      if (!currentUser) {
         document.getElementById('accessDenied').style.display = 'block';
         return;
+      }
+      try {
+        var users = await (await fetch('/api/tasks/users')).json();
+        var me = users.find(function(u) { return u.username === currentUser.username || u.id === currentUser.id; });
+        if (!me || me.role !== 'admin') {
+          document.getElementById('accessDenied').style.display = 'block';
+          return;
+        }
+      } catch(e) {
+        // fallback to local token role
+        if (currentUser.role !== 'admin') {
+          document.getElementById('accessDenied').style.display = 'block';
+          return;
+        }
       }
       document.getElementById('adminContent').style.display = 'block';
       loadUsers();
