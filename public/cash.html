@@ -464,7 +464,17 @@
         var o1 = document.createElement('option'); o1.value = s.snapshot_date; o1.textContent = s.snapshot_date + ' (' + s.account_count + ')'; asOf.appendChild(o1);
         var o2 = document.createElement('option'); o2.value = s.snapshot_date; o2.textContent = s.snapshot_date + ' (' + s.account_count + ')'; prior.appendChild(o2);
       });
-      if (snaps.length >= 2) { asOf.value = snaps[0].snapshot_date; prior.value = snaps[1].snapshot_date; }
+      if (snaps.length >= 1) {
+        var _lastDay = lastDayOfPrevMonth();
+        // As of: 找最接近上月末的快照（不超过上月末）
+        var asOfSnap = snaps.find(function(s) { return s.snapshot_date <= _lastDay; }) || snaps[0];
+        asOf.value = asOfSnap.snapshot_date;
+        // Prior: 找上上月末（上月末往前推一个月的最后一天）
+        var _d = new Date(_lastDay + 'T00:00:00');
+        var _prevPrevLastDay = new Date(_d.getFullYear(), _d.getMonth(), 0).toISOString().slice(0, 10);
+        var priorSnap = snaps.find(function(s) { return s.snapshot_date <= _prevPrevLastDay; }) || snaps[1] || snaps[0];
+        prior.value = priorSnap.snapshot_date;
+      }
     }
 
     async function loadPosition() {
