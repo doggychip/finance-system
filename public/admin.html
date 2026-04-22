@@ -135,6 +135,20 @@
       <div id="foundationTable"><p style="color:var(--text-dim)">Loading...</p></div>
     </div>
 
+    <!-- Keystone Foundation Manual Balances -->
+    <div class="card">
+      <h2>Keystone Foundation — Manual Balances</h2>
+      <div id="keystoneMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="keystonePeriod" onchange="loadKeystone()"></select>
+        <button class="btn primary" onclick="saveKeystone()">Save Changes</button>
+        <button class="btn" onclick="addNewKeystonePeriod()" id="btnAddKeystonePeriod" style="border-color:var(--green);color:var(--green)">+ Add Month</button>
+        <span id="keystoneTotal" style="font-size:13px;color:var(--green);font-weight:700;margin-left:12px"></span>
+      </div>
+      <div id="keystoneTable"><p style="color:var(--text-dim)">Loading...</p></div>
+    </div>
+
   </div>
 
   <div id="accessDenied" class="access-denied" style="display:none;visibility:hidden">
@@ -156,6 +170,7 @@
       loadUsers();
       loadOWPeriods();
       loadFoundationPeriods();
+      loadKeystonePeriods();
     }
 
     async function loadUsers() {
@@ -583,6 +598,189 @@
         }
       } catch(e) {
         showMsg('foundationMsg', 'Error: ' + e.message, 'error');
+      }
+    }
+
+    // ── Keystone Foundation Manual Balances ──
+    var keystoneRows = [];
+    var KEYSTONE_ENTITY = 'Keystone Foundation';
+
+    async function loadKeystonePeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY))).json();
+        var existingPeriods = (data.periods || []);
+        // Generate all months from earliest existing to current month
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        // Find earliest: existingPeriods is desc, so last element is earliest
+        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
+        var parts = earliest.split('-');
+        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = cy * 12 + cm;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+        var sel = document.getElementById('keystonePeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        // Default to current month
+        sel.value = currentPeriod;
+        loadKeystone();
+      } catch(e) {
+        console.error(e);
+        showMsg('keystoneMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadKeystone() {
+      var period = document.getElementById('keystonePeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + period)).json();
+        keystoneRows = data.rows;
+        if (!keystoneRows.length) {
+          document.getElementById('keystoneTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
+            'No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevKeystone(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('keystoneTotal').textContent = '';
+        } else {
+          renderKeystoneTable(keystoneRows);
+        }
+      } catch(e) {
+        showMsg('keystoneMsg', 'Failed to load data', 'error');
+      }
+    }
+
+    function renderKeystoneTable(rows) {
+      if (!rows.length) {
+        document.getElementById('keystoneTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+        return;
+      }
+      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
+      var totalUSD = 0;
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>Amount (Local)</th><th>Currency</th><th>FX Rate</th><th>USD Amount</th></tr></thead><tbody>';
+      cats.forEach(function(cat) {
+        html += '<tr class="cat-header"><td colspan="6">' + cat + '</td></tr>';
+        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
+          totalUSD += r.amount_local * r.exchange_rate;
+          html += '<tr data-id="' + r.id + '">' +
+            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
+            '<td>' + r.account_name + '</td>' +
+            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:140px"></td>' +
+            '<td>' + (r.currency || 'USD') + '</td>' +
+            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:90px"></td>' +
+            '<td id="keystone_usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '</tr>';
+        });
+      });
+      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="keystoneTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('keystoneTable').innerHTML = html;
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(totalUSD);
+    }
+
+    function recalcKeystoneRow(input, id) {
+      var row = keystoneRows.find(function(r) { return r.id === id; });
+      if (!row) return;
+      var tr = input.closest('tr');
+      var amt = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
+      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
+      var usd = amt * fx;
+      document.getElementById('keystone_usd_' + id).textContent = fmt(usd);
+      // update total
+      var total = 0;
+      keystoneRows.forEach(function(r) {
+        var t = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
+        if (!t) return;
+        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
+        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
+        total += c * f;
+      });
+      var tc = document.getElementById('keystoneTotalCell');
+      if (tc) tc.textContent = fmt(total);
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(total);
+    }
+
+    async function saveKeystone() {
+      var saved = 0, failed = 0;
+      for (var r of keystoneRows) {
+        var tr = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
+        if (!tr) continue;
+        var amt = parseFloat(tr.querySelectorAll('input')[0].value);
+        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        try {
+          var res = await fetch('/api/dashboard/manual-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: KEYSTONE_ENTITY, amount_local: amt, exchange_rate: fx })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) {
+        showMsg('keystoneMsg', saved + ' rows saved successfully', 'success');
+      } else {
+        showMsg('keystoneMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      }
+      loadKeystone();
+    }
+
+    function addNewKeystonePeriod() {
+      var sel = document.getElementById('keystonePeriod');
+      var now = new Date();
+      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      sel.value = currentPeriod;
+      loadKeystone();
+    }
+
+    async function copyFromPrevKeystone(period) {
+      // Calculate previous month
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + prevPeriod)).json();
+        if (!data.rows.length) {
+          showMsg('keystoneMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
+          return;
+        }
+        // Post new rows for current period based on prev month
+        var newRows = data.rows.map(function(r) {
+          return {
+            account_code: r.account_code,
+            account_name: r.account_name,
+            category: r.category,
+            amount_local: r.amount_local,
+            currency: r.currency || 'USD',
+            exchange_rate: r.exchange_rate
+          };
+        });
+        var res = await fetch('/api/dashboard/manual-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity: KEYSTONE_ENTITY, period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('keystoneMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
+          await loadKeystonePeriods();
+          document.getElementById('keystonePeriod').value = period;
+          loadKeystone();
+        } else {
+          showMsg('keystoneMsg', 'Failed to copy data', 'error');
+        }
+      } catch(e) {
+        showMsg('keystoneMsg', 'Error: ' + e.message, 'error');
       }
     }
 

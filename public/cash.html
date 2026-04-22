@@ -455,9 +455,9 @@
       { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
       { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
       { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
-      { type: 'entity', key: 'Keystone', label: 'Keystone Foundation', companies: ['PLAY ALGORITHM (BVI)'] },
+      { type: 'manual', label: 'Keystone Foundation', get value() { return window._keystoneTotal || 0; } },
       { type: 'manual', label: 'OW Additional Fiat (USD)', get value() { return window._owAdditionalTotal || 0; } },
-      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'], get manualAdd() { return window._owAdditionalTotal || 0; } },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'], get manualAdd() { return (window._owAdditionalTotal || 0) + (window._keystoneTotal || 0); } },
     ];
 
     function posRow(label, cur, prior, cls) {
@@ -504,6 +504,12 @@
           var owData = await (await fetch('/api/dashboard/manual-balances?entity=OW%20Additional&period=' + owPeriod)).json();
           window._owAdditionalTotal = (owData.rows || []).reduce(function(s, r) { return s + r.amount_local * r.exchange_rate; }, 0);
         } catch(e) { window._owAdditionalTotal = 0; }
+
+        // Load Keystone Foundation from manual_balances
+        try {
+          var keystoneData = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent('Keystone Foundation') + '&period=' + owPeriod)).json();
+          window._keystoneTotal = (keystoneData.rows || []).reduce(function(s, r) { return s + r.amount_local * r.exchange_rate; }, 0);
+        } catch(e) { window._keystoneTotal = 0; }
 
         var data = await (await fetch('/api/dashboard/bank-accounts?as_of_date=' + asOf + '&prior_date=' + prior)).json();
         if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
