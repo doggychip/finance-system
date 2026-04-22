@@ -141,7 +141,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
 
     const rows = db.prepare(`
-      SELECT company_id, company_name, account_code as code, account_name as name, account_type as odoo_type, balance
+      SELECT company_id, company_name, account_code as code, account_name as name, account_type as odoo_type, COALESCE(currency, 'USD') as currency, balance
       FROM account_balances
       WHERE snapshot_date = ? AND (account_type = 'asset_cash' OR (account_type = 'asset_receivable' AND company_id IN (15, 16, 30, 31, 28)))
       AND ABS(balance) > 0.01
@@ -192,24 +192,23 @@ export function dashboardRoutes(db: Database.Database): Router {
       : 5942149;  // fallback
     const nonOWCash = nonOWBankCash + foundationCashLegacy;
 
-    // Split cash into bank (100xxx) vs crypto (10Wxxx) sub-categories
-    const allPositiveCash = [...cash]; // non-OW positive asset_cash accounts
-    const isBankCode = (code: string) => code.startsWith('100');
-    const isCryptoCode = (code: string) => code.startsWith('10W');
+    // Split cash into fiat bank vs crypto using currency field (set during sync)
+    // Fallback: code prefix (100xxx = fiat, 10Wxxx = crypto)
+    const allPositiveCash = [...cash];
+    const isCrypto = (r: any) => r.currency === 'CRYPTO' || r.code.startsWith('10W');
+    const isFiat = (r: any) => !isCrypto(r);
     const isFixedDeposit = (name: string) => /time deposit|mma/i.test(name);
     const isHotWallet = (name: string) => /integrated|segregate|mt ledger/i.test(name);
     const isColdWallet = (name: string) => /cold wallet|safe wallet/i.test(name);
     const isDefi = (name: string) => /defi/i.test(name);
 
-    const cash_current = allPositiveCash.filter(r => isBankCode(r.code) && !isFixedDeposit(r.name));
-    const cash_fixed = allPositiveCash.filter(r => isBankCode(r.code) && isFixedDeposit(r.name));
-    const crypto_hot = allPositiveCash.filter(r => isCryptoCode(r.code) && isHotWallet(r.name));
-    const crypto_cold = allPositiveCash.filter(r => isCryptoCode(r.code) && isColdWallet(r.name));
-    const crypto_defi = allPositiveCash.filter(r => isCryptoCode(r.code) && isDefi(r.name));
-    const crypto_other = allPositiveCash.filter(r => isCryptoCode(r.code) && !isHotWallet(r.name) && !isColdWallet(r.name) && !isDefi(r.name));
-    // Accounts that don't match 100 or 10W patterns go into cash_current as fallback
-    const unmatched = allPositiveCash.filter(r => !isBankCode(r.code) && !isCryptoCode(r.code));
-    const cash_current_all = [...cash_current, ...unmatched];
+    const cash_current = allPositiveCash.filter(r => isFiat(r) && !isFixedDeposit(r.name));
+    const cash_fixed = allPositiveCash.filter(r => isFiat(r) && isFixedDeposit(r.name));
+    const crypto_hot = allPositiveCash.filter(r => isCrypto(r) && isHotWallet(r.name));
+    const crypto_cold = allPositiveCash.filter(r => isCrypto(r) && isColdWallet(r.name));
+    const crypto_defi = allPositiveCash.filter(r => isCrypto(r) && isDefi(r.name));
+    const crypto_other = allPositiveCash.filter(r => isCrypto(r) && !isHotWallet(r.name) && !isColdWallet(r.name) && !isDefi(r.name));
+    const cash_current_all = [...cash_current];
 
     const total_cash_bank = sum(cash_current_all) + sum(cash_fixed);
     const total_crypto = sum(crypto_hot) + sum(crypto_cold) + sum(crypto_defi) + sum(crypto_other);
@@ -1403,7 +1402,8 @@ export function dashboardRoutes(db: Database.Database): Router {
           current_balance: currentBal,
           prior_balance: priorBal,
           change, change_pct: changePct,
-          asset_type: row.code.startsWith('10W') ? 'Crypto' : 'Cash',
+          asset_type: (row.currency === 'CRYPTO' || row.code.startsWith('10W')) ? 'Crypto' : 'Cash',
+          currency: row.currency,
         });
       }
 
@@ -2053,4 +2053,6 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   return router;
+}
+ router;
 }

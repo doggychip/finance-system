@@ -70,9 +70,20 @@ export async function syncBalances(
           const accountType = a.account_type || '';
           if (!code) continue;
 
+          // Determine currency: use Odoo currency_id, fallback by code prefix
+          const currencyRef = a.currency_id as [number, string] | false;
+          let currency = currencyRef ? currencyRef[1] : '';
+          if (!currency) {
+            if (code.startsWith('10W')) currency = 'CRYPTO';
+            else if (code.startsWith('100')) currency = 'USD'; // default, will be overridden by Odoo value
+            else currency = 'USD';
+          }
+          // Normalize: crypto accounts always tagged CRYPTO
+          if (code.startsWith('10W')) currency = 'CRYPTO';
+
           upsert.run(
             company.id, company.name,
-            a.id, code, name, accountType,
+            a.id, code, name, accountType, currency,
             a.current_balance, snapshotDate
           );
           result.accounts_synced++;

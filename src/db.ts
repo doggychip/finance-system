@@ -128,6 +128,7 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       account_code TEXT NOT NULL,
       account_name TEXT NOT NULL,
       account_type TEXT NOT NULL,
+      currency TEXT DEFAULT 'USD',
       balance REAL DEFAULT 0,
       snapshot_date TEXT NOT NULL,
       synced_at TEXT DEFAULT (datetime('now')),
@@ -188,6 +189,12 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       ('mario', 'finance123', 'Mario', 'finance'),
       ('bk', 'finance123', 'BK', 'finance');
   `);
+
+  // Migrations: add columns to existing tables if not present
+  const cols = (db.prepare(`PRAGMA table_info(account_balances)`).all() as any[]).map((c: any) => c.name);
+  if (!cols.includes('currency')) {
+    db.exec(`ALTER TABLE account_balances ADD COLUMN currency TEXT DEFAULT 'USD'`);
+  }
 
   return db;
 }
