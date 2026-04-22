@@ -456,7 +456,8 @@
       { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
       { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
       { type: 'entity', key: 'Keystone', label: 'Keystone Foundation', companies: ['PLAY ALGORITHM (BVI)'] },
-      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'] },
+      { type: 'manual', label: 'OW Additional Fiat (USD)', value: 5.76 },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house', 'Keystone'], manualAdd: 5.76 },
     ];
 
     function posRow(label, cur, prior, cls) {
