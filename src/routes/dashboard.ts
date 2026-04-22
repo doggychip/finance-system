@@ -1612,6 +1612,44 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
+  // ── Generic manual-balances API (entity param) ──
+  router.get('/manual-balances', (req, res) => {
+    try {
+      const entity = (req.query.entity as string) || '';
+      const period = (req.query.period as string) || '';
+      if (!entity) return res.status(400).json({ error: 'entity required' }) as any;
+      let rows: any[];
+      if (period) {
+        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = ? AND period = ? ORDER BY category, account_code`).all(entity, period) as any[];
+      } else {
+        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = ? ORDER BY period DESC, category, account_code`).all(entity) as any[];
+      }
+      const periods = [...new Set((db.prepare('SELECT DISTINCT period FROM manual_balances WHERE entity = ? ORDER BY period DESC').all(entity) as any[]).map((r: any) => r.period))];
+      res.json({ rows, periods });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.patch('/manual-balances/:id', (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { amount_local, exchange_rate, entity } = req.body as { amount_local: number; exchange_rate: number; entity: string };
+      const amount_usd = amount_local * exchange_rate;
+      db.prepare(`UPDATE manual_balances SET amount_local = ?, exchange_rate = ?, amount_usd = ? WHERE id = ? AND entity = ?`).run(amount_local, exchange_rate, amount_usd, id, entity || '');
+      res.json({ ok: true, id, amount_local, exchange_rate, amount_usd });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  router.post('/manual-balances', (req, res) => {
+    try {
+      const { entity, period, rows } = req.body as { entity: string; period: string; rows: Array<{ account_code: string; account_name: string; category: string; amount_local: number; currency: string; exchange_rate: number }> };
+      if (!entity || !period || !rows?.length) return res.status(400).json({ error: 'entity, period and rows required' }) as any;
+      const insert = db.prepare(`INSERT INTO manual_balances (entity, account_code, account_name, period, amount_local, currency, exchange_rate, amount_usd, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const tx = db.transaction(() => { for (const r of rows) insert.run(entity, r.account_code, r.account_name, period, r.amount_local, r.currency || 'USD', r.exchange_rate, r.amount_local * r.exchange_rate, r.category); });
+      tx();
+      res.json({ ok: true, entity, period, count: rows.length });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // List available balance snapshots
   router.get('/snapshots', (_req, res) => {
     const snaps = db.prepare(`

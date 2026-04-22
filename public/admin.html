@@ -107,6 +107,20 @@
       <div id="resetMsg" class="msg"></div>
       <div id="userTable"><p style="color:var(--text-dim)">Loading...</p></div>
     </div>
+    <!-- OW Additional Manual Balances -->
+    <div class="card">
+      <h2>Overworld Inc — Additional Manual Balances</h2>
+      <div id="owMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="owPeriod" onchange="loadOW()"></select>
+        <button class="btn primary" onclick="saveOW()">Save Changes</button>
+        <button class="btn" onclick="addNewOWPeriod()" style="border-color:var(--green);color:var(--green)">+ Add Month</button>
+        <span id="owTotal" style="font-size:13px;color:var(--green);font-weight:700;margin-left:12px"></span>
+      </div>
+      <div id="owTable"><p style="color:var(--text-dim)">Loading...</p></div>
+    </div>
+
     <!-- Foundation Manual Balances -->
     <div class="card">
       <h2>Xterio Foundation — Manual Balances</h2>
@@ -140,6 +154,7 @@
       // Show admin content for any logged-in user (server-side security via auth.js)
       document.getElementById('adminContent').style.display = 'block';
       loadUsers();
+      loadOWPeriods();
       loadFoundationPeriods();
     }
 
@@ -252,6 +267,139 @@
     }
 
     init();
+
+    // ── OW Additional Manual Balances ──
+    var owRows = [];
+    var OW_ENTITY = 'OW Additional';
+
+    async function loadOWPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(OW_ENTITY))).json();
+        var existingPeriods = data.periods || [];
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        if (existingPeriods.length) {
+          var earliest = existingPeriods[existingPeriods.length - 1];
+          var cur = new Date(earliest + '-01');
+          var end = new Date(currentPeriod + '-01');
+          while (cur <= end) {
+            allPeriods.push(cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0'));
+            cur.setMonth(cur.getMonth() + 1);
+          }
+        } else {
+          allPeriods = [currentPeriod];
+        }
+        var sel = document.getElementById('owPeriod');
+        sel.innerHTML = allPeriods.reverse().map(function(p) {
+          return '<option value="' + p + '">' + p + '</option>';
+        }).join('');
+        sel.value = allPeriods[0];
+        loadOW();
+      } catch(e) {
+        showMsg('owMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadOW() {
+      var period = document.getElementById('owPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(OW_ENTITY) + '&period=' + period)).json();
+        owRows = data.rows;
+        if (!owRows.length) {
+          document.getElementById('owTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevOW(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('owTotal').textContent = '';
+        } else {
+          renderOWTable(owRows);
+        }
+      } catch(e) {
+        document.getElementById('owTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+      }
+    }
+
+    function renderOWTable(rows) {
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>Amount (Local)</th><th>Currency</th><th>FX Rate</th><th>USD Amount</th></tr></thead><tbody>';
+      var totalUSD = 0;
+      rows.forEach(function(r, i) {
+        var usd = r.amount_local * r.exchange_rate;
+        totalUSD += usd;
+        html += '<tr>' +
+          '<td>' + r.account_code + '</td>' +
+          '<td>' + r.account_name + '</td>' +
+          '<td><input type="number" step="0.01" value="' + r.amount_local + '" id="ow_amount_' + i + '" oninput="updateOWRow(' + i + ')"></td>' +
+          '<td>' + (r.currency || 'USD') + '</td>' +
+          '<td><input type="number" step="0.0001" value="' + r.exchange_rate + '" id="ow_fx_' + i + '" oninput="updateOWRow(' + i + ')"></td>' +
+          '<td id="ow_usd_' + i + '">' + usd.toLocaleString('en-US', {style:'currency',currency:'USD',maximumFractionDigits:0}) + '</td>' +
+          '</tr>';
+      });
+      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="owTotalCell">' + totalUSD.toLocaleString('en-US', {style:'currency',currency:'USD',maximumFractionDigits:0}) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('owTable').innerHTML = html;
+      document.getElementById('owTotal').textContent = 'Total: ' + totalUSD.toLocaleString('en-US', {style:'currency',currency:'USD',maximumFractionDigits:0});
+    }
+
+    function updateOWRow(i) {
+      var amt = parseFloat(document.getElementById('ow_amount_' + i).value) || 0;
+      var fx = parseFloat(document.getElementById('ow_fx_' + i).value) || 1;
+      var usd = amt * fx;
+      document.getElementById('ow_usd_' + i).textContent = usd.toLocaleString('en-US', {style:'currency',currency:'USD',maximumFractionDigits:0});
+      owRows[i].amount_local = amt;
+      owRows[i].exchange_rate = fx;
+    }
+
+    async function saveOW() {
+      var saved = 0, failed = 0;
+      for (var i = 0; i < owRows.length; i++) {
+        var r = owRows[i];
+        try {
+          var res = await fetch('/api/dashboard/manual-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: OW_ENTITY, amount_local: r.amount_local, exchange_rate: r.exchange_rate })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) showMsg('owMsg', saved + ' rows saved successfully', 'success');
+      else showMsg('owMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      loadOW();
+    }
+
+    function addNewOWPeriod() {
+      var sel = document.getElementById('owPeriod');
+      var now = new Date();
+      sel.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      loadOW();
+    }
+
+    async function copyFromPrevOW(period) {
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(OW_ENTITY) + '&period=' + prevPeriod)).json();
+        if (!data.rows.length) { showMsg('owMsg', 'No data for ' + prevPeriod, 'error'); return; }
+        var newRows = data.rows.map(function(r) {
+          return { account_code: r.account_code, account_name: r.account_name, category: r.category, amount_local: r.amount_local, currency: r.currency || 'USD', exchange_rate: r.exchange_rate };
+        });
+        var res = await fetch('/api/dashboard/manual-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity: OW_ENTITY, period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('owMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod, 'success');
+          await loadOWPeriods();
+          document.getElementById('owPeriod').value = period;
+          loadOW();
+        } else { showMsg('owMsg', 'Failed to copy', 'error'); }
+      } catch(e) { showMsg('owMsg', 'Error: ' + e.message, 'error'); }
+    }
 
     // ── Foundation Manual Balances ──
     var foundationRows = [];
