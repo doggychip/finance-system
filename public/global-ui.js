@@ -1,34 +1,20 @@
-// Global UI state: shared date picker, user menu, i18n
-// Include after auth.js, before page-specific scripts
+// Global UI: progressive-enhancement layer.
+// - Does NOT replace each page's .nav or .actions.
+// - Adds: user menu, i18n toggle, nav nowrap CSS, and a value-sync
+//   layer that keeps every page's existing #asOfDate input in sync
+//   via localStorage + URL param (?as_of_date=YYYY-MM-DD).
+// Loaded on all pages after auth.js.
 
 (function() {
   // ========== i18n ==========
   var TRANSLATIONS = {
     en: {
-      'nav.overview': 'Overview', 'nav.reports': 'Reports', 'nav.cash': 'Cash',
-      'nav.consolidated': 'Consolidated', 'nav.ic_detail': 'IC Detail',
-      'nav.reconciliation': 'Reconciliation', 'nav.tasks': 'Tasks',
       'menu.change_password': 'Change Password', 'menu.admin': 'Admin',
       'menu.logout': 'Logout', 'menu.language': 'Language',
-      'date.today': 'Today', 'date.month_end': 'Month End',
-      'date.last_month': 'Last Month', 'date.quarter_end': 'Quarter End',
-      'date.ytd': 'YTD', 'date.as_of': 'As of',
-      'tooltip.consolidated': 'Combined balance sheet across all entities',
-      'tooltip.ic_detail': 'Intercompany transactions between entities',
-      'tooltip.reconciliation': 'Compare Odoo records vs ledger',
     },
     zh: {
-      'nav.overview': '总览', 'nav.reports': '报表', 'nav.cash': '现金',
-      'nav.consolidated': '合并报表', 'nav.ic_detail': '内部往来',
-      'nav.reconciliation': '核对', 'nav.tasks': '任务',
       'menu.change_password': '修改密码', 'menu.admin': '管理',
       'menu.logout': '登出', 'menu.language': '语言',
-      'date.today': '今天', 'date.month_end': '月末',
-      'date.last_month': '上月', 'date.quarter_end': '季末',
-      'date.ytd': '今年', 'date.as_of': '截至',
-      'tooltip.consolidated': '所有实体的合并资产负债表',
-      'tooltip.ic_detail': '实体间往来交易',
-      'tooltip.reconciliation': 'Odoo记录与账本对比',
     }
   };
 
@@ -44,125 +30,109 @@
     return (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
   };
 
-  // ========== Global Date State ==========
+  // ========== Global date state (sync layer) ==========
   var DATE_KEY = 'finance_as_of_date';
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   window.getGlobalDate = function() {
-    // URL param takes precedence
-    var urlParams = new URLSearchParams(window.location.search);
-    var urlDate = urlParams.get('as_of_date');
-    if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) return urlDate;
-    // Then localStorage
-    return localStorage.getItem(DATE_KEY) || '2026-02-28';
+    var urlDate = new URLSearchParams(window.location.search).get('as_of_date');
+    if (urlDate && DATE_RE.test(urlDate)) return urlDate;
+    var stored = localStorage.getItem(DATE_KEY);
+    return stored && DATE_RE.test(stored) ? stored : '';
   };
 
-  window.setGlobalDate = function(date, reload) {
+  window.setGlobalDate = function(date) {
+    if (!date || !DATE_RE.test(date)) return;
     localStorage.setItem(DATE_KEY, date);
-    // Update URL
     var url = new URL(window.location);
-    url.searchParams.set('as_of_date', date);
-    window.history.replaceState({}, '', url);
-    if (reload !== false) {
-      window.dispatchEvent(new CustomEvent('finance:date-change', { detail: { date: date } }));
+    if (url.searchParams.get('as_of_date') !== date) {
+      url.searchParams.set('as_of_date', date);
+      window.history.replaceState({}, '', url);
     }
   };
 
-  // Date quick-selects
-  window.getDateShortcut = function(type) {
-    var d = new Date();
-    switch (type) {
-      case 'today':
-        return d.toISOString().slice(0, 10);
-      case 'month_end':
-        return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-      case 'last_month':
-        return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
-      case 'quarter_end':
-        var q = Math.floor(d.getMonth() / 3);
-        return new Date(d.getFullYear(), (q + 1) * 3, 0).toISOString().slice(0, 10);
-      case 'ytd':
-        return d.toISOString().slice(0, 10);
-    }
-    return d.toISOString().slice(0, 10);
-  };
+  // Sync layer: seed the page's existing #asOfDate from global state,
+  // and listen for user changes to write them back to global state.
+  // Safe no-op on pages without an #asOfDate element.
+  function installDateSync() {
+    var el = document.getElementById('asOfDate');
+    if (!el) return;
+    var globalDate = window.getGlobalDate();
 
-  // ========== Global Header (nav + actions) ==========
-  window.renderGlobalHeader = function(activePage) {
+    // If the user has picked a global date, apply it to this page's input.
+    // For <select>, only set if the matching option already exists; otherwise
+    // leave the page's own init (e.g. loadSnapshots) to populate and choose.
+    if (globalDate) {
+      if (el.tagName === 'SELECT') {
+        var hasOption = Array.prototype.some.call(el.options, function(o) {
+          return o.value === globalDate;
+        });
+        if (hasOption) el.value = globalDate;
+      } else {
+        el.value = globalDate;
+      }
+    }
+
+    el.addEventListener('change', function() {
+      if (el.value && DATE_RE.test(el.value)) {
+        window.setGlobalDate(el.value);
+      }
+    });
+  }
+
+  // For <select id="asOfDate"> (cash.html, cash-position.html) the options
+  // are injected asynchronously. Retry seeding once options appear.
+  function observeAsyncSelect() {
+    var el = document.getElementById('asOfDate');
+    if (!el || el.tagName !== 'SELECT') return;
+    if (el.options.length > 0) return;
+    var mo = new MutationObserver(function() {
+      if (el.options.length > 0) {
+        mo.disconnect();
+        var globalDate = window.getGlobalDate();
+        if (globalDate) {
+          var hasOption = Array.prototype.some.call(el.options, function(o) {
+            return o.value === globalDate;
+          });
+          if (hasOption) el.value = globalDate;
+        }
+      }
+    });
+    mo.observe(el, { childList: true });
+  }
+
+  // ========== User menu (additive) ==========
+  // Injected into .header WITHOUT removing existing .nav or .actions.
+  function injectUserMenu() {
     var header = document.querySelector('.header');
     if (!header) return;
+    if (document.getElementById('user-menu')) return; // already present
 
     var user = window.getUser && window.getUser();
+    if (!user) return;
+
     var lang = window.getLang();
-
-    // Build nav with tooltips
-    var navItems = [
-      { id: 'overview', href: '/', label: window.t('nav.overview'), tooltip: '' },
-      { id: 'reports', href: '/reports.html', label: window.t('nav.reports'), tooltip: '' },
-      { id: 'cash', href: '/cash.html', label: window.t('nav.cash'), tooltip: '' },
-      { id: 'consolidated', href: '/consolidated-bs.html', label: window.t('nav.consolidated'), tooltip: window.t('tooltip.consolidated') },
-      { id: 'ic_detail', href: '/ic-detail.html', label: window.t('nav.ic_detail'), tooltip: window.t('tooltip.ic_detail') },
-      { id: 'reconciliation', href: '/reconciliation.html', label: window.t('nav.reconciliation'), tooltip: window.t('tooltip.reconciliation') },
-      { id: 'tasks', href: '/kanban.html', label: window.t('nav.tasks'), tooltip: '' },
-    ];
-
-    // Clear existing nav and actions
-    var existingNav = header.querySelector('.nav');
-    var existingActions = header.querySelector('.actions');
-    if (existingNav) existingNav.remove();
-    if (existingActions) existingActions.remove();
-    var existingUserInfo = document.getElementById('user-info');
-    if (existingUserInfo) existingUserInfo.remove();
-    var existingMenu = document.getElementById('user-menu');
-    if (existingMenu) existingMenu.remove();
-
-    // Build nav
-    var nav = document.createElement('div');
-    nav.className = 'nav';
-    nav.innerHTML = navItems.map(function(n) {
-      var cls = n.id === activePage ? 'active' : '';
-      var title = n.tooltip ? ' title="' + n.tooltip + '"' : '';
-      return '<a href="' + n.href + '" class="' + cls + '"' + title + '>' + n.label + '</a>';
-    }).join('');
-    header.appendChild(nav);
-
-    // Build actions with date picker + user menu
-    var actions = document.createElement('div');
-    actions.style.cssText = 'display:flex;align-items:center;gap:8px;';
-    actions.innerHTML =
-      '<div class="global-date-control" style="display:flex;align-items:center;gap:4px;padding:4px;background:var(--surface2,#232734);border:1px solid var(--border,#2e3344);border-radius:6px;">' +
-        '<label style="font-size:11px;color:var(--text-dim,#8b8fa3);padding:0 6px">' + window.t('date.as_of') + '</label>' +
-        '<input type="date" id="globalDate" value="' + window.getGlobalDate() + '" style="padding:4px 6px;border-radius:4px;border:1px solid var(--border,#2e3344);background:var(--surface,#1a1d27);color:var(--text,#e4e6ef);font-size:11px;">' +
-        '<button class="btn" onclick="applyGlobalDate()" style="padding:4px 10px;font-size:11px">Apply</button>' +
-      '</div>' +
-      '<div class="date-chips" style="display:flex;gap:4px;">' +
-        '<button class="chip-btn" onclick="setDateShortcut(\'today\')" title="' + window.t('date.today') + '" style="padding:4px 8px;background:var(--surface2,#232734);border:1px solid var(--border,#2e3344);border-radius:4px;color:var(--text-secondary,#b0b8c4);font-size:10px;cursor:pointer">' + window.t('date.today') + '</button>' +
-        '<button class="chip-btn" onclick="setDateShortcut(\'month_end\')" title="' + window.t('date.month_end') + '" style="padding:4px 8px;background:var(--surface2,#232734);border:1px solid var(--border,#2e3344);border-radius:4px;color:var(--text-secondary,#b0b8c4);font-size:10px;cursor:pointer">' + window.t('date.month_end') + '</button>' +
-      '</div>';
-
-    // User menu (collapsed dropdown)
-    if (user) {
-      actions.innerHTML += '<div id="user-menu" style="position:relative">' +
-        '<button id="userBtn" onclick="toggleUserMenu()" style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--surface2,#232734);border:1px solid var(--border,#2e3344);border-radius:20px;color:var(--text,#e4e6ef);font-size:12px;cursor:pointer">' +
-          '<span style="width:22px;height:22px;border-radius:50%;background:var(--accent,#6366f1);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">' + (user.display_name || 'U').charAt(0) + '</span>' +
-          '<span style="max-width:120px;overflow:hidden;text-overflow:ellipsis">' + (user.display_name || user.username) + '</span>' +
-          '<span style="color:var(--text-dim,#8b8fa3)">▾</span>' +
-        '</button>' +
-        '<div id="userDropdown" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#1a1d27);border:1px solid var(--border,#2e3344);border-radius:8px;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:100;overflow:hidden">' +
-          (user.role === 'admin' ? '<a href="/admin.html" class="menu-item" style="display:block;padding:10px 14px;color:var(--text,#e4e6ef);text-decoration:none;font-size:12px;border-bottom:1px solid var(--border,#2e3344)">⚙ ' + window.t('menu.admin') + '</a>' : '') +
-          '<button onclick="openPasswordModal();toggleUserMenu()" class="menu-item" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:var(--text,#e4e6ef);font-size:12px;cursor:pointer;border-bottom:1px solid var(--border,#2e3344)">🔒 ' + window.t('menu.change_password') + '</button>' +
-          '<div class="menu-item" style="padding:10px 14px;font-size:12px;border-bottom:1px solid var(--border,#2e3344);color:var(--text-dim,#8b8fa3)">' + window.t('menu.language') + ': ' +
-            '<button onclick="setLang(\'en\')" style="padding:2px 8px;margin-left:4px;background:' + (lang === 'en' ? 'var(--accent,#6366f1)' : 'transparent') + ';color:' + (lang === 'en' ? 'white' : 'var(--text,#e4e6ef)') + ';border:1px solid var(--border,#2e3344);border-radius:4px;font-size:11px;cursor:pointer">EN</button> ' +
-            '<button onclick="setLang(\'zh\')" style="padding:2px 8px;background:' + (lang === 'zh' ? 'var(--accent,#6366f1)' : 'transparent') + ';color:' + (lang === 'zh' ? 'white' : 'var(--text,#e4e6ef)') + ';border:1px solid var(--border,#2e3344);border-radius:4px;font-size:11px;cursor:pointer">中文</button>' +
-          '</div>' +
-          '<button onclick="logout()" class="menu-item" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:var(--negative,#ef4444);font-size:12px;cursor:pointer">→ ' + window.t('menu.logout') + '</button>' +
+    var wrap = document.createElement('div');
+    wrap.id = 'user-menu';
+    wrap.style.cssText = 'position:relative;margin-left:8px;flex-shrink:0;';
+    wrap.innerHTML =
+      '<button id="userBtn" type="button" aria-haspopup="menu" style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:#232734;border:1px solid #2e3344;border-radius:20px;color:#e4e6ef;font-size:12px;cursor:pointer">' +
+        '<span style="width:22px;height:22px;border-radius:50%;background:#6366f1;color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">' + (user.display_name || user.username || 'U').charAt(0).toUpperCase() + '</span>' +
+        '<span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (user.display_name || user.username) + '</span>' +
+        '<span style="color:#8b8fa3">▾</span>' +
+      '</button>' +
+      '<div id="userDropdown" role="menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#1a1d27;border:1px solid #2e3344;border-radius:8px;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:100;overflow:hidden">' +
+        (user.role === 'admin' ? '<a href="/admin.html" class="menu-item" style="display:block;padding:10px 14px;color:#e4e6ef;text-decoration:none;font-size:12px;border-bottom:1px solid #2e3344">⚙ ' + window.t('menu.admin') + '</a>' : '') +
+        '<button type="button" onclick="openPasswordModal();toggleUserMenu()" class="menu-item" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:#e4e6ef;font-size:12px;cursor:pointer;border-bottom:1px solid #2e3344">🔒 ' + window.t('menu.change_password') + '</button>' +
+        '<div class="menu-item" style="padding:10px 14px;font-size:12px;border-bottom:1px solid #2e3344;color:#8b8fa3">' + window.t('menu.language') + ': ' +
+          '<button type="button" onclick="setLang(\'en\')" style="padding:2px 8px;margin-left:4px;background:' + (lang === 'en' ? '#6366f1' : 'transparent') + ';color:' + (lang === 'en' ? 'white' : '#e4e6ef') + ';border:1px solid #2e3344;border-radius:4px;font-size:11px;cursor:pointer">EN</button> ' +
+          '<button type="button" onclick="setLang(\'zh\')" style="padding:2px 8px;background:' + (lang === 'zh' ? '#6366f1' : 'transparent') + ';color:' + (lang === 'zh' ? 'white' : '#e4e6ef') + ';border:1px solid #2e3344;border-radius:4px;font-size:11px;cursor:pointer">中文</button>' +
         '</div>' +
+        '<button type="button" onclick="logout()" class="menu-item" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:#ef4444;font-size:12px;cursor:pointer">→ ' + window.t('menu.logout') + '</button>' +
       '</div>';
-    }
 
-    actions.className = 'actions-wrapper';
-    header.appendChild(actions);
+    header.appendChild(wrap);
 
-    // Close dropdown on outside click
     document.addEventListener('click', function(e) {
       var dropdown = document.getElementById('userDropdown');
       var btn = document.getElementById('userBtn');
@@ -170,37 +140,65 @@
         dropdown.style.display = 'none';
       }
     });
-  };
+  }
 
   window.toggleUserMenu = function() {
     var d = document.getElementById('userDropdown');
-    if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
+    if (d) d.style.display = d.style.display === 'none' || !d.style.display ? 'block' : 'none';
   };
 
-  window.applyGlobalDate = function() {
-    var input = document.getElementById('globalDate');
-    if (input && input.value) {
-      window.setGlobalDate(input.value);
-      location.reload();
+  // Kept for backward compatibility with auth.js, which calls
+  // renderGlobalHeader(activePage) after login. Now a no-op for nav/actions:
+  // we don't touch them. Just mark the active link and inject the user menu.
+  window.renderGlobalHeader = function(activePage) {
+    var nav = document.querySelector('.header .nav');
+    if (nav && activePage) {
+      // Normalize active state based on href. Does not rebuild the nav.
+      var hrefMap = {
+        overview: '/', reports: '/reports.html', cash: '/cash.html',
+        consolidated: '/consolidated-bs.html', ic_detail: '/ic-detail.html',
+        reconciliation: '/reconciliation.html', tasks: '/kanban.html'
+      };
+      var target = hrefMap[activePage];
+      if (target) {
+        nav.querySelectorAll('a').forEach(function(a) {
+          var href = a.getAttribute('href') || '';
+          a.classList.toggle('active', href === target);
+        });
+      }
     }
+    injectUserMenu();
+    installDateSync();
+    observeAsyncSelect();
   };
 
-  window.setDateShortcut = function(type) {
-    var date = window.getDateShortcut(type);
-    window.setGlobalDate(date);
-    location.reload();
-  };
-
-  // Auto-wrap nav links with nowrap on wider screens
+  // ========== Nav nowrap + compact padding CSS ==========
   var style = document.createElement('style');
-  style.textContent = `
-    .header { flex-wrap: nowrap !important; gap: 12px; }
-    .nav { flex-wrap: nowrap !important; overflow-x: auto; }
-    .nav a { white-space: nowrap; }
-    @media (max-width: 1199px) { .nav { flex-wrap: wrap !important; } }
-    .actions-wrapper { flex-shrink: 0; }
-    #userDropdown .menu-item:hover { background: var(--surface2, #232734); }
-    .chip-btn:hover { background: var(--border, #2e3344) !important; color: var(--text, #e4e6ef) !important; }
-  `;
+  style.textContent =
+    '.header { flex-wrap: nowrap !important; gap: 16px; }' +
+    '.header h1 { flex-shrink: 0; }' +
+    '.nav { flex-wrap: nowrap !important; min-width: 0; overflow: hidden; }' +
+    '.nav a { white-space: nowrap; flex-shrink: 0; }' +
+    '.actions { flex-shrink: 0; }' +
+    '@media (max-width: 1299px) { .nav a { padding: 6px 10px !important; font-size: 12px !important; } }' +
+    '@media (max-width: 1199px) { .nav a { padding: 5px 8px !important; font-size: 12px !important; } .nav { gap: 1px !important; } }' +
+    '@media (max-width: 1099px) { .nav { flex-wrap: wrap !important; overflow: visible; } }' +
+    '#userDropdown .menu-item:hover { background: #232734; }';
   document.head.appendChild(style);
+
+  // ========== React to URL changes (back/forward) ==========
+  window.addEventListener('popstate', function() {
+    var el = document.getElementById('asOfDate');
+    var d = window.getGlobalDate();
+    if (el && d && el.value !== d) {
+      if (el.tagName === 'SELECT') {
+        var hasOption = Array.prototype.some.call(el.options, function(o) {
+          return o.value === d;
+        });
+        if (hasOption) el.value = d;
+      } else {
+        el.value = d;
+      }
+    }
+  });
 })();

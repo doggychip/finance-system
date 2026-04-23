@@ -137,7 +137,7 @@
     }
     // d focuses date picker (when not typing)
     if (e.key === 'd' && !isTyping && !e.metaKey && !e.ctrlKey) {
-      var dateInput = document.getElementById('globalDate') || document.getElementById('asOfDate');
+      var dateInput = document.getElementById('asOfDate');
       if (dateInput) { e.preventDefault(); dateInput.focus(); }
     }
     // Esc closes overlays
