@@ -162,7 +162,16 @@
     <div class="filter-group">
       <button class="filter-btn" id="btnThisWeek" onclick="toggleThisWeek()">本周任务</button>
     </div>
-  </div>
+    <div class="filter-group" style="margin-left:auto">
+      <input type="search" id="taskSearch" placeholder="🔍 Search tasks..." oninput="applySearch()" style="padding:6px 10px;border-radius:5px;border:1px solid var(--border,#2e3344);background:var(--surface2,#232734);color:var(--text,#e4e6ef);font-size:12px;width:180px">
+      <select id="taskSort" onchange="applySort()" style="padding:6px 10px;border-radius:5px;border:1px solid var(--border,#2e3344);background:var(--surface2,#232734);color:var(--text,#e4e6ef);font-size:12px">
+        <option value="due_date">Sort: Due date</option>
+        <option value="priority">Sort: Priority</option>
+        <option value="assignee">Sort: Assignee</option>
+        <option value="created_at">Sort: Created</option>
+      </select>
+    </div>
+
 
   <div class="board-container">
     <div class="board">
@@ -262,7 +271,26 @@
       renderBoard();
     }
 
+    // 8.2 Search & sort
+    window.applySearch = function() { renderBoard(); };
+    window.applySort = function() { renderBoard(); };
+    function getSearchQ() { var e = document.getElementById('taskSearch'); return e ? e.value.toLowerCase().trim() : ''; }
+    function getSortKey() { var e = document.getElementById('taskSort'); return e ? e.value : 'due_date'; }
+
     function filterTasks(tasks) {
+      var q = getSearchQ();
+      if (q) {
+        tasks = tasks.filter(function(t) {
+          return (t.title || '').toLowerCase().includes(q) ||
+            (t.description || '').toLowerCase().includes(q) ||
+            (t.assigned_name || '').toLowerCase().includes(q) ||
+            (t.category || '').toLowerCase().includes(q);
+        });
+      }
+      return _filterTasksOrig(tasks);
+    }
+
+    function _filterTasksOrig(tasks) {
       return tasks.filter(function(t) {
         if (filters.assignee !== 'all') {
           var name = (t.assigned_name || '').split(' ')[0];
@@ -279,7 +307,21 @@
     }
 
     function sortTasks(tasks) {
+      var key = getSortKey ? getSortKey() : 'priority';
       return tasks.slice().sort(function(a, b) {
+        if (key === 'due_date') {
+          if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+          if (a.due_date) return -1;
+          if (b.due_date) return 1;
+          return 0;
+        }
+        if (key === 'assignee') {
+          return (a.assigned_name || 'zzz').localeCompare(b.assigned_name || 'zzz');
+        }
+        if (key === 'created_at') {
+          return (b.created_at || '').localeCompare(a.created_at || '');
+        }
+        // Default: priority
         var pa = PRIORITY_ORDER[a.priority] !== undefined ? PRIORITY_ORDER[a.priority] : 9;
         var pb = PRIORITY_ORDER[b.priority] !== undefined ? PRIORITY_ORDER[b.priority] : 9;
         if (pa !== pb) return pa - pb;
