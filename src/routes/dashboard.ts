@@ -186,7 +186,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       : new Date().toISOString().slice(0, 10);
     const foundationPeriodCash = _foundationDateCash.slice(0, 7);
     const foundationRowsCash = foundationPeriodCash
-      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(foundationPeriodCash) as any[])
+      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ? AND account_code != 'FOUNDATION_IC'`).all(foundationPeriodCash) as any[])
       : [];
     const foundationCashLegacy = foundationRowsCash.length
       ? foundationRowsCash.reduce((s: number, r: any) => s + r.amount_local * r.exchange_rate, 0)
@@ -760,6 +760,15 @@ export function dashboardRoutes(db: Database.Database): Router {
 
         // Handle manual entities (e.g. Xterio Foundation)
         if (group.is_manual) {
+          // Foundation period: prefer user-requested date, else snapshot date
+          const _foundationDateBs = (snapshotDate && snapshotDate < '9000') ? snapshotDate
+            : (snapDate && snapDate < '9000') ? snapDate
+            : new Date().toISOString().slice(0, 10);
+          const foundationPeriodBs = _foundationDateBs.slice(0, 7);
+          const foundationICRowBs = foundationPeriodBs
+            ? (db.prepare(`SELECT amount_usd FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code = 'FOUNDATION_IC' AND period = ? LIMIT 1`).get(foundationPeriodBs) as any)
+            : null;
+          const foundationLiabilitiesBs = foundationICRowBs?.amount_usd ?? 1369636;
           // Xterio Foundation — hardcoded from spreadsheet (as at 28.02.2026)
           const balances: Record<string, number> = {
             'ASSETS': 5942149,
@@ -774,7 +783,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             'FIXED_ASSETS': 0,
             'NON_CURRENT_ASSETS': 0,
             'A_200000': 0, 'A_202000': 0,
-            'LIABILITIES': 1369636,
+            'LIABILITIES': foundationLiabilitiesBs,
             'CURRENT_LIABILITIES': 165000,
             'A_303010': 0, 'A_303011': 0, 'A_303040': 0, 'A_303041': 0,
             'A_303050': 0, 'A_303100': 0, 'A_303031': 165000,
@@ -884,7 +893,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         const latestPeriod = db.prepare(`
           SELECT period, SUM(amount_usd) as total_usd
           FROM manual_balances
-          WHERE entity = ?
+          WHERE entity = ? AND account_code != 'FOUNDATION_IC'
           GROUP BY period
           ORDER BY period DESC
           LIMIT 1
@@ -1528,7 +1537,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const rows = db.prepare(`
       SELECT entity, account_code, account_name, period, amount_local, currency, exchange_rate, amount_usd, category
       FROM manual_balances
-      WHERE entity = 'Xterio Foundation'
+      WHERE entity = 'Xterio Foundation' AND account_code != 'FOUNDATION_IC'
       ORDER BY category, account_code, period
     `).all() as any[];
 
@@ -1572,11 +1581,11 @@ export function dashboardRoutes(db: Database.Database): Router {
       const period = (req.query.period as string) || '';
       let rows: any[];
       if (period) {
-        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ? ORDER BY category, account_code`).all(period) as any[];
+        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code != 'FOUNDATION_IC' AND period = ? ORDER BY category, account_code`).all(period) as any[];
       } else {
-        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = 'Xterio Foundation' ORDER BY period DESC, category, account_code`).all() as any[];
+        rows = db.prepare(`SELECT id, account_code, account_name, category, amount_local, currency, exchange_rate, amount_usd, period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code != 'FOUNDATION_IC' ORDER BY period DESC, category, account_code`).all() as any[];
       }
-      const periods = [...new Set((db.prepare("SELECT DISTINCT period FROM manual_balances WHERE entity = 'Xterio Foundation' ORDER BY period DESC").all() as any[]).map((r: any) => r.period))];
+      const periods = [...new Set((db.prepare("SELECT DISTINCT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code != 'FOUNDATION_IC' ORDER BY period DESC").all() as any[]).map((r: any) => r.period))];
       res.json({ rows, periods });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1696,12 +1705,15 @@ export function dashboardRoutes(db: Database.Database): Router {
       : new Date().toISOString().slice(0, 10);
     const foundationPeriod = _foundationDateExec.slice(0, 7);
     const foundationRows = foundationPeriod
-      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(foundationPeriod) as any[])
+      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ? AND account_code != 'FOUNDATION_IC'`).all(foundationPeriod) as any[])
       : [];
     const foundationAssets = foundationRows.length
       ? foundationRows.reduce((s: number, r: any) => s + r.amount_local * r.exchange_rate, 0)
       : 5942149;  // fallback to hardcoded if no data
-    const foundationLiabilities = 1369636;  // IC payables to Xterio entities
+    const foundationICRow = foundationPeriod
+      ? (db.prepare(`SELECT amount_usd FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code = 'FOUNDATION_IC' AND period = ? LIMIT 1`).get(foundationPeriod) as any)
+      : null;
+    const foundationLiabilities = foundationICRow?.amount_usd ?? 1369636;  // IC payables to Xterio entities
     const foundationNetAssets = foundationAssets - foundationLiabilities;
 
     // Helper: get all company IDs for a group set

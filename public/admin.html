@@ -121,6 +121,19 @@
       <div id="foundationTable"><p style="color:var(--text-dim)">Loading...</p></div>
     </div>
 
+    <!-- Foundation IC Payable -->
+    <div class="card">
+      <h2>Foundation IC Payable</h2>
+      <div id="foundationICMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="foundationICPeriod" onchange="loadFoundationIC()"></select>
+        <label style="font-size:12px;color:var(--text-dim);margin-left:12px">IC Payable (USD):</label>
+        <input type="number" step="0.01" id="foundationICAmount" style="width:160px">
+        <button class="btn primary" onclick="saveFoundationIC()">Save</button>
+      </div>
+    </div>
+
     <!-- Keystone Foundation Manual Balances -->
     <div class="card">
       <h2>Keystone Foundation — Manual Balances</h2>
@@ -155,6 +168,7 @@
       document.getElementById('adminContent').style.display = 'block';
       loadUsers();
       loadFoundationPeriods();
+      loadFoundationICPeriods();
       loadKeystonePeriods();
     }
 
@@ -450,6 +464,79 @@
         }
       } catch(e) {
         showMsg('foundationMsg', 'Error: ' + e.message, 'error');
+      }
+    }
+
+    // ── Foundation IC Payable ──
+    var FOUNDATION_IC_ENTITY = 'Xterio Foundation';
+    var FOUNDATION_IC_CODE = 'FOUNDATION_IC';
+    var foundationICRow = null;
+
+    async function loadFoundationICPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY))).json();
+        var existingPeriods = (data.periods || []);
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
+        var parts = earliest.split('-');
+        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = cy * 12 + cm;
+        var allPeriods = [];
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+        var sel = document.getElementById('foundationICPeriod');
+        sel.innerHTML = allPeriods.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join('');
+        sel.value = currentPeriod;
+        loadFoundationIC();
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadFoundationIC() {
+      var period = document.getElementById('foundationICPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY) + '&period=' + period)).json();
+        foundationICRow = (data.rows || []).find(function(r) { return r.account_code === FOUNDATION_IC_CODE; }) || null;
+        document.getElementById('foundationICAmount').value = foundationICRow ? foundationICRow.amount_usd : 0;
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to load IC data', 'error');
+      }
+    }
+
+    async function saveFoundationIC() {
+      var period = document.getElementById('foundationICPeriod').value;
+      var amount = parseFloat(document.getElementById('foundationICAmount').value) || 0;
+      try {
+        if (foundationICRow && foundationICRow.id) {
+          var res = await fetch('/api/dashboard/manual-balances/' + foundationICRow.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: FOUNDATION_IC_ENTITY, amount_local: amount, exchange_rate: 1 })
+          });
+          if (!res.ok) throw new Error('save failed');
+        } else {
+          var res = await fetch('/api/dashboard/manual-balances', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entity: FOUNDATION_IC_ENTITY,
+              period: period,
+              rows: [{ account_code: FOUNDATION_IC_CODE, account_name: 'IC Payable (USD)', category: 'IC', amount_local: amount, currency: 'USD', exchange_rate: 1 }]
+            })
+          });
+          if (!res.ok) throw new Error('save failed');
+        }
+        showMsg('foundationICMsg', 'IC Payable saved for ' + period, 'success');
+        loadFoundationIC();
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to save: ' + e.message, 'error');
       }
     }
 

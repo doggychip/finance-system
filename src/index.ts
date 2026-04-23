@@ -15,6 +15,7 @@ import { alertsTasksRoutes } from './routes/alerts-tasks';
 import { startSyncScheduler } from './odoo/sync-orchestrator';
 import { seedXterioFoundation } from './data/xterio-seed';
 import { seedKeystoneFoundation } from './data/keystone-seed';
+import { seedFoundationIC } from './data/foundation-ic-seed';
 import { migrateHistoricalCash } from './db/migrate-historical-cash';
 import { seedHistoricalCash } from './db/seed-historical-cash';
 import { historicalCashRoutes } from './routes/historical-cash';
@@ -60,6 +61,7 @@ const dbPath = process.env.DB_PATH || 'finance.db';
 const db = initDb(dbPath);
 seedXterioFoundation(db);
 seedKeystoneFoundation(db);
+seedFoundationIC(db);
 migrateHistoricalCash(db);
 seedHistoricalCash(db);
 
