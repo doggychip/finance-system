@@ -113,7 +113,7 @@
     .hero-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
     .hero-card .value { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
     .hero-card.main .value { font-size: 38px; color: var(--positive); }
-    .hero-card .change { font-size: 11px; margin-top: 8px; font-weight: 600; }
+    .hero-card .change { font-size: 11px; margin-top: 8px; font-weight: 600; color: var(--text-dim); }
     .hero-card .change.up { color: var(--positive); }
     .hero-card .change.down { color: var(--negative); }
     .hero-card .sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
@@ -318,6 +318,15 @@
       return '$' + Math.round(n);
     }
     function fmtPct(n) { return (n == null || isNaN(n) || !isFinite(n)) ? '' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+    // Format change label with meaningful empty state
+    function fmtChange(chg, pct) {
+      if (Math.abs(chg) < 0.5) return 'No change since last period';
+      return fmtShort(chg) + (pct != null ? ' (' + fmtPct(pct) + ')' : '') + ' vs prior';
+    }
+    function changeClassName(chg) {
+      if (Math.abs(chg) < 0.5) return 'change';
+      return 'change ' + (chg >= 0 ? 'up' : 'down');
+    }
 
     var palette = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e','#a855f7','#64748b','#0ea5e9'];
 
@@ -330,23 +339,23 @@
         var nonOWChg = data.non_ow_cash - data.non_ow_cash_prior;
         var nonOWPct = data.non_ow_cash_prior ? (nonOWChg / Math.abs(data.non_ow_cash_prior) * 100) : 0;
         var chgEl = document.getElementById('heroNonOWChange');
-        chgEl.textContent = fmtShort(nonOWChg) + ' (' + fmtPct(nonOWPct) + ') vs prior';
-        chgEl.className = 'change ' + (nonOWChg >= 0 ? 'up' : 'down');
+        chgEl.textContent = fmtChange(nonOWChg, nonOWPct);
+        chgEl.className = changeClassName(nonOWChg);
         document.getElementById('heroSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
 
         document.getElementById('heroOW').textContent = fmt(data.ow_cash);
         var owChg = data.ow_cash - data.ow_cash_prior;
         var owChgEl = document.getElementById('heroOWChange');
-        owChgEl.textContent = fmtShort(owChg) + ' vs prior';
-        owChgEl.className = 'change ' + (owChg >= 0 ? 'up' : 'down');
+        owChgEl.textContent = fmtChange(owChg, null);
+        owChgEl.className = changeClassName(owChg);
 
         // Xterio closing balance
         document.getElementById('heroXterio').textContent = fmt(data.xterio_cash);
         var xterioChg = data.xterio_cash - data.xterio_cash_prior;
         var xterioPct = data.xterio_cash_prior ? (xterioChg / Math.abs(data.xterio_cash_prior) * 100) : 0;
         var xterioChgEl = document.getElementById('heroXterioChange');
-        xterioChgEl.textContent = fmtShort(xterioChg) + ' (' + fmtPct(xterioPct) + ') vs prior';
-        xterioChgEl.className = 'change ' + (xterioChg >= 0 ? 'up' : 'down');
+        xterioChgEl.textContent = fmtChange(xterioChg, xterioPct);
+        xterioChgEl.className = changeClassName(xterioChg);
         document.getElementById('heroXterioSub').textContent = 'As of ' + data.snapshot_date + ' | Incl. Xterio Foundation';
 
         // Holdings closing balance
@@ -354,8 +363,8 @@
         var holdingsChg = data.holdings_cash - data.holdings_cash_prior;
         var holdingsPct = data.holdings_cash_prior ? (holdingsChg / Math.abs(data.holdings_cash_prior) * 100) : 0;
         var holdingsChgEl = document.getElementById('heroHoldingsChange');
-        holdingsChgEl.textContent = fmtShort(holdingsChg) + ' (' + fmtPct(holdingsPct) + ') vs prior';
-        holdingsChgEl.className = 'change ' + (holdingsChg >= 0 ? 'up' : 'down');
+        holdingsChgEl.textContent = fmtChange(holdingsChg, holdingsPct);
+        holdingsChgEl.className = changeClassName(holdingsChg);
         document.getElementById('heroHoldingsSub').textContent = 'As of ' + data.snapshot_date;
 
         // OW closing balance
@@ -363,8 +372,8 @@
         var owClosingChg = data.ow_total_cash - data.ow_total_cash_prior;
         var owClosingPct = data.ow_total_cash_prior ? (owClosingChg / Math.abs(data.ow_total_cash_prior) * 100) : 0;
         var owClosingChgEl = document.getElementById('heroOWClosingChange');
-        owClosingChgEl.textContent = fmtShort(owClosingChg) + ' (' + fmtPct(owClosingPct) + ') vs prior';
-        owClosingChgEl.className = 'change ' + (owClosingChg >= 0 ? 'up' : 'down');
+        owClosingChgEl.textContent = fmtChange(owClosingChg, owClosingPct);
+        owClosingChgEl.className = changeClassName(owClosingChg);
         document.getElementById('heroOWClosingSub').textContent = 'As of ' + data.snapshot_date;
 
         // Cash trend chart
@@ -401,6 +410,7 @@
           barsEl.innerHTML = '<div class="loading">No data</div>';
         } else {
           var maxCash = Math.max.apply(null, entities.map(function(e) { return Math.abs(e.cash); }));
+          var grandTotalCash = entities.reduce(function(s,e) { return s + Math.abs(e.cash); }, 0);
           barsEl.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:10px;font-size:11px;color:var(--text-dim)"><span style="color:var(--green)">■ Cash (Bank)</span><span style="color:var(--cyan)">■ Crypto</span></div>' +
             entities.map(function(e, i) {
             var total = Math.abs(e.cash);
@@ -410,10 +420,13 @@
             var cryptoPct = maxCash > 0 ? (cryptoAbs / maxCash * 100) : 0;
             var bankFmt = e.bank ? fmtShort(e.bank) : '';
             var cryptoFmt = e.crypto ? fmtShort(e.crypto) : '';
+            var pctOfTotal = grandTotalCash > 0 ? ((total / grandTotalCash) * 100).toFixed(1) + '%' : '0%';
+            var tooltip = e.name + ' — ' + pctOfTotal + ' of total cash & crypto';
             var detail = '<div style="font-size:10px;color:var(--text-dim)">' +
               (bankFmt ? '<span style="color:var(--green)">Cash: ' + bankFmt + '</span>' : '') +
               (cryptoFmt ? ' <span style="color:var(--cyan)">Crypto: ' + cryptoFmt + '</span>' : '') + '</div>';
-            return '<div class="entity-bar"><div class="name">' + e.name + detail + '</div>' +
+            return '<div class="entity-bar" title="' + tooltip + '" style="cursor:pointer" onclick="location.href=\'/cash-position.html\'">' +
+              '<div class="name">' + e.name + detail + '</div>' +
               '<div class="bar-track">' +
                 '<div style="display:flex;height:100%">' +
                   (bankPct > 0 ? '<div style="width:' + Math.max(bankPct,1) + '%;background:var(--green);border-radius:4px 0 0 4px;min-width:2px"></div>' : '') +
@@ -655,14 +668,19 @@
           '<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">' + allOW.length + ' accounts</div>' +
           walletTable(allOW, 'No OW/Reach accounts');
 
-        // Overdrawn
+        // Overdrawn — improved empty state
         var overdrawnAccts = b.overdrawn ? b.overdrawn.accounts : [];
-        var odTotal = overdrawnAccts.reduce(function(s,a) { return s + a.balance; }, 0);
-        document.getElementById('overdrawnWallets').innerHTML =
-          (overdrawnAccts.length > 0 ?
-            '<div style="font-size:20px;font-weight:700;color:var(--red);margin-bottom:8px">' + fmt(odTotal) + '</div>' +
-            '<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">' + overdrawnAccts.length + ' accounts</div>' : '') +
-          walletTable(overdrawnAccts, 'No overdrawn accounts');
+        var realOverdrawn = overdrawnAccts.filter(function(a) { return a.balance < -0.5; });
+        var odTotal = realOverdrawn.reduce(function(s,a) { return s + a.balance; }, 0);
+        if (realOverdrawn.length === 0) {
+          document.getElementById('overdrawnWallets').innerHTML =
+            '<div style="padding:30px 20px;text-align:center;color:var(--positive,#22c55e);font-size:14px;font-weight:600">✓ No overdrawn accounts</div>';
+        } else {
+          document.getElementById('overdrawnWallets').innerHTML =
+            '<div style="font-size:20px;font-weight:700;color:var(--negative,#ef4444);margin-bottom:8px">' + fmt(odTotal) + '</div>' +
+            '<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">' + realOverdrawn.length + ' account' + (realOverdrawn.length === 1 ? '' : 's') + '</div>' +
+            walletTable(realOverdrawn, 'No overdrawn accounts');
+        }
 
       } catch (e) { console.error('Cash summary error:', e); }
     }
@@ -673,35 +691,50 @@
         var score = document.getElementById('healthScore');
         var meta = document.getElementById('healthMeta');
         var scoreColor = data.score >= 80 ? 'var(--positive)' : data.score >= 50 ? 'var(--warning)' : 'var(--negative)';
-        score.textContent = data.score + '%';
-        score.style.color = scoreColor;
+        // Gauge bar for health score
+        score.innerHTML = '<span title="System health: (tasks done % × 0.4) + (alerts resolved % × 0.6)" style="cursor:help;color:' + scoreColor + '">' + data.score + '%</span>' +
+          '<div style="width:80px;height:5px;background:var(--surface2);border-radius:3px;margin-top:4px;overflow:hidden"><div style="width:' + data.score + '%;height:100%;background:' + scoreColor + ';border-radius:3px"></div></div>';
         meta.innerHTML =
-          '<span>✓ Tasks <span class="stat-num">' + data.tasks.done + '/' + data.tasks.total + '</span></span>' +
-          (data.tasks.overdue > 0 ? '<span>⏰ Overdue <span class="stat-num" style="color:var(--negative)">' + data.tasks.overdue + '</span></span>' : '') +
-          (data.alerts.critical > 0 ? '<span>⚠ Critical <span class="stat-num" style="color:var(--negative)">' + data.alerts.critical + '</span></span>' : '') +
-          (data.alerts.open > 0 ? '<span>🔔 Alerts <span class="stat-num" style="color:var(--warning)">' + data.alerts.open + '</span></span>' : '');
+          '<span style="cursor:pointer" onclick="location.href=\'/kanban.html\'" title="View tasks">✓ Tasks <span class="stat-num">' + data.tasks.done + '/' + data.tasks.total + '</span></span>' +
+          (data.tasks.overdue > 0 ? '<span style="cursor:pointer" onclick="location.href=\'/kanban.html?filter=overdue\'" title="View overdue tasks">⏰ Overdue <span class="stat-num" style="color:var(--negative)">' + data.tasks.overdue + '</span></span>' : '') +
+          (data.alerts.critical > 0 ? '<span style="cursor:pointer" onclick="document.getElementById(\'dbAlerts\').scrollIntoView({behavior:\'smooth\'})" title="Scroll to critical alerts">⚠ Critical <span class="stat-num" style="color:var(--negative)">' + data.alerts.critical + '</span></span>' : '') +
+          (data.alerts.open > 0 ? '<span style="cursor:pointer" onclick="document.getElementById(\'dbAlerts\').scrollIntoView({behavior:\'smooth\'})" title="Scroll to alerts">🔔 Alerts <span class="stat-num" style="color:var(--warning)">' + data.alerts.open + '</span></span>' : '');
       } catch(e) { console.error(e); }
+    }
+
+    var alertsCache = [];
+    var alertFilter = 'all';
+
+    function renderAlerts() {
+      var el = document.getElementById('dbAlerts');
+      var filtered = alertFilter === 'all' ? alertsCache : alertsCache.filter(function(a) { return a.severity === alertFilter; });
+      var chips = '<div style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border)">' +
+        ['all','critical','warning','info'].map(function(f) {
+          var count = f === 'all' ? alertsCache.length : alertsCache.filter(function(a) { return a.severity === f; }).length;
+          var active = f === alertFilter;
+          return '<button onclick="alertFilter=\'' + f + '\';renderAlerts()" style="padding:4px 10px;border-radius:4px;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';background:' + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? 'white' : 'var(--text-secondary)') + ';font-size:11px;cursor:pointer;text-transform:capitalize">' + f + ' <span style="opacity:0.7">(' + count + ')</span></button>';
+        }).join('') + '</div>';
+      if (!filtered.length) {
+        el.innerHTML = chips + '<div style="padding:30px 20px;text-align:center;color:var(--positive);font-size:13px;font-weight:600">✓ ' + (alertsCache.length === 0 ? 'All clear — no active alerts' : 'No ' + alertFilter + ' alerts') + '</div>';
+        return;
+      }
+      el.innerHTML = chips + '<ul class="alert-list">' + filtered.map(function(a) {
+        var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
+        var rowCls = a.severity === 'critical' ? 'alert-item critical' : 'alert-item';
+        return '<li class="' + rowCls + '">' +
+          '<div class="alert-title"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span>' +
+          '<strong>' + a.title + '</strong>' +
+          (a.entity ? '<span style="color:var(--text-dim)">— ' + a.entity + '</span>' : '') +
+          '</div>' +
+          (a.message ? '<div class="alert-description">' + a.message + '</div>' : '') +
+          '</li>';
+      }).join('') + '</ul>';
     }
 
     async function loadDbAlerts() {
       try {
-        var alerts = await (await fetch('/api/alerts-tasks/alerts?resolved=false')).json();
-        var el = document.getElementById('dbAlerts');
-        if (!alerts.length) {
-          el.innerHTML = '<ul class="alert-list"><li class="alert-item"><span class="alert-label"><span class="badge ok">All Clear</span> No active alerts</span></li></ul>';
-          return;
-        }
-        el.innerHTML = '<ul class="alert-list">' + alerts.map(function(a) {
-          var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
-          var rowCls = a.severity === 'critical' ? 'alert-item critical' : 'alert-item';
-          return '<li class="' + rowCls + '">' +
-            '<div class="alert-title"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span>' +
-            '<strong>' + a.title + '</strong>' +
-            (a.entity ? '<span style="color:var(--text-dim)">— ' + a.entity + '</span>' : '') +
-            '</div>' +
-            (a.message ? '<div class="alert-description">' + a.message + '</div>' : '') +
-            '</li>';
-        }).join('') + '</ul>';
+        alertsCache = await (await fetch('/api/alerts-tasks/alerts?resolved=false')).json();
+        renderAlerts();
       } catch(e) { console.error(e); }
     }
 
