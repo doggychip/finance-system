@@ -2,9 +2,30 @@
 (function() {
   var style = document.createElement('style');
   style.textContent = `
-    #chat-toggle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); width: 32px; height: 80px; border-radius: 8px 0 0 8px; background: #6366f1; border: none; color: white; font-size: 16px; cursor: pointer; z-index: 9998; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-weight: 600; font-size: 11px; letter-spacing: 1px; box-shadow: -2px 0 10px rgba(99,102,241,0.3); }
-    #chat-toggle:hover { width: 36px; background: #5558e6; }
-    #chat-toggle.open { display: none; }
+    /* 9.1 Floating action button (circular, bottom-right) */
+    #chat-toggle {
+      position: fixed; bottom: 20px; right: 20px;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none; color: white; font-size: 22px;
+      cursor: pointer; z-index: 9998;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #chat-toggle:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(99,102,241,0.6); }
+    #chat-toggle.open { opacity: 0; pointer-events: none; transform: scale(0.8); }
+    /* 9.3 Welcome prompt chips */
+    .chat-prompt-chip {
+      display: block; width: 100%; text-align: left;
+      padding: 10px 14px; margin-bottom: 6px;
+      background: #232734; border: 1px solid #2e3344; border-radius: 10px;
+      color: #b0b8c4; font-size: 12px; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .chat-prompt-chip:hover { background: #2e3344; color: #f0f2f8; border-color: #6366f1; }
+    /* 9.4 Keyboard shortcut hint */
+    .kbd-hint { display:inline-block; padding: 1px 5px; background: #2e3344; border-radius: 3px; font-size: 10px; color: #b0b8c4; font-family: monospace; margin-left: 4px; }
     #chat-sidebar { position: fixed; top: 0; right: -400px; width: 400px; height: 100vh; background: #1a1d27; border-left: 1px solid #2e3344; z-index: 9999; display: flex; flex-direction: column; transition: right 0.3s ease; box-shadow: -4px 0 20px rgba(0,0,0,0.4); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
     #chat-sidebar.open { right: 0; }
     #chat-sidebar-header { padding: 16px 20px; background: #232734; border-bottom: 1px solid #2e3344; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
@@ -33,23 +54,29 @@
   `;
   document.head.appendChild(style);
 
-  // Toggle tab
+  // 9.1 Circular FAB toggle (bottom-right with sparkle icon)
   var toggle = document.createElement('button');
   toggle.id = 'chat-toggle';
-  toggle.textContent = 'AI';
-  toggle.title = 'Ask AI about your finances';
+  toggle.innerHTML = '✨';
+  toggle.title = 'Ask AI about your finances (press / to open)';
   document.body.appendChild(toggle);
 
-  // Sidebar
+  // 9.2 Slide-out panel (right side, 400px)
   var sidebar = document.createElement('div');
   sidebar.id = 'chat-sidebar';
   sidebar.innerHTML = `
     <div id="chat-sidebar-header">
-      <h3>AI Finance Assistant</h3>
-      <button onclick="toggleChat()">&times;</button>
+      <h3>✨ AI Finance Assistant</h3>
+      <button onclick="toggleChat()" title="Close (Esc)">&times;</button>
     </div>
     <div id="chat-messages">
-      <div class="chat-msg ai"><div class="bubble">Hi! I can answer questions about your financial data. Try asking:\n\n• "What's the total cash for each entity?"\n• "Compare LTECH vs OW assets"\n• "Which accounts are overdrawn?"\n• "What are the IC balances?"\n• "What's our runway?"</div></div>
+      <div class="chat-msg ai"><div class="bubble">Hi! Ask me anything about your financial data, or try one of these:</div></div>
+      <div id="chat-prompts" style="padding: 4px 0 8px;">
+        <button class="chat-prompt-chip" onclick="chatPrompt(this.textContent)">What's my current cash position?</button>
+        <button class="chat-prompt-chip" onclick="chatPrompt(this.textContent)">Show overdue tasks</button>
+        <button class="chat-prompt-chip" onclick="chatPrompt(this.textContent)">Summarize this month's cash flow</button>
+        <button class="chat-prompt-chip" onclick="chatPrompt(this.textContent)">Which entities are overdrawn?</button>
+      </div>
     </div>
     <div id="chat-input-wrap">
       <input id="chat-input" placeholder="Ask about your finances..." autocomplete="off">
@@ -57,6 +84,12 @@
     </div>
   `;
   document.body.appendChild(sidebar);
+
+  // 9.4 Welcome prompt helper + keyboard shortcut
+  window.chatPrompt = function(text) {
+    document.getElementById('chat-input').value = text;
+    sendChat();
+  };
 
   window.toggleChat = function() {
     sidebar.classList.toggle('open');
@@ -67,6 +100,19 @@
   };
 
   toggle.addEventListener('click', window.toggleChat);
+
+  // 9.4 Keyboard shortcut: / opens chat (if not in an input)
+  document.addEventListener('keydown', function(e) {
+    var tag = (e.target && e.target.tagName || '').toLowerCase();
+    var isTyping = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
+    if (e.key === '/' && !isTyping && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      if (!sidebar.classList.contains('open')) window.toggleChat();
+      else document.getElementById('chat-input').focus();
+    } else if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+      window.toggleChat();
+    }
+  });
 
   document.getElementById('chat-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
