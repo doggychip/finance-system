@@ -476,21 +476,24 @@
       try {
         var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY))).json();
         var existingPeriods = (data.periods || []);
+
         var now = new Date();
         var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
-        var parts = earliest.split('-');
-        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
-        var np = now.getFullYear() * 12 + now.getMonth() + 1;
-        var ep = cy * 12 + cm;
         var allPeriods = [];
+        var startYear = 2025, startMonth = 5;
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = startYear * 12 + startMonth;
         for (var i = np; i >= ep; i--) {
           var y = Math.floor((i - 1) / 12);
           var m = ((i - 1) % 12) + 1;
           allPeriods.push(y + '-' + String(m).padStart(2, '0'));
         }
+
         var sel = document.getElementById('foundationICPeriod');
-        sel.innerHTML = allPeriods.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join('');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
         sel.value = currentPeriod;
         loadFoundationIC();
       } catch(e) {
@@ -548,27 +551,24 @@
       try {
         var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY))).json();
         var existingPeriods = (data.periods || []);
-        // Generate all months from earliest existing to current month
+
         var now = new Date();
         var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         var allPeriods = [];
-        // Find earliest: existingPeriods is desc, so last element is earliest
-        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
-        var parts = earliest.split('-');
-        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var startYear = 2025, startMonth = 5;
         var np = now.getFullYear() * 12 + now.getMonth() + 1;
-        var ep = cy * 12 + cm;
+        var ep = startYear * 12 + startMonth;
         for (var i = np; i >= ep; i--) {
           var y = Math.floor((i - 1) / 12);
           var m = ((i - 1) % 12) + 1;
           allPeriods.push(y + '-' + String(m).padStart(2, '0'));
         }
+
         var sel = document.getElementById('keystonePeriod');
         sel.innerHTML = allPeriods.map(function(p) {
           var hasData = existingPeriods.indexOf(p) >= 0;
-          return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
+          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
         }).join('');
-        // Default to current month
         sel.value = currentPeriod;
         loadKeystone();
       } catch(e) {
