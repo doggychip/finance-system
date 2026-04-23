@@ -1216,7 +1216,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       { key: 'current_assets', label: 'Current Assets', filter: "a.odoo_type IN ('asset_current','asset_prepayments')" },
       { key: 'non_current_assets', label: 'Non-current Assets', filter: "a.odoo_type IN ('asset_fixed','asset_non_current')" },
       { key: 'payables', label: 'Payables', filter: "a.odoo_type = 'liability_payable'" },
-      { key: 'current_liabilities', label: 'Current Liabilities', filter: "a.odoo_type IN ('liability_current','liability_credit_card')" },
+      { key: 'current_liabilities', label: 'Current Liabilities', filter: "a.odoo_type IN ('liability_current','liability_credit_card') AND a.code NOT LIKE '303%'" },
       { key: 'non_current_liabilities', label: 'Non-current Liabilities', filter: "a.odoo_type = 'liability_non_current'" },
       { key: 'ic_balances', label: 'IC Balances', filter: "a.code LIKE '303%'" },
     ];
@@ -1805,7 +1805,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       const q = (filter: string) => (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${ph}) AND ${filter}`).get(currentSnap, ...companyIds) as any)?.total || 0;
       return {
         receivable: q(`account_type = 'asset_receivable'`),
-        payable: q(`account_type IN ('liability_payable', 'liability_current')`),
+        payable: q(`account_type IN ('liability_payable', 'liability_current') AND account_code NOT LIKE '303%'`),
         intercompany: q(`account_code LIKE '303%'`),
         deposit: q(`account_code = '202000'`),
         cash_fiat: q(`account_type = 'asset_cash' AND currency IN ('USD', 'CNY', 'SGD')`),
