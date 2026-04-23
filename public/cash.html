@@ -140,14 +140,22 @@
     <div class="hero">
       <div class="label">Total Assets (All Entities)</div>
       <div class="total" id="heroTotal">--</div>
-      <div class="sub" id="heroSub">Loading...</div>
+      <div class="sub" id="heroSub" style="opacity:0;height:0">Loading...</div>
     </div>
 
-    <!-- Stats -->
+    <!-- Hero KPI breakdown (4.1) -->
+    <div class="stats-row" id="heroKPIs" style="margin-top:-8px">
+      <div class="stat-card" style="border-left:3px solid var(--green)"><div class="label">Cash (Bank)</div><div class="value" id="kpiBank">--</div></div>
+      <div class="stat-card" style="border-left:3px solid var(--cyan,#06b6d4)"><div class="label">Crypto</div><div class="value" id="kpiCrypto">--</div></div>
+      <div class="stat-card" style="border-left:3px solid var(--yellow)"><div class="label">Overworld</div><div class="value" id="kpiOW">--</div></div>
+      <div class="stat-card" style="border-left:3px solid var(--blue)"><div class="label">Reach</div><div class="value" id="kpiReach">--</div></div>
+    </div>
+
+    <!-- Stats (clickable filter cards) -->
     <div class="stats-row">
-      <div class="stat-card"><div class="label">Cash Accounts</div><div class="value" id="statCount">--</div></div>
-      <div class="stat-card"><div class="label">Positive Accounts</div><div class="value text-green" id="statPositive">--</div></div>
-      <div class="stat-card"><div class="label">Negative / Overdrawn</div><div class="value text-red" id="statNegative">--</div></div>
+      <div class="stat-card" data-filter="all" style="cursor:pointer" onclick="setAccountFilter('all')"><div class="label">Cash Accounts</div><div class="value" id="statCount">--</div></div>
+      <div class="stat-card" data-filter="positive" style="cursor:pointer" onclick="setAccountFilter('positive')"><div class="label">Positive Accounts</div><div class="value text-green" id="statPositive">--</div></div>
+      <div class="stat-card" data-filter="negative" style="cursor:pointer" onclick="setAccountFilter('negative')"><div class="label">Negative / Overdrawn</div><div class="value text-red" id="statNegative">--</div></div>
       <div class="stat-card"><div class="label">Largest Account</div><div class="value" id="statLargest">--</div></div>
     </div>
 
@@ -215,6 +223,23 @@
 
   <script>
     var charts = {};
+    // Account filter state (4.2)
+    var accountFilter = 'all';
+    window.setAccountFilter = function(f) {
+      accountFilter = f;
+      // Visual highlight on selected card
+      document.querySelectorAll('[data-filter]').forEach(function(el) {
+        el.style.borderColor = el.dataset.filter === f ? 'var(--accent)' : 'var(--border)';
+      });
+      // Filter visible account rows
+      document.querySelectorAll('[data-account-row]').forEach(function(el) {
+        var bal = parseFloat(el.dataset.balance || '0');
+        if (f === 'all') { el.style.display = ''; }
+        else if (f === 'positive' && bal > 0) { el.style.display = ''; }
+        else if (f === 'negative' && bal < 0) { el.style.display = ''; }
+        else { el.style.display = 'none'; }
+      });
+    };
     var currentPeriod = 'monthly';
     var exportAccounts = [];
 
@@ -287,10 +312,12 @@
       var heroEl = document.getElementById('heroTotal');
       heroEl.textContent = fmt(grandTotal);
       heroEl.className = 'total ' + (grandTotal >= 0 ? 'positive' : 'negative');
-      document.getElementById('heroSub').textContent =
-        'Bank: ' + fmtShort(totalBank) + ' | Crypto: ' + fmtShort(totalCrypto) +
-        ' | OW: ' + fmtShort(data.overworld?.total || 0) + ' | Reach: ' + fmtShort(data.reach?.total || 0) +
-        ' | ' + (data.snapshot_date || '');
+      document.getElementById('heroSub').textContent = data.snapshot_date ? ('As of ' + data.snapshot_date) : '';
+      // Populate new KPI cards
+      document.getElementById('kpiBank').textContent = fmtShort(totalBank);
+      document.getElementById('kpiCrypto').textContent = fmtShort(totalCrypto);
+      document.getElementById('kpiOW').textContent = fmtShort(data.overworld?.total || 0);
+      document.getElementById('kpiReach').textContent = fmtShort(data.reach?.total || 0);
 
       var positiveCount = cashCurrentAccs.length + cashFixedAccs.length + cryptoHotAccs.length + cryptoColdAccs.length + cryptoDefiAccs.length + cryptoOtherAccs.length;
       document.getElementById('statCount').textContent = fmtNum(positiveCount);
@@ -323,7 +350,7 @@
       var sorted = accounts.slice().sort(function(a,b){ return Math.abs(b.balance) - Math.abs(a.balance); });
       listEl.innerHTML = sorted.map(function(a) {
         var balColor = a.balance >= 0 ? 'var(--green)' : 'var(--red)';
-        return '<div class="box-item"><div class="item-code">' + a.code + '</div><div class="item-name">' + (a.name.length > 35 ? a.name.slice(0,35) + '...' : a.name) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
+        return '<div class="box-item" data-account-row="1" data-balance="' + a.balance + '"><div class="item-code">' + a.code + '</div><div class="item-name">' + (a.name.length > 35 ? a.name.slice(0,35) + '...' : a.name) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
       }).join('');
     }
 
