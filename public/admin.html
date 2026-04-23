@@ -643,7 +643,7 @@
       if (!period) return;
       try {
         var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + period)).json();
-        keystoneRows = data.rows;
+        keystoneRows = data.rows || [];
         if (!keystoneRows.length) {
           document.getElementById('keystoneTable').innerHTML =
             '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
@@ -711,12 +711,17 @@
     }
 
     async function saveKeystone() {
+      if (!keystoneRows || !keystoneRows.length) {
+        showMsg('keystoneMsg', 'No rows to save. Copy from previous month or add a row first.', 'error');
+        return;
+      }
       var saved = 0, failed = 0;
       for (var r of keystoneRows) {
         var tr = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
         if (!tr) continue;
         var amt = parseFloat(tr.querySelectorAll('input')[0].value);
         var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        if (isNaN(amt) || isNaN(fx)) { failed++; continue; }
         try {
           var res = await fetch('/api/dashboard/manual-balances/' + r.id, {
             method: 'PATCH',

@@ -2092,5 +2092,3 @@ export function dashboardRoutes(db: Database.Database): Router {
 
   return router;
 }
- router;
-}
