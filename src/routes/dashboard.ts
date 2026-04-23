@@ -13,7 +13,9 @@ export function dashboardRoutes(db: Database.Database): Router {
         SELECT MAX(period) FROM manual_balances WHERE entity = 'Xterio Foundation'
       )
     `).get() as any;
-    return row?.total ? Math.round(row.total) : 5942149;
+    if (row?.total) return Math.round(row.total);
+    console.warn('[dashboard] WARNING: Foundation cash using hardcoded fallback (5942149). manual_balances may be empty.');
+    return 5942149;
   }
 
   // Overview stats

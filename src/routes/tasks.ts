@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
+import bcrypt from 'bcryptjs';
 
 export function taskRoutes(db: Database.Database): Router {
   const router = Router();
@@ -7,9 +8,11 @@ export function taskRoutes(db: Database.Database): Router {
   // Login
   router.post('/login', (req, res) => {
     const { username, password } = req.body;
-    const user = db.prepare('SELECT id, username, display_name, role FROM users WHERE username = ? AND password = ?').get(username, password) as any;
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    res.json(user);
+    const user = db.prepare('SELECT id, username, password, display_name, role FROM users WHERE username = ?').get(username) as any;
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    res.json({ id: user.id, username: user.username, display_name: user.display_name, role: user.role });
   });
 
   // List users
@@ -23,7 +26,9 @@ export function taskRoutes(db: Database.Database): Router {
     const { username, password, display_name, role } = req.body;
     if (!username || !password || !display_name) return res.status(400).json({ error: 'Username, password, and display name required' });
     try {
-      db.prepare('INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)').run(username, password, display_name, role || 'finance');
+      if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      const hashedPw = bcrypt.hashSync(password, 10);
+      db.prepare('INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)').run(username, hashedPw, display_name, role || 'finance');
       const user = db.prepare('SELECT id, username, display_name, role FROM users WHERE username = ?').get(username);
       res.status(201).json(user);
     } catch (e: any) {
@@ -37,7 +42,7 @@ export function taskRoutes(db: Database.Database): Router {
     const { password, display_name } = req.body;
     const updates: string[] = [];
     const values: any[] = [];
-    if (password) { updates.push('password = ?'); values.push(password); }
+    if (password) { updates.push('password = ?'); values.push(bcrypt.hashSync(password, 10)); }
     if (display_name) { updates.push('display_name = ?'); values.push(display_name); }
     if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(id);
@@ -50,8 +55,8 @@ export function taskRoutes(db: Database.Database): Router {
   router.patch('/users/:id/password', (req, res) => {
     const id = parseInt(req.params.id);
     const { current_password, new_password, requester_id } = req.body;
-    if (!new_password || new_password.length < 4) {
-      return res.status(400).json({ error: 'New password must be at least 4 characters' });
+    if (!new_password || new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
 
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
@@ -69,12 +74,12 @@ export function taskRoutes(db: Database.Database): Router {
       if (!current_password) {
         return res.status(400).json({ error: 'Current password is required' });
       }
-      if (target.password !== current_password) {
+      if (!bcrypt.compareSync(current_password, target.password)) {
         return res.status(403).json({ error: 'Current password is incorrect' });
       }
     }
 
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(new_password, id);
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 10), id);
     res.json({ ok: true, message: 'Password updated successfully' });
   });
 

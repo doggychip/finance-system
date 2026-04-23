@@ -184,14 +184,27 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity);
     CREATE INDEX IF NOT EXISTS idx_alerts_resolved ON alerts(is_resolved);
     CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at);
-
-    -- Seed default users if empty
-    INSERT OR IGNORE INTO users (username, password, display_name, role) VALUES
-      ('ryan', 'finance123', 'Ryan Cheung', 'admin'),
-      ('paul', 'finance123', 'Paul', 'finance'),
-      ('mario', 'finance123', 'Mario', 'finance'),
-      ('bk', 'finance123', 'BK', 'finance');
   `);
+
+  // Seed default users with hashed passwords (if empty)
+  const bcrypt = require('bcryptjs');
+  const userCount = (db.prepare("SELECT COUNT(*) as c FROM users").get() as any).c;
+  if (userCount === 0) {
+    const hash = (pw: string) => bcrypt.hashSync(pw, 10);
+    db.prepare(`INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)`).run('ryan', hash('finance123'), 'Ryan Cheung', 'admin');
+    db.prepare(`INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)`).run('paul', hash('finance123'), 'Paul', 'finance');
+    db.prepare(`INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)`).run('mario', hash('finance123'), 'Mario', 'finance');
+    db.prepare(`INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)`).run('bk', hash('finance123'), 'BK', 'finance');
+    console.log('[db] Default users created with hashed passwords');
+  } else {
+    // Migrate existing plaintext passwords to hashed
+    const users = db.prepare("SELECT id, password FROM users").all() as any[];
+    for (const u of users) {
+      if (u.password && !u.password.startsWith('$2')) {
+        db.prepare("UPDATE users SET password = ? WHERE id = ?").run(bcrypt.hashSync(u.password, 10), u.id);
+      }
+    }
+  }
 
   // Migration: Add currency column to account_balances if it doesn't exist
   try {
