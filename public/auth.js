@@ -27,6 +27,23 @@
   window.addUserToHeader = function() {
     var user = window.getUser();
     if (!user) return;
+    // Use new global header if available
+    if (typeof window.renderGlobalHeader === 'function') {
+      // Detect active page from URL
+      var path = window.location.pathname;
+      var activePage = 'overview';
+      if (path.includes('reports')) activePage = 'reports';
+      else if (path.includes('cash')) activePage = 'cash';
+      else if (path.includes('consolidated')) activePage = 'consolidated';
+      else if (path.includes('ic-detail') || path.includes('ic-recon')) activePage = 'ic_detail';
+      else if (path.includes('reconciliation')) activePage = 'reconciliation';
+      else if (path.includes('kanban') || path.includes('tasks')) activePage = 'tasks';
+      window.renderGlobalHeader(activePage);
+      // Also inject password modal
+      window.injectPasswordModal();
+      return;
+    }
+    // Fallback: legacy header
     var header = document.querySelector('.header');
     if (!header) return;
 
@@ -43,28 +60,30 @@
       '<button onclick="logout()" style="padding:4px 10px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#8b8fa3;font-size:11px;cursor:pointer">Logout</button>';
     header.appendChild(div);
 
-    // Inject password change modal
-    if (!document.getElementById('pwModalOverlay')) {
-      var modal = document.createElement('div');
-      modal.id = 'pwModalOverlay';
-      modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;';
-      modal.innerHTML =
-        '<div style="background:#1a1d27;border:1px solid #2e3344;border-radius:12px;padding:24px;width:400px;max-width:90vw">' +
-          '<h2 style="font-size:16px;margin-bottom:16px;color:#e4e6ef">修改密码</h2>' +
-          '<div id="pwMsg" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px"></div>' +
-          '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">Current Password</label>' +
-          '<input type="password" id="pwCurrent" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:12px">' +
-          '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">New Password</label>' +
-          '<input type="password" id="pwNew" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:12px">' +
-          '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">Confirm New Password</label>' +
-          '<input type="password" id="pwConfirm" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:16px">' +
-          '<div style="display:flex;justify-content:flex-end;gap:8px">' +
-            '<button onclick="closePasswordModal()" style="padding:8px 16px;border-radius:6px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:13px;cursor:pointer">Cancel</button>' +
-            '<button onclick="submitPasswordChange()" style="padding:8px 16px;border-radius:6px;border:1px solid #6366f1;background:#6366f1;color:white;font-size:13px;cursor:pointer">Save</button>' +
-          '</div>' +
-        '</div>';
-      document.body.appendChild(modal);
-    }
+    window.injectPasswordModal();
+  };
+
+  window.injectPasswordModal = function() {
+    if (document.getElementById('pwModalOverlay')) return;
+    var modal = document.createElement('div');
+    modal.id = 'pwModalOverlay';
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;';
+    modal.innerHTML =
+      '<div style="background:#1a1d27;border:1px solid #2e3344;border-radius:12px;padding:24px;width:400px;max-width:90vw">' +
+        '<h2 style="font-size:16px;margin-bottom:16px;color:#e4e6ef">Change Password</h2>' +
+        '<div id="pwMsg" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px"></div>' +
+        '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">Current Password</label>' +
+        '<input type="password" id="pwCurrent" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:12px">' +
+        '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">New Password (min 8 chars)</label>' +
+        '<input type="password" id="pwNew" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:12px">' +
+        '<label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px">Confirm New Password</label>' +
+        '<input type="password" id="pwConfirm" style="width:100%;padding:8px 12px;background:#232734;border:1px solid #2e3344;border-radius:6px;color:#e4e6ef;font-size:13px;margin-bottom:16px">' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px">' +
+          '<button onclick="closePasswordModal()" style="padding:8px 16px;border-radius:6px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:13px;cursor:pointer">Cancel</button>' +
+          '<button onclick="submitPasswordChange()" style="padding:8px 16px;border-radius:6px;border:1px solid #6366f1;background:#6366f1;color:white;font-size:13px;cursor:pointer">Save</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
   };
 
   window.openPasswordModal = function() {
