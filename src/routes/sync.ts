@@ -119,12 +119,14 @@ export function syncRoutes(db: Database.Database): Router {
   });
 
   // Sync account balances — uses historical method for accurate per-company data
+  // Accepts as_of_date in body OR query string
   router.post('/balances', async (req, res) => {
     try {
       const odoo = createOdooClient();
       await odoo.authenticate();
-      const asOfDate = req.body.as_of_date || new Date().toISOString().slice(0, 10);
-      const result = await syncHistoricalBalances(odoo, db, asOfDate);
+      const asOfDate = (req.body && req.body.as_of_date) || req.query.as_of_date || new Date().toISOString().slice(0, 10);
+      console.log(`[sync /balances] Syncing for as_of_date=${asOfDate}`);
+      const result = await syncHistoricalBalances(odoo, db, asOfDate as string);
       res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';

@@ -57,7 +57,7 @@ export async function syncHistoricalBalances(
       const accts = await odoo.execute('account.account', 'search_read',
         [[['company_ids', 'in', [company.id]]]],
         {
-          fields: ['id', 'code', 'name', 'current_balance', 'account_type', 'currency_id'],
+          fields: ['id', 'code', 'name', 'current_balance', 'account_type'],
           context: {
             'allowed_company_ids': [company.id],
             'company_id': company.id,
@@ -92,8 +92,17 @@ export async function syncHistoricalBalances(
           const code = a.code || '';
           const name = a.name || '';
           const accountType = a.account_type || '';
-          // currency_id in Odoo is [id, name] tuple, e.g. [2, "USD"]
-          const currency = (a.currency_id && Array.isArray(a.currency_id)) ? a.currency_id[1] : 'USD';
+          // Derive currency from account code/name (Odoo 18 doesn't expose currency_id on account.account)
+          const codeUpper = code.toUpperCase();
+          const nameUpper = name.toUpperCase();
+          let currency = 'USD';
+          if (codeUpper.startsWith('10W')) currency = 'CRYPTO';
+          else if (nameUpper.includes('RMB') || nameUpper.includes('CNY') || nameUpper.includes('CNH')) currency = 'CNY';
+          else if (nameUpper.includes('HKD')) currency = 'HKD';
+          else if (nameUpper.includes('EUR')) currency = 'EUR';
+          else if (nameUpper.includes('JPY')) currency = 'JPY';
+          else if (nameUpper.includes('GBP')) currency = 'GBP';
+          else if (nameUpper.includes('SGD')) currency = 'SGD';
           if (!code) continue;
 
           // Only include accounts that have actual journal entries for this company
