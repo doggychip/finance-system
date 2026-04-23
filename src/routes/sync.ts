@@ -120,12 +120,37 @@ export function syncRoutes(db: Database.Database): Router {
 
   // Sync account balances — uses historical method for accurate per-company data
   // Accepts as_of_date in body OR query string
+  // IMPORTANT: 2026-02-28 is protected - uses verified spreadsheet seed data only
   router.post('/balances', async (req, res) => {
     try {
       const odoo = createOdooClient();
       await odoo.authenticate();
       const asOfDate = (req.body && req.body.as_of_date) || req.query.as_of_date || new Date().toISOString().slice(0, 10);
       console.log(`[sync /balances] Syncing for as_of_date=${asOfDate}`);
+
+      // Protected date - use seed data, don't overwrite with potentially wrong Odoo data
+      if (asOfDate === '2026-02-28') {
+        return res.status(400).json({
+          error: '2026-02-28 is protected (uses verified spreadsheet data). Sync a different date or use /balances/force-sync to override.',
+          snapshot_date: asOfDate,
+        });
+      }
+
+      const result = await syncHistoricalBalances(odoo, db, asOfDate as string);
+      res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Force sync — bypasses protection for 2026-02-28 (dangerous)
+  router.post('/balances/force-sync', async (req, res) => {
+    try {
+      const odoo = createOdooClient();
+      await odoo.authenticate();
+      const asOfDate = (req.body && req.body.as_of_date) || req.query.as_of_date || new Date().toISOString().slice(0, 10);
+      console.log(`[sync /force-sync] FORCE syncing for as_of_date=${asOfDate}`);
       const result = await syncHistoricalBalances(odoo, db, asOfDate as string);
       res.json(result);
     } catch (err: unknown) {

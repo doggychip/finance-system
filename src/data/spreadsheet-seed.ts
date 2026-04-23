@@ -192,7 +192,7 @@ const ENTITIES: Entity[] = [
 
 export function seedSpreadsheetBalances(db: Database.Database) {
   const snapshotDate = '2026-02-28';
-  const SEED_VERSION = 6; // Increment this to force re-seed
+  const SEED_VERSION = 7; // Increment this to force re-seed
 
   // Check seed version
   const versionCheck = db.prepare(
@@ -200,9 +200,21 @@ export function seedSpreadsheetBalances(db: Database.Database) {
   ).get() as any;
   const currentVersion = versionCheck?.c || 0;
 
-  if (currentVersion >= SEED_VERSION) {
-    console.log('[seed-bs] Seed version ' + SEED_VERSION + ' already applied, skipping');
+  // Also verify key data integrity - Palios equity should be -385028 (system)
+  // If Odoo sync has corrupted the data, restore from spreadsheet
+  const palioEquity = db.prepare(
+    "SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id = 11 AND account_type IN ('equity', 'equity_unaffected', 'income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation')"
+  ).get(snapshotDate) as any;
+  const palioEquityTotal = palioEquity?.total || 0;
+  const palioEquityCorrect = Math.abs(palioEquityTotal - (-385028)) < 1000;
+
+  if (currentVersion >= SEED_VERSION && palioEquityCorrect) {
+    console.log('[seed-bs] Seed version ' + SEED_VERSION + ' applied and data integrity OK, skipping');
     return;
+  }
+
+  if (!palioEquityCorrect && palioEquityTotal !== 0) {
+    console.log('[seed-bs] DATA INTEGRITY FAILURE: Palios equity is ' + palioEquityTotal + ', expected -385028. Restoring from spreadsheet...');
   }
 
   console.log('[seed-bs] Importing verified spreadsheet balances for ' + snapshotDate + '...');
