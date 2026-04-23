@@ -176,9 +176,10 @@ export function dashboardRoutes(db: Database.Database): Router {
     const reach = owRows.filter(r => companyToGroup[r.company_id] === 'Reach');
     const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
 
-    // Non-OW Total "Cash" = bank accounts only (100xxx codes) + Xterio Foundation
-    // This excludes Digital Token (10Wxxx) — matches the "Cash" sub-line in consolidated BS
-    const nonOWBankCash = nonOWRows.filter((r: any) => r.code.startsWith('100')).reduce((s: number, r: any) => s + r.balance, 0);
+    // Non-OW Total "Cash" = fiat bank accounts only + Xterio Foundation
+    // This excludes crypto — matches the "Cash" sub-line in consolidated BS
+    const FIAT_CURRENCIES_FOR_CASH = ['USD', 'CNY', 'SGD'];
+    const nonOWBankCash = nonOWRows.filter((r: any) => FIAT_CURRENCIES_FOR_CASH.includes(r.currency)).reduce((s: number, r: any) => s + r.balance, 0);
     // Foundation period: use user-requested date directly, not snapshot date
     const _foundationDateCash = (requestedDate && requestedDate < '9000') ? requestedDate
       : (snap.snapshot_date && snap.snapshot_date < '9000') ? snap.snapshot_date
@@ -192,10 +193,11 @@ export function dashboardRoutes(db: Database.Database): Router {
       : 5942149;  // fallback
     const nonOWCash = nonOWBankCash + foundationCashLegacy;
 
-    // Split cash into fiat bank vs crypto using currency field (set during sync)
-    // Fallback: code prefix (100xxx = fiat, 10Wxxx = crypto)
+    // Split cash into fiat bank vs crypto by currency field
+    const FIAT_CURRENCIES = ['USD', 'CNY', 'SGD'];
+    const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
     const allPositiveCash = [...cash];
-    const isCrypto = (r: any) => r.currency === 'CRYPTO' || r.code.startsWith('10W');
+    const isCrypto = (r: any) => CRYPTO_CURRENCIES.includes(r.currency);
     const isFiat = (r: any) => !isCrypto(r);
     const isFixedDeposit = (name: string) => /time deposit|mma/i.test(name);
     const isHotWallet = (name: string) => /integrated|segregate|mt ledger/i.test(name);
@@ -1355,14 +1357,14 @@ export function dashboardRoutes(db: Database.Database): Router {
       // Use account_balances
       // Get ALL cash accounts from both current and prior snapshots
       const currentRows = db.prepare(`
-        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
+        SELECT company_id, company_name, account_code as code, account_name as name, account_type, COALESCE(currency, 'USD') as currency, balance
         FROM account_balances
         WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
         ORDER BY company_name, account_code
       `).all(snap.snapshot_date) as any[];
 
       const priorRows = priorSnap?.snapshot_date ? db.prepare(`
-        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
+        SELECT company_id, company_name, account_code as code, account_name as name, account_type, COALESCE(currency, 'USD') as currency, balance
         FROM account_balances
         WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
       `).all(priorSnap.snapshot_date) as any[] : [];
@@ -1402,7 +1404,7 @@ export function dashboardRoutes(db: Database.Database): Router {
           current_balance: currentBal,
           prior_balance: priorBal,
           change, change_pct: changePct,
-          asset_type: (row.currency === 'CRYPTO' || row.code.startsWith('10W')) ? 'Crypto' : 'Cash',
+          asset_type: ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'].includes(row.currency) ? 'Crypto' : 'Cash',
           currency: row.currency,
         });
       }
@@ -1418,8 +1420,8 @@ export function dashboardRoutes(db: Database.Database): Router {
         accounts: accs,
         total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
         total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
-        total_cash_current: accs.filter((a: any) => a.code.startsWith('100')).reduce((s: number, a: any) => s + a.current_balance, 0),
-        total_crypto_current: accs.filter((a: any) => a.code.startsWith('10W')).reduce((s: number, a: any) => s + a.current_balance, 0),
+        total_cash_current: accs.filter((a: any) => a.asset_type !== 'Crypto').reduce((s: number, a: any) => s + a.current_balance, 0),
+        total_crypto_current: accs.filter((a: any) => a.asset_type === 'Crypto').reduce((s: number, a: any) => s + a.current_balance, 0),
         total_all: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
       }));
 
@@ -1794,8 +1796,8 @@ export function dashboardRoutes(db: Database.Database): Router {
         payable: q(`account_type IN ('liability_payable', 'liability_current')`),
         intercompany: q(`account_code LIKE '303%'`),
         deposit: q(`account_code = '202000'`),
-        cash_fiat: q(`account_type = 'asset_cash' AND account_code LIKE '100%'`),
-        cash_crypto: q(`account_type = 'asset_cash' AND account_code LIKE '10W%'`),
+        cash_fiat: q(`account_type = 'asset_cash' AND currency IN ('USD', 'CNY', 'SGD')`),
+        cash_crypto: q(`account_type = 'asset_cash' AND currency IN ('BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE')`),
       };
     };
 
@@ -1861,10 +1863,11 @@ export function dashboardRoutes(db: Database.Database): Router {
     `).all(currentSnap) as any[];
 
     // Cash by entity group for chart — split into bank and crypto
+    const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
     const entityCash: any[] = [];
     // Get per-entity bank vs crypto split
     const entityDetailRows = db.prepare(`
-      SELECT company_id, account_code, balance
+      SELECT company_id, currency, balance
       FROM account_balances
       WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
     `).all(currentSnap) as any[];
@@ -1873,7 +1876,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const entityCryptoCash: Record<string, number> = {};
     for (const r of entityDetailRows) {
       const group = companyToGroup[r.company_id] || 'Other';
-      if (r.account_code.startsWith('10W')) {
+      if (CRYPTO_CURRENCIES.includes(r.currency)) {
         entityCryptoCash[group] = (entityCryptoCash[group] || 0) + r.balance;
       } else {
         entityBankCash[group] = (entityBankCash[group] || 0) + r.balance;
