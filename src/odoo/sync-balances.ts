@@ -8,6 +8,13 @@ export interface BalanceSyncResult {
   errors: string[];
 }
 
+export const FIAT_CURRENCIES = ['USD', 'CNY', 'SGD'];
+export const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
+
+export function classifyCurrency(currency: string): 'fiat' | 'crypto' {
+  return CRYPTO_CURRENCIES.includes(currency) ? 'crypto' : 'fiat';
+}
+
 // All company IDs and names
 const COMPANIES = [
   { id: 1, name: 'LTECH' }, { id: 23, name: 'LTECH W3' },
@@ -38,13 +45,20 @@ export async function syncBalances(
     errors: [],
   };
 
+  // One-time cleanup: rows tagged with legacy 'CRYPTO' sentinel (set before we
+  // stored real currency_id) lose their specific currency after this fix. Map
+  // them to 'UST' so the new classifier still treats them as crypto; real
+  // per-account currency will be overwritten on the next fresh sync.
+  db.prepare(`UPDATE account_balances SET currency = 'UST' WHERE currency = 'CRYPTO'`).run();
+
   const upsert = db.prepare(`
-    INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, snapshot_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, currency, balance, snapshot_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(company_id, account_odoo_id, snapshot_date) DO UPDATE SET
       balance = excluded.balance,
       account_name = excluded.account_name,
       account_type = excluded.account_type,
+      currency = excluded.currency,
       synced_at = datetime('now')
   `);
 
@@ -56,7 +70,7 @@ export async function syncBalances(
       const accts = await odoo.execute('account.account', 'search_read',
         [[['company_ids', 'in', [company.id]]]],
         {
-          fields: ['id', 'code', 'name', 'current_balance', 'account_type'],
+          fields: ['id', 'code', 'name', 'current_balance', 'account_type', 'currency_id'],
           context: { 'allowed_company_ids': [company.id] },
           limit: 2000,
         }
@@ -70,16 +84,9 @@ export async function syncBalances(
           const accountType = a.account_type || '';
           if (!code) continue;
 
-          // Determine currency: use Odoo currency_id, fallback by code prefix
+          // Determine currency from Odoo currency_id; fallback to USD
           const currencyRef = a.currency_id as [number, string] | false;
-          let currency = currencyRef ? currencyRef[1] : '';
-          if (!currency) {
-            if (code.startsWith('10W')) currency = 'CRYPTO';
-            else if (code.startsWith('100')) currency = 'USD'; // default, will be overridden by Odoo value
-            else currency = 'USD';
-          }
-          // Normalize: crypto accounts always tagged CRYPTO
-          if (code.startsWith('10W')) currency = 'CRYPTO';
+          const currency = (currencyRef && currencyRef[1]) ? currencyRef[1] : 'USD';
 
           upsert.run(
             company.id, company.name,

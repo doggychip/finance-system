@@ -519,7 +519,7 @@
         groups.forEach(function(g) {
           (g.accounts || []).forEach(function(a) {
             var item = { entity: g.name, code: a.code, name: a.name, balance: a.current_balance, company: a.company_name };
-            if (a.asset_type === 'Crypto' || (a.code && a.code.startsWith('10W'))) {
+            if (a.asset_type === 'Crypto') {
               cryptoAccounts.push(item);
             } else {
               fiatAccounts.push(item);
