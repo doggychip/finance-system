@@ -61,13 +61,16 @@
     <input type="date" id="asOfDate" value="2026-02-28">
     <label>Entity:</label>
     <select id="entitySelect"></select>
-    <button class="btn primary" onclick="loadData()">Compare</button>
+    <button class="btn primary" onclick="loadData()">Run Reconciliation</button>
   </div>
+
+  <!-- 7.2 All-entity status grid -->
+  <div id="statusGrid" style="padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface)"></div>
 
   <div class="summary" id="summary"></div>
 
   <div class="scroll-wrap">
-    <div id="content"><div class="loading">Select an entity and click Compare</div></div>
+    <div id="content"><div class="loading">Loading reconciliation...</div></div>
   </div>
 
   <script>
@@ -209,21 +212,67 @@
     // Load entity options
     var entities = Object.keys(SPREADSHEET);
     var sel = document.getElementById('entitySelect');
+    // 7.4 "All entities" option
+    var allOpt = document.createElement('option');
+    allOpt.value = '__ALL__'; allOpt.textContent = '🌐 All entities (combined)';
+    sel.appendChild(allOpt);
     entities.forEach(function(e) {
       var opt = document.createElement('option');
       opt.value = e; opt.textContent = e;
       sel.appendChild(opt);
     });
+    // 7.1 Auto-run on load - pre-select first real entity
+    if (entities.length > 0) sel.value = entities[0];
+
+    // 7.2 All-entity status summary grid
+    async function renderStatusGrid() {
+      var asOf = document.getElementById('asOfDate').value;
+      var grid = document.getElementById('statusGrid');
+      if (!grid) return;
+      grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">' +
+        entities.map(function(e) {
+          // Status unknown until reconciled - use placeholder
+          return '<button onclick="document.getElementById(\'entitySelect\').value=\'' + e + '\';loadData()" style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;text-align:left;cursor:pointer">' +
+            '<span style="color:var(--text-dim)">⚪</span> ' + e +
+            '</button>';
+        }).join('') + '</div>';
+    }
+    renderStatusGrid();
+    // Auto-run for first entity
+    setTimeout(function() { if (typeof loadData === 'function') loadData(); }, 100);
 
     async function loadData() {
       var entity = document.getElementById('entitySelect').value;
       var asOf = document.getElementById('asOfDate').value;
-      var ssData = SPREADSHEET[entity] || {};
       var el = document.getElementById('content');
 
-      // Fetch Odoo data for this entity
+      // Fetch Odoo data
       var res = await fetch('/api/dashboard/consolidated-bs?as_of_date=' + asOf);
       var bsData = await res.json();
+
+      // Handle "All entities" - show side-by-side status
+      if (entity === '__ALL__') {
+        var rows = entities.map(function(ent) {
+          var idx = bsData.columns.findIndex(function(c) { return c.name === ent; });
+          if (idx === -1) return { ent: ent, status: 'missing', diff: null };
+          var ss = SPREADSHEET[ent] || {};
+          var odoo = {};
+          bsData.rows.forEach(function(r) { odoo[r.code] = r.values[idx]; });
+          var ssAssets = ss._ASSETS || 0;
+          var odAssets = odoo.ASSETS || 0;
+          var diff = Math.abs(ssAssets - odAssets);
+          var status = diff < 100 ? 'match' : diff < 10000 ? 'small' : 'large';
+          return { ent: ent, status: status, diff: diff, ssAssets: ssAssets, odAssets: odAssets };
+        });
+        el.innerHTML = '<table><thead><tr><th>Entity</th><th>Status</th><th class="val">Spreadsheet Assets</th><th class="val">Odoo Assets</th><th class="val">Difference</th></tr></thead><tbody>' +
+          rows.map(function(r) {
+            var icon = r.status === 'match' ? '<span style="color:var(--green)">✓ Match</span>' : r.status === 'small' ? '<span style="color:var(--yellow)">⚠ Small variance</span>' : r.status === 'missing' ? '<span style="color:var(--text-dim)">— Missing</span>' : '<span style="color:var(--red)">✗ Large variance</span>';
+            return '<tr><td>' + r.ent + '</td><td>' + icon + '</td><td class="val">' + fmt(r.ssAssets) + '</td><td class="val">' + fmt(r.odAssets) + '</td><td class="val">' + (r.diff != null ? fmt(r.diff) : '-') + '</td></tr>';
+          }).join('') + '</tbody></table>';
+        return;
+      }
+
+      var ssData = SPREADSHEET[entity] || {};
 
       // Find entity column
       var colIdx = bsData.columns.findIndex(function(c) { return c.name === entity; });
