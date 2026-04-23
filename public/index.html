@@ -7,83 +7,138 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    /* Tighter semantic palette */
+    :root {
+      --bg: #0b0d14;
+      --surface: #151822;
+      --surface2: #1f2330;
+      --border: #2a2f3d;
+      --text: #f0f2f8;
+      --text-secondary: #b0b8c4;
+      --text-dim: #7a8497;
+      /* Semantic colors */
+      --accent: #6366f1;          /* brand */
+      --positive: #22c55e;        /* green */
+      --negative: #ef4444;        /* red */
+      --warning: #f59e0b;         /* amber */
+      --info: #3b82f6;            /* blue */
+      --crypto: #06b6d4;          /* cyan for crypto */
+      /* Legacy aliases (kept for compatibility) */
+      --green: var(--positive);
+      --red: var(--negative);
+      --blue: var(--info);
+      --yellow: var(--warning);
+      --cyan: var(--crypto);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      font-feature-settings: 'tnum' 1, 'cv02' 1;
+    }
+    /* Tabular nums globally for numeric alignment */
+    .val, .value, [class*="amount"], [class*="balance"], [data-num] { font-variant-numeric: tabular-nums; }
 
-    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
-    .header h1 { font-size: 20px; font-weight: 700; }
-    .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
-    .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
+    /* Header */
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 20px; }
+    .header h1 { font-size: 18px; font-weight: 700; white-space: nowrap; }
+    .nav { display: flex; gap: 2px; flex: 1; justify-content: center; }
+    .nav a { padding: 7px 14px; border-radius: 6px; color: var(--text-secondary); text-decoration: none; font-size: 13px; white-space: nowrap; transition: all 0.15s; }
     .nav a:hover { background: var(--surface2); color: var(--text); }
     .nav a.active { background: var(--accent); color: white; }
-    .actions { display: flex; gap: 8px; }
-    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.15s; }
-    .btn:hover { background: var(--border); }
-    .btn.primary { background: var(--accent); border-color: var(--accent); }
+    .actions { display: flex; gap: 6px; align-items: center; padding: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; }
+    .actions label { font-size: 11px; color: var(--text-dim); padding: 0 6px; white-space: nowrap; }
+    .actions input[type=date] { padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; }
+    .btn { padding: 6px 14px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; transition: all 0.15s; font-weight: 500; }
+    .btn:hover { background: var(--surface2); border-color: var(--text-dim); }
+    .btn:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn.primary:hover { background: #4f52d9; }
 
-    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
 
-    /* Health bar */
-    .health-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
-    .health-bar .label { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .health-track { flex: 1; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
-    .health-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
-    .health-score { font-size: 16px; font-weight: 700; min-width: 50px; text-align: right; }
-    .health-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 14px; }
+    /* Health bar — icon-based stat strip */
+    .health-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .health-bar .label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .health-score { font-size: 22px; font-weight: 700; min-width: 60px; font-variant-numeric: tabular-nums; }
+    .health-meta { font-size: 12px; color: var(--text-secondary); display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+    .health-meta span { display: flex; align-items: center; gap: 5px; }
+    .health-meta .stat-num { font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    /* Alerts */
+    /* Alerts — stacked layout */
     .alert-list { list-style: none; }
-    .alert-item { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .alert-item { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
     .alert-item:last-child { border-bottom: none; }
     .alert-item:hover { background: var(--surface2); }
-    .alert-item .alert-label { flex: 1; }
-    .alert-item .alert-value { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 100px; text-align: right; }
-    .alert-item .alert-value.neg { color: var(--red); }
-    .alert-item .alert-value.warn { color: var(--yellow); }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-    .badge.danger { background: rgba(239,68,68,0.15); color: var(--red); }
-    .badge.warning { background: rgba(234,179,8,0.15); color: var(--yellow); }
-    .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+    .alert-item.critical { background: rgba(239,68,68,0.05); border-left: 3px solid var(--negative); padding-left: 11px; }
+    .alert-item .alert-title { display: flex; align-items: center; gap: 8px; }
+    .alert-item .alert-description { color: var(--text-secondary); font-size: 11px; padding-left: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+    .badge.danger { background: rgba(239,68,68,0.15); color: var(--negative); }
+    .badge.warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .badge.ok { background: rgba(34,197,94,0.15); color: var(--positive); }
 
-    /* Cash Overview */
-    .cash-overview { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
-    .cash-overview h2 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
-    .cash-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
-    @media (max-width: 900px) { .cash-metrics { grid-template-columns: 1fr 1fr; } }
-    .cash-metric { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
-    .cash-metric .cm-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
-    .cash-metric .cm-value { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
-    .cash-metric .cm-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    /* Cash Overview — simplified hero */
+    .cash-overview { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+    .cash-overview h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+    .cm-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
+    .cm-value { font-size: 36px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); font-variant-numeric: tabular-nums; }
+    .cm-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
     .cash-flow-chart { position: relative; height: 180px; }
+    /* Chart range selector */
+    .range-tabs { display: flex; gap: 2px; background: var(--surface2); border-radius: 6px; padding: 3px; font-size: 11px; }
+    .range-tab { padding: 4px 10px; border-radius: 4px; color: var(--text-secondary); cursor: pointer; border: none; background: transparent; font-weight: 500; }
+    .range-tab:hover { color: var(--text); }
+    .range-tab.active { background: var(--accent); color: white; }
+    /* Chip system for inline status */
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 99px; font-size: 10px; font-weight: 600; }
+    .chip.positive { background: rgba(34,197,94,0.12); color: var(--positive); }
+    .chip.negative { background: rgba(239,68,68,0.12); color: var(--negative); }
+    .chip.warning { background: rgba(245,158,11,0.12); color: var(--warning); }
+    .chip.info { background: rgba(59,130,246,0.12); color: var(--info); }
+    .chip.crypto { background: rgba(6,182,212,0.12); color: var(--crypto); }
 
-    /* Hero KPIs */
-    .hero-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-    @media (max-width: 1000px) { .hero-grid { grid-template-columns: 1fr 1fr; } }
-    .hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
-    .hero-card.main { background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--green); }
-    .hero-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 8px; }
-    .hero-card .value { font-size: 36px; font-weight: 800; letter-spacing: -1px; }
-    .hero-card.main .value { font-size: 42px; color: var(--green); }
-    .hero-card .change { font-size: 12px; margin-top: 6px; }
-    .hero-card .change.up { color: var(--green); }
-    .hero-card .change.down { color: var(--red); }
-    .hero-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    /* Hero KPI cards — standardized */
+    .hero-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+    @media (max-width: 1100px) { .hero-grid { grid-template-columns: 1fr 1fr; } }
+    .hero-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 20px; position: relative; overflow: hidden;
+      border-left-width: 3px;
+    }
+    .hero-card.accent-info { border-left-color: var(--info); }
+    .hero-card.accent-positive { border-left-color: var(--positive); }
+    .hero-card.accent-warning { border-left-color: var(--warning); }
+    .hero-card.accent-crypto { border-left-color: var(--crypto); }
+    .hero-card.main { background: linear-gradient(135deg, #1a2035 0%, #0f172a 100%); border-left-color: var(--positive); }
+    .hero-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
+    .hero-card .value { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .hero-card.main .value { font-size: 38px; color: var(--positive); }
+    .hero-card .change { font-size: 11px; margin-top: 8px; font-weight: 600; }
+    .hero-card .change.up { color: var(--positive); }
+    .hero-card .change.down { color: var(--negative); }
+    .hero-card .sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
 
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
     @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
-    .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .card h2 { font-size: 13px; font-weight: 600; margin-bottom: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between; }
     .chart-box { position: relative; height: 260px; }
 
-    /* Entity cash bars */
-    .entity-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .entity-bar .name { font-size: 12px; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .entity-bar .bar-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    /* Entity cash bars — distinct Cash vs Crypto */
+    .entity-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; padding: 4px 0; }
+    .entity-bar .name { font-size: 12px; width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); }
+    .entity-bar .bar-track { flex: 1; height: 20px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
     .entity-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; min-width: 2px; }
-    .entity-bar .amount { font-size: 12px; font-weight: 600; width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+    .entity-bar .amount { font-size: 12px; font-weight: 700; width: 110px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
 
-    .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
-    .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+    .snap-info { font-size: 11px; color: var(--text-secondary); text-align: center; padding: 8px; }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 180px; color: var(--text-dim); font-size: 13px; }
+
+    /* Chat widget float — repositioned to bottom-right */
+    #chatWidget, .chat-widget, [id^="chat-widget"] {
+      position: fixed !important; right: 20px !important; bottom: 20px !important;
+      top: auto !important; z-index: 100 !important;
+    }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -100,20 +155,19 @@
       <a href="/reconciliation.html">Reconciliation</a>
       <a href="/kanban.html">Tasks</a>
     </div>
-    <div class="actions" style="display:flex;gap:8px;align-items:center">
-      <label style="font-size:12px;color:#8b8fa3">As of:</label>
-      <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
+    <div class="actions">
+      <label>As of</label>
+      <input type="date" id="asOfDate" value="">
       <button class="btn" onclick="refreshData()">Apply</button>
-      <button class="btn" onclick="refreshData()">Refresh</button>
+      <button class="btn" onclick="refreshData()" title="Refresh data">↻</button>
       <button class="btn primary" onclick="triggerSync()" id="syncBtn">Sync Odoo</button>
     </div>
   </div>
 
   <div class="container">
-    <!-- Health Bar -->
+    <!-- Health Bar — icon stat strip -->
     <div class="health-bar">
       <span class="label">System Health</span>
-      <div class="health-track"><div class="health-fill" id="healthFill" style="width:0%"></div></div>
       <span class="health-score" id="healthScore">--</span>
       <div class="health-meta" id="healthMeta"></div>
     </div>
@@ -140,21 +194,21 @@
 
     <!-- Closing Balance Widgets -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr">
-      <div class="hero-card">
+      <div class="hero-card accent-info">
         <div class="label">Xterio Closing Balance</div>
-        <div class="value" id="heroXterio" style="font-size:28px">--</div>
+        <div class="value" id="heroXterio">--</div>
         <div class="change" id="heroXterioChange"></div>
         <div class="sub" id="heroXterioSub"></div>
       </div>
-      <div class="hero-card">
+      <div class="hero-card accent-info">
         <div class="label">Holdings Closing Balance</div>
-        <div class="value" id="heroHoldings" style="font-size:28px">--</div>
+        <div class="value" id="heroHoldings">--</div>
         <div class="change" id="heroHoldingsChange"></div>
         <div class="sub" id="heroHoldingsSub"></div>
       </div>
-      <div class="hero-card">
+      <div class="hero-card accent-warning">
         <div class="label">OW Closing Balance</div>
-        <div class="value" id="heroOWClosing" style="font-size:28px">--</div>
+        <div class="value" id="heroOWClosing">--</div>
         <div class="change" id="heroOWClosingChange"></div>
         <div class="sub" id="heroOWClosingSub"></div>
       </div>
@@ -168,9 +222,9 @@
         <div class="change" id="heroNonOWChange"></div>
         <div class="sub" id="heroSub">Loading...</div>
       </div>
-      <div class="hero-card">
+      <div class="hero-card accent-warning">
         <div class="label">OW & Reach Cash</div>
-        <div class="value" id="heroOW" style="font-size:28px">--</div>
+        <div class="value" id="heroOW">--</div>
         <div class="change" id="heroOWChange"></div>
       </div>
     </div>
@@ -184,7 +238,14 @@
     <!-- Revenue vs Expense + Monthly Volume -->
     <div class="grid-2">
       <div class="card">
-        <h2>Revenue vs Expenses</h2>
+        <h2>Revenue vs Expenses
+          <div class="range-tabs" id="revExpRange">
+            <button class="range-tab" data-range="6">6M</button>
+            <button class="range-tab active" data-range="12">12M</button>
+            <button class="range-tab" data-range="24">24M</button>
+            <button class="range-tab" data-range="all">All</button>
+          </div>
+        </h2>
         <div class="chart-box"><canvas id="revExpChart"></canvas></div>
       </div>
       <div class="card">
@@ -403,11 +464,20 @@
       }
     }
 
+    var revExpRangeMonths = 12;
+
     async function loadRevExpChart() {
       try {
         var now = new Date();
-        var from = (now.getFullYear() - 1) + now.toISOString().slice(4, 10);
         var to = now.toISOString().slice(0, 10);
+        var from;
+        if (revExpRangeMonths === 'all') {
+          from = '2020-01-01';
+        } else {
+          var d = new Date(now);
+          d.setMonth(d.getMonth() - revExpRangeMonths);
+          from = d.toISOString().slice(0, 10);
+        }
         var data = await (await fetch('/api/reporting/revenue-expenses?period=monthly&date_from=' + from + '&date_to=' + to)).json();
         if (!data.length) return;
         if (charts.revExp) charts.revExp.destroy();
@@ -416,8 +486,8 @@
           data: {
             labels: data.map(function(r) { return r.period; }),
             datasets: [
-              { label: 'Revenue', data: data.map(function(r) { return r.total_revenue; }), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
-              { label: 'Expenses', data: data.map(function(r) { return r.total_expenses; }), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 3 }
+              { label: 'Revenue', data: data.map(function(r) { return r.total_revenue; }), backgroundColor: 'rgba(34,197,94,0.75)', borderRadius: 3 },
+              { label: 'Expenses', data: data.map(function(r) { return r.total_expenses; }), backgroundColor: 'rgba(239,68,68,0.65)', borderRadius: 3 }
             ]
           },
           options: {
@@ -599,18 +669,16 @@
     async function loadHealth() {
       try {
         var data = await (await fetch('/api/alerts-tasks/health-status')).json();
-        var fill = document.getElementById('healthFill');
         var score = document.getElementById('healthScore');
         var meta = document.getElementById('healthMeta');
-        fill.style.width = data.score + '%';
-        fill.style.background = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        var scoreColor = data.score >= 80 ? 'var(--positive)' : data.score >= 50 ? 'var(--warning)' : 'var(--negative)';
         score.textContent = data.score + '%';
-        score.style.color = data.score >= 80 ? 'var(--green)' : data.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+        score.style.color = scoreColor;
         meta.innerHTML =
-          '<span>Tasks: ' + data.tasks.done + '/' + data.tasks.total + ' done</span>' +
-          (data.tasks.overdue > 0 ? '<span style="color:var(--red)">' + data.tasks.overdue + ' overdue</span>' : '') +
-          (data.alerts.critical > 0 ? '<span style="color:var(--red)">' + data.alerts.critical + ' critical</span>' : '') +
-          (data.alerts.open > 0 ? '<span>' + data.alerts.open + ' open alerts</span>' : '');
+          '<span>✓ Tasks <span class="stat-num">' + data.tasks.done + '/' + data.tasks.total + '</span></span>' +
+          (data.tasks.overdue > 0 ? '<span>⏰ Overdue <span class="stat-num" style="color:var(--negative)">' + data.tasks.overdue + '</span></span>' : '') +
+          (data.alerts.critical > 0 ? '<span>⚠ Critical <span class="stat-num" style="color:var(--negative)">' + data.alerts.critical + '</span></span>' : '') +
+          (data.alerts.open > 0 ? '<span>🔔 Alerts <span class="stat-num" style="color:var(--warning)">' + data.alerts.open + '</span></span>' : '');
       } catch(e) { console.error(e); }
     }
 
@@ -624,7 +692,14 @@
         }
         el.innerHTML = '<ul class="alert-list">' + alerts.map(function(a) {
           var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
-          return '<li class="alert-item"><span class="alert-label"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span> ' + a.title + (a.entity ? ' — ' + a.entity : '') + '</span><span class="alert-value" style="color:var(--text-dim);font-size:11px">' + (a.message || '') + '</span></li>';
+          var rowCls = a.severity === 'critical' ? 'alert-item critical' : 'alert-item';
+          return '<li class="' + rowCls + '">' +
+            '<div class="alert-title"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span>' +
+            '<strong>' + a.title + '</strong>' +
+            (a.entity ? '<span style="color:var(--text-dim)">— ' + a.entity + '</span>' : '') +
+            '</div>' +
+            (a.message ? '<div class="alert-description">' + a.message + '</div>' : '') +
+            '</li>';
         }).join('') + '</ul>';
       } catch(e) { console.error(e); }
     }
@@ -662,6 +737,17 @@
           }).join('') + '</tbody></table>';
       } catch(e) { console.error('Top expenses error:', e); }
     }
+
+    // Range tab click handler
+    document.getElementById('revExpRange').addEventListener('click', function(e) {
+      var btn = e.target.closest('.range-tab');
+      if (!btn) return;
+      document.querySelectorAll('#revExpRange .range-tab').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var r = btn.dataset.range;
+      revExpRangeMonths = r === 'all' ? 'all' : parseInt(r, 10);
+      loadRevExpChart();
+    });
 
     function refreshData() {
       loadAll();
