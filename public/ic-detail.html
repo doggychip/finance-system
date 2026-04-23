@@ -52,7 +52,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>Conso Balance Sheet — Liabilities Detail</h1>
+    <h1>Intercompany Detail</h1>
     <div class="nav">
       <a href="/">Overview</a>
       <a href="/reports.html">Reports</a>
@@ -81,6 +81,14 @@
       var s = Math.abs(Math.round(n)).toLocaleString('en-US');
       return n < 0 ? '(' + s + ')' : s;
     }
+    // Toggle collapsible section
+    window.toggleSection = function(sectId, el) {
+      var rows = document.querySelectorAll('[data-in-section="' + sectId + '"]');
+      var collapsed = el.classList.toggle('collapsed');
+      var arrow = el.querySelector('.sect-arrow');
+      if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
+      rows.forEach(function(r) { r.style.display = collapsed ? 'none' : ''; });
+    };
 
     function valCls(n, col) {
       var cls = 'val';
@@ -110,30 +118,31 @@
         });
         html += '</tr></thead><tbody>';
 
+        var currentSectionId = null;
+        var sectionCounter = 0;
         data.sections.forEach(function(row) {
           if (row.type === 'section') {
-            // Section header
-            html += '<tr class="section-row"><td class="row-label">' + row.label + '</td>';
+            sectionCounter++;
+            currentSectionId = 'sect-' + sectionCounter;
+            // Collapsible section header
+            html += '<tr class="section-row" data-section="' + currentSectionId + '" style="cursor:pointer" onclick="toggleSection(\'' + currentSectionId + '\', this)"><td class="row-label"><span class="sect-arrow">▾</span> ' + row.label + '</td>';
             cols.forEach(function() { html += '<td></td>'; });
             html += '</tr>';
           } else if (row.code === 'TOTAL_LIABILITIES') {
-            // Grand total
             html += '<tr class="grand-total"><td class="row-label">' + row.label + '</td>';
             row.values.forEach(function(val, i) {
               html += '<td class="' + valCls(val, cols[i]) + '">' + fmt(val) + '</td>';
             });
             html += '</tr>';
           } else if (row.is_total) {
-            // Subtotal row
-            html += '<tr class="total-row"><td class="row-label">' + row.label + '</td>';
+            html += '<tr class="total-row" data-in-section="' + currentSectionId + '"><td class="row-label">' + row.label + '</td>';
             row.values.forEach(function(val, i) {
               html += '<td class="' + valCls(val, cols[i]) + '">' + fmt(val) + '</td>';
             });
             html += '</tr>';
           } else {
-            // Data row
             var indentCls = row.indent ? 'indent-' + row.indent : '';
-            html += '<tr class="' + indentCls + '"><td class="row-label">' + row.label + '</td>';
+            html += '<tr class="' + indentCls + '" data-in-section="' + currentSectionId + '"><td class="row-label">' + row.label + '</td>';
             row.values.forEach(function(val, i) {
               html += '<td class="' + valCls(val, cols[i]) + '">' + fmt(val) + '</td>';
             });
