@@ -455,8 +455,9 @@
       { type: 'entity', key: 'OW', label: 'Overworld', companies: ['OVERWORLD', 'OVERWORLD W3'] },
       { type: 'entity', key: 'Reach', label: 'Reach Labs', companies: ['REACH LABS'] },
       { type: 'entity', key: 'Rough house', label: 'Rough House', companies: ['ROUGH HOUSE'] },
-      { type: 'manual', label: 'Keystone Foundation', get value() { return window._keystoneTotal || 0; } },
-      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'], get manualAdd() { return window._keystoneTotal || 0; } },
+      { type: 'manual', label: 'Keystone Fiat (USD)', get value() { return window._keystoneFiat || 0; } },
+      { type: 'manual', label: 'Keystone Crypto (USDC)', get value() { return window._keystoneCrypto || 0; } },
+      { type: 'subtotal', label: 'OW & Reach Total', keys: ['OW', 'Reach', 'Rough house'], get manualAdd() { return (window._keystoneFiat || 0) + (window._keystoneCrypto || 0); } },
     ];
 
     function posRow(label, cur, prior, cls) {
@@ -498,11 +499,19 @@
       if (!asOf || !prior) { el.innerHTML = '<div class="loading">Select dates</div>'; return; }
       try {
         var owPeriod = asOf.slice(0, 7);
-        // Load Keystone Foundation from manual_balances
+        // Load Keystone Foundation from manual_balances (split into Fiat and Crypto)
         try {
           var keystoneData = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent('Keystone Foundation') + '&period=' + owPeriod)).json();
-          window._keystoneTotal = (keystoneData.rows || []).reduce(function(s, r) { return s + r.amount_local * r.exchange_rate; }, 0);
-        } catch(e) { window._keystoneTotal = 0; }
+          var kFiat = 0, kCrypto = 0;
+          (keystoneData.rows || []).forEach(function(r) {
+            var usd = r.amount_local * r.exchange_rate;
+            if (r.account_code === 'KEYSTONE_FIAT') kFiat += usd;
+            else if (r.account_code === 'KEYSTONE_USDC') kCrypto += usd;
+            else kCrypto += usd; // fallback for legacy rows
+          });
+          window._keystoneFiat = kFiat;
+          window._keystoneCrypto = kCrypto;
+        } catch(e) { window._keystoneFiat = 0; window._keystoneCrypto = 0; }
 
         var data = await (await fetch('/api/dashboard/bank-accounts?as_of_date=' + asOf + '&prior_date=' + prior)).json();
         if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
