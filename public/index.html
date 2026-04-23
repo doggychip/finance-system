@@ -441,12 +441,24 @@
       try {
         await fetch('/api/sync/accounts', { method: 'POST' });
         var asOf = document.getElementById('asOfDate').value || new Date().toISOString().slice(0,10);
+
+        // Protected baseline — skip silently, don't hit the API
+        if (asOf === '2026-02-28') {
+          console.log('[sync] 2026-02-28 is the verified baseline - skipping sync');
+          await refreshData();
+          btn.disabled = false; btn.textContent = 'Sync Odoo';
+          return;
+        }
+
         var r = await fetch('/api/sync/balances', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({as_of_date: asOf}) });
         var result = await r.json();
-        if (result.error) { alert('Sync error: ' + result.error); }
-        else { alert('Synced: ' + (result.companies_synced||0) + ' companies, ' + (result.accounts_synced||0) + ' accounts for ' + asOf + (result.errors && result.errors.length ? '\nErrors: ' + result.errors.join(', ') : '')); }
+        if (result.error) {
+          console.warn('[sync] ' + result.error);
+        } else {
+          console.log('[sync] Synced ' + (result.companies_synced||0) + ' companies, ' + (result.accounts_synced||0) + ' accounts for ' + asOf);
+        }
         await refreshData();
-      } catch (e) { console.error(e); alert('Sync failed: ' + e.message); }
+      } catch (e) { console.error('[sync]', e); }
       btn.disabled = false; btn.textContent = 'Sync Odoo';
     }
 
