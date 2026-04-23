@@ -8,7 +8,9 @@ export function seedKeystoneFoundation(db: Database.Database) {
         currency = 'USDC',
         account_code = 'KEYSTONE_USDC'
     WHERE entity = 'Keystone Foundation'
-      AND account_name = 'PLAY ALGORITHM (BVI)'
+      AND (account_name != 'Keystone Foundation'
+           OR currency != 'USDC'
+           OR account_code != 'KEYSTONE_USDC')
   `).run();
   if (fixed.changes > 0) {
     console.log('[seed] Corrected ' + fixed.changes + ' existing Keystone Foundation row(s)');
