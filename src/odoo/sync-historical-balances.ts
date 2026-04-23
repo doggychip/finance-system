@@ -38,12 +38,13 @@ export async function syncHistoricalBalances(
   };
 
   const upsert = db.prepare(`
-    INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, snapshot_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO account_balances (company_id, company_name, account_odoo_id, account_code, account_name, account_type, balance, currency, snapshot_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(company_id, account_odoo_id, snapshot_date) DO UPDATE SET
       balance = excluded.balance,
       account_name = excluded.account_name,
       account_type = excluded.account_type,
+      currency = excluded.currency,
       synced_at = datetime('now')
   `);
 
@@ -56,7 +57,7 @@ export async function syncHistoricalBalances(
       const accts = await odoo.execute('account.account', 'search_read',
         [[['company_ids', 'in', [company.id]]]],
         {
-          fields: ['id', 'code', 'name', 'current_balance', 'account_type'],
+          fields: ['id', 'code', 'name', 'current_balance', 'account_type', 'currency_id'],
           context: {
             'allowed_company_ids': [company.id],
             'company_id': company.id,
@@ -91,6 +92,8 @@ export async function syncHistoricalBalances(
           const code = a.code || '';
           const name = a.name || '';
           const accountType = a.account_type || '';
+          // currency_id in Odoo is [id, name] tuple, e.g. [2, "USD"]
+          const currency = (a.currency_id && Array.isArray(a.currency_id)) ? a.currency_id[1] : 'USD';
           if (!code) continue;
 
           // Only include accounts that have actual journal entries for this company
@@ -99,7 +102,7 @@ export async function syncHistoricalBalances(
           upsert.run(
             company.id, company.name,
             a.id, code, name, accountType,
-            a.current_balance, asOfDate
+            a.current_balance, currency, asOfDate
           );
           result.accounts_synced++;
         }

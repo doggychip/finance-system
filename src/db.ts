@@ -129,10 +129,14 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       account_name TEXT NOT NULL,
       account_type TEXT NOT NULL,
       balance REAL DEFAULT 0,
+      currency TEXT DEFAULT 'USD',
       snapshot_date TEXT NOT NULL,
       synced_at TEXT DEFAULT (datetime('now')),
       UNIQUE(company_id, account_odoo_id, snapshot_date)
     );
+
+    -- Add currency column if it doesn't exist (for existing databases)
+    -- SQLite doesn't support IF NOT EXISTS for ALTER, so we try and ignore errors
     CREATE INDEX IF NOT EXISTS idx_ab_company_snapshot ON account_balances(company_id, snapshot_date);
     CREATE INDEX IF NOT EXISTS idx_ab_snapshot ON account_balances(snapshot_date);
 
@@ -188,6 +192,14 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
       ('mario', 'finance123', 'Mario', 'finance'),
       ('bk', 'finance123', 'BK', 'finance');
   `);
+
+  // Migration: Add currency column to account_balances if it doesn't exist
+  try {
+    db.exec("ALTER TABLE account_balances ADD COLUMN currency TEXT DEFAULT 'USD'");
+    console.log('[db] Added currency column to account_balances');
+  } catch (err) {
+    // Column already exists, ignore
+  }
 
   return db;
 }

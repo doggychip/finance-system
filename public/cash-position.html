@@ -150,15 +150,25 @@
         var data = await (await fetch('/api/dashboard/bank-accounts?as_of_date=' + asOf + '&prior_date=' + prior)).json();
         if (!data.groups || !data.groups.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
 
-        // Build lookup: company_name -> { total_current, total_prior }
+        // Build lookup: company_name -> { total_current, total_prior, cash, crypto }
         var byCompany = {};
         var byEntity = {};
         data.groups.forEach(function(g) {
           byEntity[g.name] = g;
+          // Compute cash vs crypto totals per entity
+          g.cash_total = 0;
+          g.crypto_total = 0;
           g.accounts.forEach(function(a) {
-            if (!byCompany[a.company_name]) byCompany[a.company_name] = { current: 0, prior: 0 };
+            if (!byCompany[a.company_name]) byCompany[a.company_name] = { current: 0, prior: 0, cash: 0, crypto: 0 };
             byCompany[a.company_name].current += a.current_balance;
             byCompany[a.company_name].prior += a.prior_balance;
+            if (a.asset_type === 'Crypto') {
+              byCompany[a.company_name].crypto += a.current_balance;
+              g.crypto_total += a.current_balance;
+            } else {
+              byCompany[a.company_name].cash += a.current_balance;
+              g.cash_total += a.current_balance;
+            }
           });
         });
 
@@ -172,20 +182,22 @@
             html += '<tr class="parent-row"><td colspan="6">' + item.name + '</td></tr>';
 
           } else if (item.type === 'entity') {
-            // Entity total row
+            // Entity total row - use cash/crypto breakdown
             var g = byEntity[item.key];
             var eCur = g ? g.total_current : 0;
             var ePrior = g ? g.total_prior : 0;
-            html += row(item.label, eCur, ePrior, 'subtotal-row');
+            var eCash = g ? (g.cash_total || 0) : 0;
+            var eCrypto = g ? (g.crypto_total || 0) : 0;
+            html += row(item.label, eCur, ePrior, 'subtotal-row', eCash, eCrypto);
             grandCur += eCur;
             grandPrior += ePrior;
 
-            // Individual company rows
+            // Individual company rows with cash/crypto split
             if (item.companies) {
               item.companies.forEach(function(cName) {
                 var c = byCompany[cName];
                 if (c && Math.abs(c.current) > 0.5) {
-                  html += row(cName, c.current, c.prior, 'company-row');
+                  html += row(cName, c.current, c.prior, 'company-row', c.cash, c.crypto);
                 }
               });
             }

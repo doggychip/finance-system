@@ -1550,14 +1550,14 @@ export function dashboardRoutes(db: Database.Database): Router {
       // Use account_balances
       // Get ALL cash accounts from both current and prior snapshots
       const currentRows = db.prepare(`
-        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
+        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance, currency
         FROM account_balances
         WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
         ORDER BY company_name, account_code
       `).all(snap.snapshot_date) as any[];
 
       const priorRows = priorSnap?.snapshot_date ? db.prepare(`
-        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance
+        SELECT company_id, company_name, account_code as code, account_name as name, account_type, balance, currency
         FROM account_balances
         WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
       `).all(priorSnap.snapshot_date) as any[] : [];
@@ -1589,15 +1589,21 @@ export function dashboardRoutes(db: Database.Database): Router {
         const change = currentBal - priorBal;
         const changePct = priorBal !== 0 ? ((change / Math.abs(priorBal)) * 100) : 0;
 
+        // Classify as Crypto if: currency is a crypto token OR account code starts with 10W
+        const currency = row.currency || 'USD';
+        const fiatCurrencies = new Set(['USD', 'HKD', 'EUR', 'CNY', 'CNH', 'JPY', 'GBP', 'CHF', 'SGD', 'CAD', 'AUD']);
+        const isCrypto = !fiatCurrencies.has(currency) || row.code.startsWith('10W');
+
         accounts.push({
           entity_group: companyToGroup[row.company_id] || 'Other',
           company_name: row.company_name,
           code: row.code,
           name: row.name,
+          currency: currency,
           current_balance: currentBal,
           prior_balance: priorBal,
           change, change_pct: changePct,
-          asset_type: row.code.startsWith('10W') ? 'Crypto' : 'Cash',
+          asset_type: isCrypto ? 'Crypto' : 'Cash',
         });
       }
 
