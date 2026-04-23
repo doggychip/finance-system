@@ -71,6 +71,16 @@ app.use('/api/chat', chatRoutes(db));
 app.use('/api/tasks', taskRoutes(db));
 app.use('/api/alerts-tasks', alertsTasksRoutes(db));
 
+// Redirects for common URL mistakes
+app.get('/consolidated.html', (_req, res) => res.redirect(301, '/consolidated-bs.html'));
+
+// 404 handler — must be last
+app.use((_req, res) => {
+  res.status(404).sendFile(path.join(publicDir, '404.html'), (err) => {
+    if (err) res.status(404).send('Page not found');
+  });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Finance system running on port ${PORT}`);
