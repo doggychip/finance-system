@@ -1,9 +1,8 @@
 {
   "$schema": "https://schema.zeabur.app/template.json",
   "build": {
-    "type": "node",
-    "build_command": "npm run build",
-    "start_command": "npm start"
+    "type": "dockerfile",
+    "dockerfile": "Dockerfile"
   },
   "healthcheck": {
     "path": "/health"
