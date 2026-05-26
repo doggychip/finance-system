@@ -19,6 +19,7 @@ import { seedFoundationIC } from './data/foundation-ic-seed';
 import { migrateHistoricalCash } from './db/migrate-historical-cash';
 import { seedHistoricalCash } from './db/seed-historical-cash';
 import { historicalCashRoutes } from './routes/historical-cash';
+import { mountMcp } from './mcp/mount';
 
 const app = express();
 
@@ -76,6 +77,8 @@ app.use('/api/chat', chatRoutes(db));
 app.use('/api/tasks', taskRoutes(db));
 app.use('/api/alerts-tasks', alertsTasksRoutes(db));
 app.use('/api/historical-cash', historicalCashRoutes(db));
+
+mountMcp(app, { dbPath });
 
 const PORT = process.env.PORT || 3000;
 app.listen(Number(PORT), '0.0.0.0', () => {
