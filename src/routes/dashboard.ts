@@ -132,8 +132,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Find best snapshot
     const snap = db.prepare(
       requestedDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     if (!snap?.snapshot_date) {
@@ -517,8 +517,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Find closest snapshot
     const latestSnap = db.prepare(
       requestedDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     const snapDate = latestSnap?.snapshot_date;
@@ -737,8 +737,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Find latest snapshot date
     const latestSnap = db.prepare(
       snapshotDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(snapshotDate ? [snapshotDate] : [])) as any;
 
     const useBalanceTable = !!latestSnap?.snapshot_date;
@@ -1354,12 +1354,12 @@ export function dashboardRoutes(db: Database.Database): Router {
     // Use account_balances if available
     const snap = db.prepare(
       requestedDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`
+        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
+        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(...(requestedDate ? [requestedDate] : [])) as any;
 
     const priorSnap = db.prepare(
-      `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`
+      `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
     ).get(priorDate) as any;
 
     if (snap?.snapshot_date) {
@@ -1678,13 +1678,13 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     // Find matching snapshot
     const snapQuery = requestedDate
-      ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate) as any
-      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1`).get() as any;
+      ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate) as any
+      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get() as any;
     const currentSnap = snapQuery?.snapshot_date;
     if (!currentSnap) return res.json({});
 
     // Find prior snapshot (the one before current)
-    const priorQuery = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < ? ORDER BY snapshot_date DESC LIMIT 1`).get(currentSnap) as any;
+    const priorQuery = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get(currentSnap) as any;
     const priorSnap = priorQuery?.snapshot_date;
 
     // Company to group mapping
