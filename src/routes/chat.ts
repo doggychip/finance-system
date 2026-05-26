@@ -56,7 +56,7 @@ export function chatRoutes(db: Database.Database): Router {
     try {
       console.log('[chat] Building context...');
       // Get latest snapshot
-      const snap = db.prepare('SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date DESC LIMIT 1').get() as any;
+      const snap = db.prepare("SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1").get() as any;
       const snapDate = snap?.snapshot_date || 'unknown';
       console.log('[chat] Using snapshot:', snapDate);
 
@@ -157,7 +157,7 @@ export function chatRoutes(db: Database.Database): Router {
       }
 
       // Historical cash balances across all snapshots
-      const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
+      const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date`).all() as any[];
       context += `\nHistorical Cash Balances by Snapshot Date:\n`;
       for (const s of allSnaps) {
         const cashTotal = db.prepare(`

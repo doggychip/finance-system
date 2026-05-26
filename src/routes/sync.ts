@@ -138,6 +138,13 @@ export function syncRoutes(db: Database.Database): Router {
       if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
         return res.status(400).json({ error: 'as_of_date required (YYYY-MM-DD)' });
       }
+      // Reject far-future dates — sentinel values like 9999-01-01 caused
+      // Odoo to return aggregate-since-beginning data that polluted snapshots.
+      const maxFuture = new Date();
+      maxFuture.setDate(maxFuture.getDate() + 30);
+      if (new Date(asOfDate) > maxFuture) {
+        return res.status(400).json({ error: 'as_of_date too far in the future' });
+      }
       const odoo = createOdooClient();
       await odoo.authenticate();
       const result = await syncHistoricalBalances(odoo, db, asOfDate);

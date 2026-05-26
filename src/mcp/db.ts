@@ -94,10 +94,10 @@ export function resolveSnapshotDate(asOfDate?: string): string | null {
   const row = asOfDate
     ? conn
         .prepare(
-          'SELECT MAX(snapshot_date) AS d FROM account_balances WHERE snapshot_date <= ?'
+          "SELECT MAX(snapshot_date) AS d FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01'"
         )
         .get(asOfDate)
-    : conn.prepare('SELECT MAX(snapshot_date) AS d FROM account_balances').get();
+    : conn.prepare("SELECT MAX(snapshot_date) AS d FROM account_balances WHERE snapshot_date < '9000-01-01'").get();
   const d = (row as { d: string | null } | undefined)?.d ?? null;
   return d;
 }
