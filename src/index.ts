@@ -28,12 +28,13 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Basic auth protection (set AUTH_USER and AUTH_PASS env vars to enable)
+// Basic auth protection (set AUTH_USER and AUTH_PASS env vars to enable).
+// Probe endpoints (/health, /mcp/health) are exempt so uptime monitors don't 401.
 const authUser = process.env.AUTH_USER;
 const authPass = process.env.AUTH_PASS;
 if (authUser && authPass) {
   app.use((req, res, next) => {
-    if (req.path === '/health') return next();
+    if (req.path === '/health' || req.path === '/mcp/health') return next();
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Basic ')) {
       res.setHeader('WWW-Authenticate', 'Basic realm="Finance Dashboard"');
