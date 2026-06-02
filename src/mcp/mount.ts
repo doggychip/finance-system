@@ -124,4 +124,20 @@ export function mountMcp(app: Express, opts: MountOptions = {}): void {
       res.status(503).json({ status: 'error', error: (err as Error).message });
     }
   });
+
+  // We use static bearer tokens, NOT OAuth. Clients like mcp-remote probe these
+  // OAuth discovery / dynamic-registration endpoints after a 401; without these
+  // handlers they hit the Basic-auth HTML 401 and report a misleading
+  // "Invalid OAuth error response". A clean JSON 404 makes them surface the real
+  // bearer 401 instead.
+  const noOauth = (_req: Request, res: Response): void => {
+    res.status(404).json({
+      error:
+        'OAuth is not supported. Authenticate with a static "Authorization: Bearer <token>" header.',
+    });
+  };
+  app.get('/.well-known/oauth-authorization-server', noOauth);
+  app.get('/.well-known/oauth-protected-resource', noOauth);
+  app.get('/.well-known/oauth-protected-resource/mcp', noOauth);
+  app.post('/register', noOauth);
 }
