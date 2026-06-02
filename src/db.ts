@@ -196,5 +196,11 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     db.exec(`ALTER TABLE account_balances ADD COLUMN currency TEXT DEFAULT 'USD'`);
   }
 
+  // Remove stale ROUGH HOUSE 303020/303021 rows that don't exist in Odoo.
+  // Real Odoo balances (as of 2026-02-28): 303050 +665,716.20, 303180 -117,775.68; other 303xxx are 0.
+  db.prepare(
+    `DELETE FROM account_balances WHERE company_id = 31 AND account_code IN ('303020', '303021')`
+  ).run();
+
   return db;
 }

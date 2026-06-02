@@ -62,6 +62,10 @@ export async function syncBalances(
       synced_at = datetime('now')
   `);
 
+  const deleteCompanySnapshot = db.prepare(
+    `DELETE FROM account_balances WHERE company_id = ? AND snapshot_date = ?`
+  );
+
   for (const company of COMPANIES) {
     try {
       console.log(`[sync-balances] Fetching balances for ${company.name} (${company.id})...`);
@@ -77,6 +81,10 @@ export async function syncBalances(
       ) as any[];
 
       const tx = db.transaction(() => {
+        // Wipe any prior rows for this company+snapshot to prevent stale entries
+        // (accounts zeroed/removed in Odoo would otherwise linger, since we skip
+        // near-zero balances below and upsert only matches by account_odoo_id).
+        deleteCompanySnapshot.run(company.id, snapshotDate);
         for (const a of accts) {
           if (Math.abs(a.current_balance) < 0.01) continue;
           const code = a.code || '';
