@@ -34,7 +34,9 @@ const authUser = process.env.AUTH_USER;
 const authPass = process.env.AUTH_PASS;
 if (authUser && authPass) {
   app.use((req, res, next) => {
-    if (req.path === '/health' || req.path === '/mcp/health') return next();
+    // /health + the MCP surface are exempt from Basic auth: probes don't 401,
+    // and /mcp is gated by its own bearer-token check (see mountMcp).
+    if (req.path === '/health' || req.path === '/mcp' || req.path.startsWith('/mcp/')) return next();
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Basic ')) {
       res.setHeader('WWW-Authenticate', 'Basic realm="Finance Dashboard"');

@@ -1,5 +1,6 @@
 import path from 'path';
-import express, { type Express, type Request, type Response } from 'express';
+import { timingSafeEqual } from 'node:crypto';
+import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { buildServer } from './tools';
 import { healthProbe, dbPath, setDbPath } from './db';
 
@@ -62,10 +63,37 @@ export function mountMcp(app: Express, opts: MountOptions = {}): void {
     log(`WARN: DB probe failed at mount (route still attached): ${(err as Error).message}`);
   }
 
+  // Bearer auth for /mcp. Tokens come from MCP_BEARER_TOKENS (comma-separated).
+  // Fails closed: with no tokens configured, every /mcp request is rejected.
+  const bearerTokens = (process.env.MCP_BEARER_TOKENS ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (bearerTokens.length === 0) {
+    log('WARN: MCP_BEARER_TOKENS is empty — /mcp will reject all requests (fail closed)');
+  }
+  const tokenMatches = (presented: string): boolean => {
+    const a = Buffer.from(presented);
+    return bearerTokens.some((t) => {
+      const b = Buffer.from(t);
+      return a.length === b.length && timingSafeEqual(a, b);
+    });
+  };
+  const requireBearer = (req: Request, res: Response, next: NextFunction): void => {
+    const header = req.header('authorization') ?? '';
+    const match = /^Bearer\s+(.+)$/i.exec(header);
+    if (!match || !tokenMatches(match[1].trim())) {
+      res.setHeader('WWW-Authenticate', 'Bearer realm="xterio-cfo-mcp"');
+      res.status(401).json({ error: 'Missing or invalid bearer token' });
+      return;
+    }
+    next();
+  };
+
   // Route-level JSON parser so this works regardless of the app's global middleware setup.
   const json = express.json({ limit: '4mb' });
 
-  app.post('/mcp', json, async (req: Request, res: Response) => {
+  app.post('/mcp', requireBearer, json, async (req: Request, res: Response) => {
     const server = buildServer();
     const transport = new StreamableHTTPServerTransportClass({
       sessionIdGenerator: undefined,
