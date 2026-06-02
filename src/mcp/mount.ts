@@ -94,6 +94,12 @@ export function mountMcp(app: Express, opts: MountOptions = {}): void {
   const json = express.json({ limit: '4mb' });
 
   app.post('/mcp', requireBearer, json, async (req: Request, res: Response) => {
+    // Force a fresh TCP connection per request (no HTTP/1.1 keep-alive reuse).
+    // Some tunnels/proxies (e.g. mihomo TUN) silently drop idle keep-alive
+    // sockets, and undici (mcp-remote's client) then reuses the dead socket and
+    // fails the follow-up request with "other side closed". Connection: close
+    // makes the client open a new connection each time, which survives the tunnel.
+    res.setHeader('Connection', 'close');
     const server = buildServer();
     const transport = new StreamableHTTPServerTransportClass({
       sessionIdGenerator: undefined,
