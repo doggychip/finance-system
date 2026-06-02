@@ -33,6 +33,14 @@ interface MountOptions {
   dbPath?: string;
   /** Logger; defaults to console.log with an [mcp] prefix. */
   log?: (msg: string) => void;
+  /**
+   * Optional OAuth access-token verifier. When provided, /mcp accepts EITHER a
+   * static MCP_BEARER_TOKENS token OR a valid OAuth token (verified here), so
+   * the two coexist during migration. Rejecting (throw) = invalid token.
+   */
+  verifyOAuthToken?: (token: string) => Promise<unknown>;
+  /** OAuth protected-resource metadata URL, advertised in 401 WWW-Authenticate. */
+  resourceMetadataUrl?: string;
 }
 
 /**
@@ -79,15 +87,25 @@ export function mountMcp(app: Express, opts: MountOptions = {}): void {
       return a.length === b.length && timingSafeEqual(a, b);
     });
   };
-  const requireBearer = (req: Request, res: Response, next: NextFunction): void => {
-    const header = req.header('authorization') ?? '';
-    const match = /^Bearer\s+(.+)$/i.exec(header);
-    if (!match || !tokenMatches(match[1].trim())) {
-      res.setHeader('WWW-Authenticate', 'Bearer realm="xterio-cfo-mcp"');
-      res.status(401).json({ error: 'Missing or invalid bearer token' });
-      return;
+  const wwwAuth = opts.resourceMetadataUrl
+    ? `Bearer realm="xterio-cfo-mcp", resource_metadata="${opts.resourceMetadataUrl}"`
+    : 'Bearer realm="xterio-cfo-mcp"';
+  const requireBearer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const match = /^Bearer\s+(.+)$/i.exec(req.header('authorization') ?? '');
+    const token = match?.[1].trim();
+    if (token) {
+      if (tokenMatches(token)) return next(); // static MCP_BEARER_TOKENS
+      if (opts.verifyOAuthToken) {
+        try {
+          await opts.verifyOAuthToken(token); // OAuth access token
+          return next();
+        } catch {
+          /* fall through to 401 */
+        }
+      }
     }
-    next();
+    res.setHeader('WWW-Authenticate', wwwAuth);
+    res.status(401).json({ error: 'Missing or invalid bearer token' });
   };
 
   // Route-level JSON parser so this works regardless of the app's global middleware setup.
@@ -130,20 +148,6 @@ export function mountMcp(app: Express, opts: MountOptions = {}): void {
       res.status(503).json({ status: 'error', error: (err as Error).message });
     }
   });
-
-  // We use static bearer tokens, NOT OAuth. Clients like mcp-remote probe these
-  // OAuth discovery / dynamic-registration endpoints after a 401; without these
-  // handlers they hit the Basic-auth HTML 401 and report a misleading
-  // "Invalid OAuth error response". A clean JSON 404 makes them surface the real
-  // bearer 401 instead.
-  const noOauth = (_req: Request, res: Response): void => {
-    res.status(404).json({
-      error:
-        'OAuth is not supported. Authenticate with a static "Authorization: Bearer <token>" header.',
-    });
-  };
-  app.get('/.well-known/oauth-authorization-server', noOauth);
-  app.get('/.well-known/oauth-protected-resource', noOauth);
-  app.get('/.well-known/oauth-protected-resource/mcp', noOauth);
-  app.post('/register', noOauth);
+  // (The OAuth discovery endpoints /.well-known/oauth-* + /register are now
+  //  served for real by mcpAuthRouter, mounted in index.ts.)
 }

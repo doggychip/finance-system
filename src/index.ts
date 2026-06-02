@@ -20,6 +20,7 @@ import { migrateHistoricalCash } from './db/migrate-historical-cash';
 import { seedHistoricalCash } from './db/seed-historical-cash';
 import { historicalCashRoutes } from './routes/historical-cash';
 import { mountMcp } from './mcp/mount';
+import { createOAuthProvider } from './mcp/oauth';
 
 const app = express();
 
@@ -27,6 +28,23 @@ const app = express();
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// OAuth 2.1 authorization server for /mcp (claude.ai web + native Desktop/Code
+// connectors, which can't use static bearer tokens). Mounted BEFORE Basic auth
+// so /authorize, /token, /register, /.well-known/* and the login page are
+// reachable without the dashboard password. /mcp itself accepts OAuth tokens OR
+// the static MCP_BEARER_TOKENS during migration (see mountMcp below).
+const oauth = createOAuthProvider((m) => console.log(`[oauth] ${new Date().toISOString()} ${m}`));
+app.use(
+  oauth.mcpAuthRouter({
+    provider: oauth.provider,
+    issuerUrl: oauth.issuerUrl,
+    resourceServerUrl: oauth.resourceUrl,
+    scopesSupported: ['mcp'],
+    resourceName: 'Xterio Finance MCP',
+  })
+);
+app.post('/oauth/login', express.urlencoded({ extended: false }), oauth.loginHandler);
 
 // Basic auth protection (set AUTH_USER and AUTH_PASS env vars to enable).
 // Probe endpoints (/health, /mcp/health) are exempt so uptime monitors don't 401.
@@ -91,7 +109,11 @@ app.use('/api/tasks', taskRoutes(db));
 app.use('/api/alerts-tasks', alertsTasksRoutes(db));
 app.use('/api/historical-cash', historicalCashRoutes(db));
 
-mountMcp(app, { dbPath });
+mountMcp(app, {
+  dbPath,
+  verifyOAuthToken: (t) => oauth.provider.verifyAccessToken(t),
+  resourceMetadataUrl: oauth.resourceMetadataUrl,
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(Number(PORT), '0.0.0.0', () => {
