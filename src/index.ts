@@ -42,6 +42,14 @@ app.use(
     resourceServerUrl: oauth.resourceUrl,
     scopesSupported: ['mcp'],
     resourceName: 'Xterio Finance MCP',
+    // The SDK's default DCR limit is 20/hour, and since we don't set Express
+    // "trust proxy", express-rate-limit keys every request on the single Zeabur
+    // ingress IP — making it effectively GLOBAL. That let claude.ai's connect
+    // attempts hit 429 ("Couldn't register"). Raise it; registration is harmless
+    // here (every client is still gated by the shared-password /authorize login).
+    clientRegistrationOptions: {
+      rateLimit: { windowMs: 60 * 60 * 1000, max: 200 },
+    },
   })
 );
 app.post('/oauth/login', express.urlencoded({ extended: false }), oauth.loginHandler);
