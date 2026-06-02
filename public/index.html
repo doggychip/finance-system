@@ -231,10 +231,13 @@
     function fmtShort(n) {
       if (n == null) return '--';
       var abs = Math.abs(n);
-      if (abs >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
-      if (abs >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+      var sign = n < 0 ? '-' : '';
+      if (abs >= 1e9) return sign + '$' + (abs/1e9).toFixed(1) + 'B';
+      if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+      if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
       return '$' + Math.round(n);
     }
+    function fmtDate(d) { return (!d || d === '9999-01-01') ? 'Latest' : d; }
     function fmtPct(n) { return (n == null || isNaN(n) || !isFinite(n)) ? '' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
 
     var palette = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e','#a855f7','#64748b','#0ea5e9'];
@@ -322,7 +325,7 @@
           charts.trend = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: data.cash_trend.map(function(r) { return r.date; }),
+              labels: data.cash_trend.map(function(r) { return fmtDate(r.date); }),
               datasets: [
                 { label: 'Non-OW Cash', data: data.cash_trend.map(function(r) { return r.non_ow; }), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#22c55e' },
                 { label: 'OW Cash', data: data.cash_trend.map(function(r) { return r.ow; }), borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: 3, borderDash: [5,3] },

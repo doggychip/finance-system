@@ -163,8 +163,12 @@ export function dashboardRoutes(db: Database.Database): Router {
     const isOW = (r: any) => owGroups.has(companyToGroup[r.company_id] || '');
 
     const nonOWRows = rows.filter(r => isNonOW(r) && r.odoo_type === 'asset_cash');
-    const owRows = rows.filter(isOW);
-    const remaining = rows.filter(r => !isOW(r));
+    // OW grouping counts cash accounts only; OW receivables fall through to
+    // `remaining` so they land in the receivable bucket below. (Previously this
+    // lived as an off-git boot-time hotpatch on the compiled dist; ported to
+    // source 2026-06-02 so it's versioned and reviewable.)
+    const owRows = rows.filter(r => isOW(r) && r.odoo_type === 'asset_cash');
+    const remaining = rows.filter(r => !isOW(r) || r.odoo_type === 'asset_receivable');
 
     const overdrawn = remaining.filter(r => r.balance < 0);
     const receivable = remaining.filter(r => r.balance > 0 && r.odoo_type === 'asset_receivable');
