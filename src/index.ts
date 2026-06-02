@@ -35,8 +35,18 @@ const authPass = process.env.AUTH_PASS;
 if (authUser && authPass) {
   app.use((req, res, next) => {
     // /health + the MCP surface are exempt from Basic auth: probes don't 401,
-    // and /mcp is gated by its own bearer-token check (see mountMcp).
-    if (req.path === '/health' || req.path === '/mcp' || req.path.startsWith('/mcp/')) return next();
+    // and /mcp is gated by its own bearer-token check (see mountMcp). OAuth
+    // discovery paths are exempt too so MCP clients get a clean JSON 404 there
+    // (not the Basic-auth HTML), avoiding a misleading client-side OAuth error.
+    if (
+      req.path === '/health' ||
+      req.path === '/mcp' ||
+      req.path.startsWith('/mcp/') ||
+      req.path.startsWith('/.well-known/') ||
+      req.path === '/register'
+    ) {
+      return next();
+    }
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Basic ')) {
       res.setHeader('WWW-Authenticate', 'Basic realm="Finance Dashboard"');
