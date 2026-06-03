@@ -2115,16 +2115,34 @@ export function dashboardRoutes(db: Database.Database): Router {
         const d = new Date(asOfDate + 'T00:00:00Z');
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       })();
-      const foundRows = db.prepare(`
+      // Try requested period; fall back to latest available period if no data
+      let foundRows = db.prepare(`
         SELECT entity AS "Company", account_code AS "Account Code",
                account_name AS "Account Name", period AS "Period",
-               amount_local AS "Amount (Local)", exchange_rate AS "Exchange Rate"
+               amount_local AS "Amount (Local)", exchange_rate AS "Exchange Rate",
+               ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)"
         FROM manual_balances
-        WHERE entity = 'Xterio Foundation' AND account_code != 'FOUNDATION_IC'
+        WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
           AND period = ?
         ORDER BY account_code
       `).all(foundationPeriod) as any[];
-      const hdrs = foundRows.length ? Object.keys(foundRows[0]) : ['Company','Account Code','Account Name','Period','Amount (Local)','Exchange Rate'];
+      // If no data for requested period, use the latest available period
+      if (!foundRows.length) {
+        const latestPeriod = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+        if (latestPeriod) {
+          foundRows = db.prepare(`
+            SELECT entity AS "Company", account_code AS "Account Code",
+                   account_name AS "Account Name", period AS "Period",
+                   amount_local AS "Amount (Local)", exchange_rate AS "Exchange Rate",
+                   ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)"
+            FROM manual_balances
+            WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
+              AND period = ?
+            ORDER BY account_code
+          `).all(latestPeriod) as any[];
+        }
+      }
+      const hdrs = foundRows.length ? Object.keys(foundRows[0]) : ['Company','Account Code','Account Name','Period','Amount (Local)','Exchange Rate','Balance (USD)'];
       const csvLines = [hdrs.map(h => `"${h}"`).join(','), ...foundRows.map(r => hdrs.map(h => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="foundation-detail.csv"`);
@@ -2179,7 +2197,8 @@ export function dashboardRoutes(db: Database.Database): Router {
         const d = new Date(asOfDate + 'T00:00:00Z');
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       })();
-      const foundRows2 = db.prepare(`
+      // Try requested period; fall back to latest available period if no data
+      let foundRows2 = db.prepare(`
         SELECT entity AS "Company", NULL AS "Odoo Account ID",
                account_code AS "Account Code", account_name AS "Account Name",
                'asset_cash' AS "Account Type",
@@ -2191,6 +2210,23 @@ export function dashboardRoutes(db: Database.Database): Router {
           AND period = ?
         ORDER BY account_code
       `).all(snapDate, foundationPeriod2) as any[];
+      if (!foundRows2.length) {
+        const latestPeriod2 = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+        if (latestPeriod2) {
+          foundRows2 = db.prepare(`
+            SELECT entity AS "Company", NULL AS "Odoo Account ID",
+                   account_code AS "Account Code", account_name AS "Account Name",
+                   'asset_cash' AS "Account Type",
+                   'USD' AS "Currency",
+                   ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)",
+                   ? AS "Snapshot Date"
+            FROM manual_balances
+            WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
+              AND period = ?
+            ORDER BY account_code
+          `).all(snapDate, latestPeriod2) as any[];
+        }
+      }
       foundRows2.forEach((r: any) => {
         csvLines2.push(hdrs2.map((h: string) => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','));
       });
