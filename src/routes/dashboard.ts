@@ -1737,7 +1737,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const netAssetsRows = db.prepare(`
       SELECT company_id, SUM(balance) as total
       FROM account_balances
-      WHERE snapshot_date = ? AND account_type IN (${netAssetTypes})
+      WHERE snapshot_date = ? AND account_type IN (${netAssetTypes}) AND account_code != '300040'
       GROUP BY company_id
     `).all(currentSnap) as any[];
 
@@ -1756,12 +1756,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       if (holdingsGroups.has(group)) holdingsNetAssets += r.total;
     }
 
-    // Holdings adjustment: add back 300040 "Other Payables (non-trade)" which is actually
-    // a shareholder investment (~$3.5M in Palios/CS), not a real payable
-    const holdingsAdj300040 = holdingsCompanyIds.length > 0
-      ? (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${holdingsCompanyIds.map(() => '?').join(',')}) AND account_code = '300040'`).get(currentSnap, ...holdingsCompanyIds) as any)?.total || 0
-      : 0;
-    holdingsNetAssets -= holdingsAdj300040; // balance is negative (liability), subtracting negative = adding
+    // 300040 accounts are excluded at the SQL level (account_code != '300040' in netAssetsRows)
 
     let owNetAssets = 0;
     for (const r of owNetAssetsRows) {
@@ -1777,7 +1772,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       const priorNARows = db.prepare(`
         SELECT company_id, SUM(balance) as total
         FROM account_balances
-        WHERE snapshot_date = ? AND account_type IN (${netAssetTypes})
+        WHERE snapshot_date = ? AND account_type IN (${netAssetTypes}) AND account_code != '300040'
         GROUP BY company_id
       `).all(priorSnap) as any[];
       for (const r of priorNARows) {
@@ -1953,7 +1948,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       waterfall: {
         foundation: { net_assets: foundationNetAssets, ...wfFoundation },
         xterio: { net_assets: xterioNetAssets, ...wfXterio },
-        holdings: { net_assets: holdingsNetAssets, adj_300040: -holdingsAdj300040, ...wfHoldings },
+        holdings: { net_assets: holdingsNetAssets, ...wfHoldings },
         ow: { net_assets: owNetAssets, ...wfOW },
       },
       // Aggregated cash totals
@@ -2158,9 +2153,11 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     const ph = companyIds.map(() => '?').join(',');
     // Non-cash cards: restrict to asset_* and liability_* only; exclude account 300040
+    // OW card excludes fixed/non-current assets (matches card calculation logic)
+    const owExtraTypeFilter = (card === 'ow') ? ` AND ab.account_type NOT IN ('asset_fixed','asset_non_current')` : '';
     const typeFilter = extraFilter
       ? ''
-      : ` AND (ab.account_type LIKE 'asset_%' OR ab.account_type LIKE 'liability_%') AND ab.account_code != '300040'`;
+      : ` AND (ab.account_type LIKE 'asset_%' OR ab.account_type LIKE 'liability_%') AND ab.account_code != '300040'${owExtraTypeFilter}`;
     const rows = db.prepare(`
       SELECT ab.company_name AS "Company",
              ab.account_odoo_id AS "Odoo Account ID",
@@ -2176,6 +2173,28 @@ export function dashboardRoutes(db: Database.Database): Router {
     `).all(snapDate, ...companyIds) as any[];
     const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company','Odoo Account ID','Account Code','Account Name','Account Type','Currency','Balance (USD)','Snapshot Date'];
     const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) => hdrs2.map(h => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
+    // For cash_fiat: also include Foundation fiat cash from manual_balances
+    if (card === 'cash_fiat') {
+      const foundationPeriod2 = (() => {
+        const d = new Date(asOfDate + 'T00:00:00Z');
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      })();
+      const foundRows2 = db.prepare(`
+        SELECT entity AS "Company", NULL AS "Odoo Account ID",
+               account_code AS "Account Code", account_name AS "Account Name",
+               'asset_cash' AS "Account Type",
+               'USD' AS "Currency",
+               ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)",
+               ? AS "Snapshot Date"
+        FROM manual_balances
+        WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
+          AND period = ?
+        ORDER BY account_code
+      `).all(snapDate, foundationPeriod2) as any[];
+      foundRows2.forEach((r: any) => {
+        csvLines2.push(hdrs2.map((h: string) => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','));
+      });
+    }
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${label}-detail.csv"`);
     res.send('\uFEFF' + csvLines2.join('\n'));
