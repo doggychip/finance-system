@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Finance Dashboard — Executive View</title>
+  <title>Finance Dashboard â Executive View</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: text; -webkit-user-select: text; }
@@ -84,6 +84,26 @@
 
     .snap-info { font-size: 11px; color: var(--text-dim); text-align: center; padding: 8px; }
     .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+
+    /* Card action buttons */
+    .card-actions { position: absolute; top: 12px; right: 12px; display: flex; gap: 5px; z-index: 10; }
+    .card-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-dim); padding: 2px 5px; border-radius: 5px; line-height: 1; transition: color 0.15s, background 0.15s; }
+    .card-btn:hover { background: var(--surface2); }
+    .card-btn.info-btn:hover { color: var(--accent); }
+    .card-btn.dl-btn:hover { color: var(--cyan); }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:2000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px 30px; max-width:580px; width:92%; position:relative; max-height:82vh; overflow-y:auto; }
+    .modal-box h3 { font-size:15px; font-weight:700; margin-bottom:16px; }
+    .modal-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer; line-height:1; }
+    .modal-close:hover { color:var(--text); }
+    .info-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; gap:14px; }
+    .info-row:last-child { border-bottom:none; }
+    .info-row .lbl { color:var(--text-dim); white-space:nowrap; flex-shrink:0; }
+    .info-row .val { color:var(--text); text-align:right; }
+    .info-formula { background:var(--surface2); border-radius:8px; padding:12px 14px; font-size:12px; color:var(--text-dim); margin-top:14px; line-height:1.8; }
+    .info-formula strong { color:var(--text); }
+
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -110,7 +130,8 @@
 
   <div class="container">
     <!-- Level 1: Total Group Net Assets -->
-    <div class="hero-card main" style="text-align:center;margin-bottom:24px;padding:28px">
+    <div class="hero-card main" style="text-align:center;margin-bottom:24px;padding:28px;position:relative">
+      <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('total_group')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('total_group')">⊕</button></div>
       <div class="label" style="font-size:14px">Total Group Net Assets</div>
       <div class="value" id="heroTotalNA" style="font-size:48px">--</div>
       <div class="sub" id="heroTotalNASub" style="font-size:12px">Loading...</div>
@@ -118,26 +139,30 @@
 
     <!-- Level 2: 4 Function Net Assets -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-      <div class="hero-card">
-        <div class="label" title="Xterio Foundation (22) — manual entry">Foundation <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('foundation')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('foundation')">⊕</button></div>
+        <div class="label" title="Xterio Foundation (22) â manual entry">Foundation <span style="cursor:help;color:var(--text-dim)">â</span></div>
         <div class="value" id="heroFoundation" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroFoundationChange"></div>
         <div class="sub" id="heroFoundationSub"></div>
       </div>
-      <div class="hero-card">
-        <div class="label" title="LTECH+AOD+XLABS+PRIVILEGE+Foundation">Xterio <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('xterio')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('xterio')">⊕</button></div>
+        <div class="label" title="LTECH+AOD+XLABS+PRIVILEGE+Foundation">Xterio <span style="cursor:help;color:var(--text-dim)">â</span></div>
         <div class="value" id="heroXterio" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroXterioChange"></div>
         <div class="sub" id="heroXterioSub"></div>
       </div>
-      <div class="hero-card">
-        <div class="label" title="CS+Palios+LHOLDINGS+QUANTUMMIND">Holdings <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('holdings')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('holdings')">⊕</button></div>
+        <div class="label" title="CS+Palios+LHOLDINGS+QUANTUMMIND">Holdings <span style="cursor:help;color:var(--text-dim)">â</span></div>
         <div class="value" id="heroHoldings" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroHoldingsChange"></div>
         <div class="sub" id="heroHoldingsSub"></div>
       </div>
-      <div class="hero-card">
-        <div class="label" title="OW+Reach+Rough house+Keystone, excl fixed assets">Overworld <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('ow')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('ow')">⊕</button></div>
+        <div class="label" title="OW+Reach+Rough house+Keystone, excl fixed assets">Overworld <span style="cursor:help;color:var(--text-dim)">â</span></div>
         <div class="value" id="heroOWClosing" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroOWClosingChange"></div>
         <div class="sub" id="heroOWClosingSub"></div>
@@ -146,19 +171,21 @@
 
     <!-- Level 3: Per-Function Waterfall -->
     <div class="card" style="margin-bottom:24px">
-      <h2>Net Assets → Cash Breakdown <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Per-function adjustment from Net Assets to Cash+Crypto.">ⓘ</span></h2>
+      <h2>Net Assets â Cash Breakdown <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Per-function adjustment from Net Assets to Cash+Crypto.">â</span></h2>
       <div id="waterfallTable" style="overflow-x:auto"><div class="loading">Loading...</div></div>
     </div>
 
     <!-- Level 4: Cash Totals -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr">
-      <div class="hero-card main">
-        <div class="label">Total Cash (Fiat) <span style="cursor:help;color:var(--text-dim)" title="Bank accounts (100xxx) across all entities incl. Foundation.">ⓘ</span></div>
+      <div class="hero-card main" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('cash_fiat')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('cash_fiat')">⊕</button></div>
+        <div class="label">Total Cash (Fiat) <span style="cursor:help;color:var(--text-dim)" title="Bank accounts (100xxx) across all entities incl. Foundation.">â</span></div>
         <div class="value" id="heroCashFiat">--</div>
         <div class="sub" id="heroCashFiatSub"></div>
       </div>
-      <div class="hero-card">
-        <div class="label">Total Crypto <span style="cursor:help;color:var(--text-dim)" title="Digital token accounts (10Wxxx) across all entities.">ⓘ</span></div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('cash_crypto')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('cash_crypto')">⊕</button></div>
+        <div class="label">Total Crypto <span style="cursor:help;color:var(--text-dim)" title="Digital token accounts (10Wxxx) across all entities.">â</span></div>
         <div class="value" id="heroCashCrypto" style="font-size:28px;color:var(--cyan)">--</div>
         <div class="sub" id="heroCashCryptoSub"></div>
       </div>
@@ -167,11 +194,11 @@
     <!-- Level 5: Account Detail -->
     <div class="grid-2">
       <div class="card">
-        <h2>Cash (Fiat) by Account <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Bank accounts (100xxx), sorted by balance descending.">ⓘ</span></h2>
+        <h2>Cash (Fiat) by Account <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Bank accounts (100xxx), sorted by balance descending.">â</span></h2>
         <div id="fiatAccounts"><div class="loading">Loading...</div></div>
       </div>
       <div class="card">
-        <h2>Crypto by Account <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Crypto/wallet accounts (10Wxxx), sorted by balance descending.">ⓘ</span></h2>
+        <h2>Crypto by Account <span style="cursor:help;color:var(--text-dim);font-size:12px" title="Crypto/wallet accounts (10Wxxx), sorted by balance descending.">â</span></h2>
         <div id="cryptoAccounts"><div class="loading">Loading...</div></div>
       </div>
     </div>
@@ -217,7 +244,7 @@
   </div>
 
   <script>
-    // 返回上个月最后一天，格式 YYYY-MM-DD
+    // è¿åä¸ä¸ªææåä¸å¤©ï¼æ ¼å¼ YYYY-MM-DD
     function lastDayOfPrevMonth() {
       var d = new Date();
       return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
@@ -283,8 +310,8 @@
           { key: 'intercompany', label: '  Intercompany (303xxx)', bold: false },
           { key: 'deposit', label: '  Deposits (202000)', bold: false },
           { key: '_cash_total', label: 'Cash + Crypto', bold: true },
-          { key: 'cash_fiat', label: '  → Cash (Fiat)', bold: false },
-          { key: 'cash_crypto', label: '  → Crypto', bold: false },
+          { key: 'cash_fiat', label: '  â Cash (Fiat)', bold: false },
+          { key: 'cash_crypto', label: '  â Crypto', bold: false },
         ];
 
         var wfHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
@@ -470,7 +497,7 @@
         }
         el.innerHTML = '<ul class="alert-list">' + alerts.map(function(a) {
           var cls = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'ok';
-          return '<li class="alert-item"><span class="alert-label"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span> ' + a.title + (a.entity ? ' — ' + a.entity : '') + '</span><span class="alert-value" style="color:var(--text-dim);font-size:11px">' + (a.message || '') + '</span></li>';
+          return '<li class="alert-item"><span class="alert-label"><span class="badge ' + cls + '">' + a.severity.toUpperCase() + '</span> ' + a.title + (a.entity ? ' â ' + a.entity : '') + '</span><span class="alert-value" style="color:var(--text-dim);font-size:11px">' + (a.message || '') + '</span></li>';
         }).join('') + '</ul>';
       } catch(e) { console.error(e); }
     }
@@ -542,7 +569,7 @@
           accounts.forEach(function(a) {
             var color = a.balance < 0 ? 'color:var(--red)' : 'color:var(--green)';
             html += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 8px;color:var(--text-dim);white-space:nowrap">' + a.entity + '</td>';
-            html += '<td style="padding:5px 8px;font-size:11px" title="' + a.code + ' — ' + a.company + '">' + a.name + '</td>';
+            html += '<td style="padding:5px 8px;font-size:11px" title="' + a.code + ' â ' + a.company + '">' + a.name + '</td>';
             html += '<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;' + color + '">' + fmt(a.balance) + '</td></tr>';
           });
           html += '</tbody></table>';
@@ -564,9 +591,43 @@
       loadAccountDetail();
     }
 
+
+    var CARD_INFO = {
+      total_group: { title: 'Total Group Net Assets — 构成逻辑', formula: '<strong>Foundation</strong> + <strong>Xterio</strong> + <strong>Holdings</strong> + <strong>OW</strong>', rows: [['包含实体','Foundation+LTECH+AOD+XLABS+PRIVILEGE+CS+Palios+LHOLDINGS+QM+OW+Reach+Rough house+Keystone'],['数据来源','Odoo account_balances 快照 + Foundation manual_balances'],['公式','Σ资产 − Σ负债（OW 排除固定资产）']] },
+      foundation: { title: 'Foundation Net Assets — 构成逻辑', formula: '<strong>手动录入资产</strong> − <strong>IC 应付款（FOUNDATION_IC）</strong>', rows: [['数据来源','manual_balances 表，实体 = Xterio Foundation'],['资产','非 FOUNDATION_IC 条目 × 汇率求和'],['负债','FOUNDATION_IC = 对 Xterio 的公司间应付款']] },
+      xterio: { title: 'Xterio Net Assets — 构成逻辑', formula: '<strong>LTECH + AOD + XLABS + PRIVILEGE HK</strong> 净资产之和', rows: [['包含实体','LTECH/LTECH W3, AOD, XLABS/XLAB W3, PRIVILEGE HK'],['数据来源','Odoo account_balances 快照'],['公式','Σ资产余额 − Σ负债余额']] },
+      holdings: { title: 'Holdings Net Assets — 构成逻辑', formula: '<strong>CS + Palios + LHOLDINGS + QUANTUMMIND</strong> 净资产之和', rows: [['包含实体','CS, Palios, LHOLDINGS, QUANTUMMIND'],['特殊调整','adj_300040: LHOLDINGS W3 的 300040 投资科目，防止双重计算'],['公式','Σ资产余额 − Σ负债余额 + 300040调整']] },
+      ow: { title: 'OW (Overworld) Net Assets — 构成逻辑', formula: '<strong>OW + Reach + Rough house + Keystone</strong> 净资产，排除固定资产', rows: [['包含实体','OW, Reach, Rough house, Keystone'],['排除项','asset_fixed 不计入'],['公式','Σ资产（非固定） − Σ负债']] },
+      cash_fiat: { title: 'Total Cash (Fiat) — 构成逻辑', formula: '所有实体 <strong>asset_cash、非加密</strong>账户余额之和', rows: [['账户类型','account_type = asset_cash， asset_type != Crypto'],['科目代码','100xxx 银行账户'],['数据来源','Odoo 快照 + Foundation manual_balances']] },
+      cash_crypto: { title: 'Total Crypto — 构成逻辑', formula: '所有实体 <strong>asset_type = Crypto</strong> 账户余额之和', rows: [['账户类型','asset_type = Crypto，链上钉包/交易所'],['科目代码','10Wxxx 数字资产账户'],['负余额说明','锁定/抖押仓位，按 Odoo 同步时汇率折 USD']] }
+    };
+    function showCardInfo(card) {
+      var info = CARD_INFO[card]; if (!info) return;
+      document.getElementById('cardModalTitle').textContent = info.title;
+      var body = '<div class="info-formula">' + info.formula + '</div>';
+      body += info.rows.map(function(r){return '<div class="info-row"><span class="lbl">'+r[0]+'</span><span class="val">'+r[1]+'</span></div>';}).join('');
+      document.getElementById('cardModalBody').innerHTML = body;
+      document.getElementById('cardInfoModal').classList.add('open');
+    }
+    function closeCardModal() { document.getElementById('cardInfoModal').classList.remove('open'); }
+    function downloadCardDetail(card) {
+      var asOf = document.getElementById('asOfDate').value || lastDayOfPrevMonth();
+      var a = document.createElement('a');
+      a.href = '/api/dashboard/card-detail-csv?card=' + encodeURIComponent(card) + '&as_of_date=' + encodeURIComponent(asOf);
+      a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeCardModal(); });
+
     refreshData();
     setInterval(refreshData, 5 * 60 * 1000);
   </script>
+  <div class="modal-overlay" id="cardInfoModal" onclick="if(event.target===this)closeCardModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeCardModal()">&#x2715;</button>
+      <h3 id="cardModalTitle"></h3>
+      <div id="cardModalBody"></div>
+    </div>
+  </div>
 <script src="/chat-widget.js"></script>
 </body>
 </html>
