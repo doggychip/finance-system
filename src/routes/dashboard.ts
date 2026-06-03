@@ -2122,12 +2122,12 @@ export function dashboardRoutes(db: Database.Database): Router {
           const allIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
           if (card === 'foundation') {
                   const period = asOfDate.slice(0, 7);
-                  const rows = db.prepare(`SELECT entity, account_code, account_name, period, amount_usd, currency, notes FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(period) as any[];
-                  const hdrs = ['Entity','Account Code','Account Name','Period','Currency','Amount (USD)','Notes'];
-                  const lines = [hdrs.map(h => `"${h}"`).join(',')];
-                  for (const r of rows) lines.push([`"${r.entity}"`,`"${r.account_code}"`,`"${(r.account_name||'').replace(/"/g,'""')}"`,`"${r.period}"`,`"${r.currency||'USD'}"`, (r.amount_usd??0).toFixed(2),`"${(r.notes||'').replace(/"/g,'""')}"`].join(','));
-                  res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="Foundation_detail_${period}.csv"`);
-                  return res.send('\uFEFF' + lines.join('\n'));
+const rows = db.prepare(`SELECT entity, account_code, period, amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(period) as any[];
+                              const hdrs = ['Entity','Account Code','Period','Amount (Local)','Exchange Rate'];
+                              const lines = [hdrs.map(h => `"${h}"`).join(',')];
+                              for (const r of rows) lines.push([`"${r.entity}"`,`"${r.account_code}"`,`"${r.period}"`, (r.amount_local??0).toFixed(2),(r.exchange_rate??0).toFixed(6)].join(','));
+                              res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="Foundation_detail_${period}.csv"`);
+                              return res.send('\uFEFF' + lines.join('\n'));
           }
           let companyIds: number[] = [], label = '', extraFilter = '';
           if (card === 'total_group') { companyIds = allIds; label = 'Total_Group'; }
