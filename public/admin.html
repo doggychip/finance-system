@@ -272,7 +272,12 @@
     async function deleteUser(userId, username) {
       if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
       try {
-        await fetch('/api/tasks/users/' + userId, { method: 'DELETE' });
+        var res = await fetch('/api/tasks/users/' + userId + '?requester_id=' + currentUser.id, { method: 'DELETE' });
+        var data = await res.json().catch(function() { return {}; });
+        if (!res.ok) {
+          showMsg('resetMsg', data.error || ('Failed to delete user (HTTP ' + res.status + ')'), 'error');
+          return;
+        }
         showMsg('resetMsg', 'User "' + username + '" deleted', 'success');
         loadUsers();
       } catch (e) {
