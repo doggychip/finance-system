@@ -81,8 +81,38 @@ export function taskRoutes(db: Database.Database): Router {
 
   // Delete user
   router.delete('/users/:id', (req, res) => {
-    db.prepare('DELETE FROM users WHERE id = ?').run(parseInt(req.params.id));
-    res.json({ ok: true });
+    const id = parseInt(req.params.id);
+    const requesterId = parseInt(String(req.query.requester_id || req.body?.requester_id || ''));
+
+    const target = db.prepare('SELECT id, role FROM users WHERE id = ?').get(id) as any;
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    if (requesterId && requesterId === id) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+
+    if (target.role === 'admin') {
+      const adminCount = (db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin'").get() as any).c;
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the last admin' });
+      }
+    }
+
+    try {
+      const tx = db.transaction((uid: number) => {
+        // Preserve task/alert history by nulling the FK columns.
+        db.prepare('UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?').run(uid);
+        db.prepare('UPDATE tasks SET created_by = NULL WHERE created_by = ?').run(uid);
+        db.prepare('UPDATE alerts SET resolved_by = NULL WHERE resolved_by = ?').run(uid);
+        const r = db.prepare('DELETE FROM users WHERE id = ?').run(uid);
+        if (r.changes !== 1) throw new Error('Delete affected ' + r.changes + ' rows');
+      });
+      tx(id);
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[delete user]', e);
+      res.status(500).json({ error: e?.message || 'Failed to delete user' });
+    }
   });
 
   // List tasks
