@@ -125,7 +125,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(rows.reverse());
   });
 
-  // Cash & bank account balances â categorized
+  // Cash & bank account balances Ã¢ÂÂ categorized
   router.get('/cash-balances', (req, res) => {
     const requestedDate = (req.query.as_of_date as string) || '';
 
@@ -181,7 +181,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
 
     // Non-OW Total "Cash" = fiat bank accounts only + Xterio Foundation
-    // This excludes crypto â matches the "Cash" sub-line in consolidated BS
+    // This excludes crypto Ã¢ÂÂ matches the "Cash" sub-line in consolidated BS
     const FIAT_CURRENCIES_FOR_CASH = ['USD', 'CNY', 'SGD'];
     const nonOWBankCash = nonOWRows.filter((r: any) => FIAT_CURRENCIES_FOR_CASH.includes(r.currency)).reduce((s: number, r: any) => s + r.balance, 0);
     // Foundation period: use user-requested date directly, not snapshot date
@@ -241,7 +241,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
-  // Cash balances over time â supports daily, weekly, monthly periods
+  // Cash balances over time Ã¢ÂÂ supports daily, weekly, monthly periods
   router.get('/cash-history', (req, res) => {
     const period = (req.query.period as string) || 'monthly';
     const limit = parseInt(req.query.limit as string) || 90;
@@ -383,7 +383,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(withBalance);
   });
 
-  // Revenue vs Expenses monthly â all time
+  // Revenue vs Expenses monthly Ã¢ÂÂ all time
   router.get('/revenue-vs-expenses', (_req, res) => {
     const rows = db.prepare(`
       SELECT
@@ -773,7 +773,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             ? (db.prepare(`SELECT amount_usd FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code = 'FOUNDATION_IC' AND period = ? LIMIT 1`).get(foundationPeriodBs) as any)
             : null;
           const foundationLiabilitiesBs = foundationICRowBs?.amount_usd ?? 1369636;
-          // Xterio Foundation â hardcoded from spreadsheet (as at 28.02.2026)
+          // Xterio Foundation Ã¢ÂÂ hardcoded from spreadsheet (as at 28.02.2026)
           const balances: Record<string, number> = {
             'ASSETS': 5942149,
             'CURRENT_ASSETS': 5942149,
@@ -836,7 +836,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         for (const line of BS_LINES) {
           if (line.computed_from) continue;
           if (line.odoo_types) {
-            // For current_balance, no need for date_filter â Odoo already computes it
+            // For current_balance, no need for date_filter Ã¢ÂÂ Odoo already computes it
             // But we need to handle the P&L split differently
             // current_balance already includes all-time for equity, and current P&L
             if (line.date_filter === 'current_year' || line.date_filter === 'prior_years') {
@@ -1010,7 +1010,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         }
       }
 
-      // Compute derived lines â multiple passes for nested dependencies
+      // Compute derived lines Ã¢ÂÂ multiple passes for nested dependencies
       for (let pass = 0; pass < 10; pass++) {
         let resolved = 0;
         for (const line of BS_LINES) {
@@ -1074,7 +1074,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const row of icBalances) icByType[row.odoo_type] = row.balance;
     }
 
-    // Build IC elimination balances â negate IC amounts per odoo_type
+    // Build IC elimination balances Ã¢ÂÂ negate IC amounts per odoo_type
     const icElimination: Record<string, number> = {};
     for (const line of BS_LINES) {
       if (line.computed_from) continue;
@@ -1579,7 +1579,7 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
 
-  // ââ Foundation Manual Balances: GET all rows for a period ââ
+  // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances: GET all rows for a period Ã¢ÂÂÃ¢ÂÂ
   router.get('/foundation-balances', (req, res) => {
     try {
       const period = (req.query.period as string) || '';
@@ -1596,7 +1596,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
-  // ââ Foundation Manual Balances: PATCH a single row ââ
+  // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances: PATCH a single row Ã¢ÂÂÃ¢ÂÂ
   router.patch('/foundation-balances/:id', (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1609,7 +1609,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
-  // ââ Foundation Manual Balances: POST new period rows ââ
+  // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances: POST new period rows Ã¢ÂÂÃ¢ÂÂ
   router.post('/foundation-balances', (req, res) => {
     try {
       const { period, rows } = req.body as { period: string; rows: Array<{ account_code: string; account_name: string; category: string; amount_local: number; currency: string; exchange_rate: number }> };
@@ -1627,7 +1627,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
-  // ââ Generic manual-balances API (entity param) ââ
+  // Ã¢ÂÂÃ¢ÂÂ Generic manual-balances API (entity param) Ã¢ÂÂÃ¢ÂÂ
   router.get('/manual-balances', (req, res) => {
     try {
       const entity = (req.query.entity as string) || '';
@@ -1802,7 +1802,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       }
     }
 
-    // === PER-FUNCTION WATERFALL: Net Assets â Cash breakdown ===
+    // === PER-FUNCTION WATERFALL: Net Assets Ã¢ÂÂ Cash breakdown ===
     const buildWaterfall = (companyIds: number[]) => {
       if (companyIds.length === 0) return { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: 0, cash_crypto: 0 };
       const ph = companyIds.map(() => '?').join(',');
@@ -1878,7 +1878,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       ORDER BY ABS(net) DESC LIMIT 5
     `).all(currentSnap) as any[];
 
-    // Cash by entity group for chart â split into bank and crypto
+    // Cash by entity group for chart Ã¢ÂÂ split into bank and crypto
     const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
     const entityCash: any[] = [];
     // Get per-entity bank vs crypto split
@@ -1910,7 +1910,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
     entityCash.sort((a, b) => b.cash - a.cash);
 
-    // Cash trend from snapshots â aggregated weekly (use latest snapshot per ISO week)
+    // Cash trend from snapshots Ã¢ÂÂ aggregated weekly (use latest snapshot per ISO week)
     const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
     // Group snapshots by ISO week, keep only the latest snapshot per week
     const weeklySnaps: any[] = [];
@@ -2014,7 +2014,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json({ snapshot_date: snapDate, accounts: categorized });
   });
 
-  // OW Closing Balance history â breakdown by line item across snapshots
+  // OW Closing Balance history Ã¢ÂÂ breakdown by line item across snapshots
   router.get('/ow-closing', (req, res) => {
     const owCompanyIds = ENTITY_GROUPS
       .filter(g => ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name) && !g.is_subtotal)
@@ -2039,7 +2039,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       `).all(s.snapshot_date, ...owCompanyIds) as any[];
 
       // Categorize into closing balance line items matching Excel definition
-      // Only include curated line items â exclude equity, P&L, fixed assets, non-current assets
+      // Only include curated line items Ã¢ÂÂ exclude equity, P&L, fixed assets, non-current assets
       let cash = 0, orFromXterio = 0, ar = 0, noteReceivable = 0;
       let payables = 0, accrualExp = 0, thrackle = 0;
 
@@ -2047,23 +2047,23 @@ export function dashboardRoutes(db: Database.Database): Router {
         const code = r.code;
         const bal = r.balance;
 
-        // Cash (asset_cash â bank 100xxx + crypto 10Wxxx)
+        // Cash (asset_cash Ã¢ÂÂ bank 100xxx + crypto 10Wxxx)
         if (r.account_type === 'asset_cash') {
           cash += bal;
         }
-        // OR From Xterio â ALL intercompany accounts (303xxx)
+        // OR From Xterio Ã¢ÂÂ ALL intercompany accounts (303xxx)
         else if (code.startsWith('303')) {
           orFromXterio += bal;
         }
-        // AR â Accounts Receivable (101000)
+        // AR Ã¢ÂÂ Accounts Receivable (101000)
         else if (code === '101000') {
           ar += bal;
         }
-        // NoteReceivable â Other Receivable (101010) + other current assets
+        // NoteReceivable Ã¢ÂÂ Other Receivable (101010) + other current assets
         else if (code === '101010' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') {
           noteReceivable += bal;
         }
-        // Payables â Trade Payables (300030, 300000)
+        // Payables Ã¢ÂÂ Trade Payables (300030, 300000)
         else if (code === '300030' || code === '300000') {
           payables += bal;
         }
@@ -2071,7 +2071,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         else if (code === '301000' || code === '302010') {
           accrualExp += bal;
         }
-        // Thrackle Loan â Other Payables non-trade (300040, 300050)
+        // Thrackle Loan Ã¢ÂÂ Other Payables non-trade (300040, 300050)
         else if (code === '300040' || code === '300050') {
           thrackle += bal;
         }
@@ -2113,67 +2113,71 @@ export function dashboardRoutes(db: Database.Database): Router {
   router.get('/card-detail-csv', (req, res) => {
     const card = (req.query.card as string) || '';
     const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
-    const snapRow = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get(asOfDate) as any;
-    const snapDate = snapRow?.snapshot_date;
-    const xterioNames = ['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK'];
-    const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
-    const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
-    const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name) && !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
-    const allIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
+
+    // ── Foundation: manual_balances ───────────────────────────────────────────
     if (card === 'foundation') {
-      const period = asOfDate.slice(0, 7);
-      const rows = db.prepare(`SELECT entity, account_code, period, amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(period) as any[];
-      const hdrs = ['Entity', 'Account Code', 'Period', 'Amount (Local)', 'Exchange Rate'];
-      const csvLines = [hdrs.map(h => `"${h}"`).join(',')];
-      for (const r of rows) csvLines.push([`"${r.entity}"`, `"${r.account_code}"`, `"${r.period}"`, (r.amount_local ?? 0).toFixed(2), (r.exchange_rate ?? 0).toFixed(6)].join(','));
+      const foundationPeriod = (() => {
+        const d = new Date(asOfDate + 'T00:00:00Z');
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      })();
+      const foundRows = db.prepare(`
+        SELECT entity AS "Company", account_code AS "Account Code",
+               account_name AS "Account Name", period AS "Period",
+               amount_local AS "Amount (Local)", exchange_rate AS "Exchange Rate"
+        FROM manual_balances
+        WHERE entity = 'Xterio Foundation' AND account_code != 'FOUNDATION_IC'
+          AND period = ?
+        ORDER BY account_code
+      `).all(foundationPeriod) as any[];
+      const hdrs = foundRows.length ? Object.keys(foundRows[0]) : ['Company','Account Code','Account Name','Period','Amount (Local)','Exchange Rate'];
+      const csvLines = [hdrs.map(h => `"${h}"`).join(','), ...foundRows.map(r => hdrs.map(h => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="Foundation_detail_${period}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="foundation-detail.csv"`);
       return res.send('\uFEFF' + csvLines.join('\n'));
     }
+
+    // ── All other cards: account_balances ─────────────────────────────────────────────────
+    const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
+    const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
+    const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name) && !g.is_subtotal).flatMap((g: any) => g.company_ids);
+    const allIds = ENTITY_GROUPS.filter((g: any) => !g.is_subtotal).flatMap((g: any) => g.company_ids);
     let companyIds: number[] = [];
     let label = '';
     let extraFilter = '';
-    if (card === 'total_group') { companyIds = allIds; label = 'Total_Group'; }
-    else if (card === 'xterio') { companyIds = getIds(xterioNames); label = 'Xterio'; }
+    if (card === 'total_group') { companyIds = allIds; label = 'Total-Group'; }
+    else if (card === 'xterio') { companyIds = getIds(['LTECH, LTECH W3','AOD','XLABS, XLAB W3','PRIVILEGE HK']); label = 'Xterio'; }
     else if (card === 'holdings') { companyIds = getIds(holdingsNames); label = 'Holdings'; }
     else if (card === 'ow') { companyIds = getIds(owNames); label = 'OW'; }
-    else if (card === 'cash_fiat') { companyIds = allIds; label = 'Cash_Fiat'; extraFilter = ` AND ab.account_type = 'asset_cash' AND ab.currency IN ('USD', 'CNY', 'SGD')`; }
-    else if (card === 'cash_crypto') { companyIds = allIds; label = 'Cash_Crypto'; extraFilter = ` AND ab.account_type = 'asset_cash' AND ab.currency IN ('BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE')`; }
+    else if (card === 'cash_fiat') { companyIds = allIds; label = 'Cash-Fiat'; extraFilter = ` AND ab.account_type = 'asset_cash' AND ab.currency IN ('USD', 'CNY', 'SGD')`; }
+    else if (card === 'cash_crypto') { companyIds = allIds; label = 'Cash-Crypto'; extraFilter = ` AND ab.account_type = 'asset_cash' AND ab.currency IN ('BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE')`; }
     else { return res.status(400).json({ error: 'Unknown card: ' + card }); }
-    if (!companyIds.length || !snapDate) {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${label}_${asOfDate}.csv"`);
-      return res.send('No snapshot data');
-    }
+    if (!companyIds.length) { return res.status(404).json({ error: 'No companies for card: ' + card }); }
+
+    const snapDate = (db.prepare(`SELECT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`).get(asOfDate) as any)?.snapshot_date;
+    if (!snapDate) { return res.send('No snapshot data'); }
+
     const ph = companyIds.map(() => '?').join(',');
+    // Non-cash cards: restrict to asset_* and liability_* only; exclude account 300040
+    const typeFilter = extraFilter
+      ? ''
+      : ` AND (ab.account_type LIKE 'asset_%' OR ab.account_type LIKE 'liability_%') AND ab.account_code != '300040'`;
     const rows = db.prepare(`
-      SELECT ab.company_name AS "Company", ab.account_code AS "Account Code",
-             ab.account_name AS "Account Name", ab.account_type AS "Account Type",
+      SELECT ab.company_name AS "Company",
+             ab.account_odoo_id AS "Odoo Account ID",
+             ab.account_code AS "Account Code",
+             ab.account_name AS "Account Name",
+             ab.account_type AS "Account Type",
              COALESCE(ab.currency, 'USD') AS "Currency",
-             ab.balance AS "Balance (USD)", ab.snapshot_date AS "Snapshot Date"
+             ab.balance AS "Balance (USD)",
+             ab.snapshot_date AS "Snapshot Date"
       FROM account_balances ab
-      WHERE ab.snapshot_date = ? AND ab.company_id IN (${ph})${extraFilter}
+      WHERE ab.snapshot_date = ? AND ab.company_id IN (${ph})${typeFilter}${extraFilter}
       ORDER BY ab.company_name, ab.account_code
     `).all(snapDate, ...companyIds) as any[];
-    const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company', 'Account Code', 'Account Name', 'Account Type', 'Currency', 'Balance (USD)', 'Snapshot Date'];
-    const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) => hdrs2.map(h => { const v = r[h]; return typeof v === 'number' ? v.toFixed(2) : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
-    // Holdings-specific: add calculation summary rows
-    if (card === 'holdings') {
-      const na = rows.reduce((s: number, r: any) => {
-        const t: string = r['Account Type'] || '';
-        return t.startsWith('asset_') || t.startsWith('liability_') ? s + (r['Balance (USD)'] || 0) : s;
-      }, 0);
-      const adj300040 = -(rows.filter((r: any) => r['Account Code'] === '300040').reduce((s: number, r: any) => s + (r['Balance (USD)'] || 0), 0));
-      const total = na + adj300040;
-      csvLines2.push('"","","","","","","" ');
-      csvLines2.push('"","","---- Summary / \u6c47\u603b ----","","","","" ');
-      csvLines2.push(`"","","\u5c0f\u8ba1 (asset_*+liability_*)","","USD","${na.toFixed(2)}","${snapDate}"`);
-      csvLines2.push(`"","300040","adj_300040 (300040\u52a0\u56de)","","USD","${adj300040.toFixed(2)}","${snapDate}"`);
-      csvLines2.push(`"HOLDINGS\u51c0\u8d44\u4ea7","","= \u5c0f\u8ba1 + adj_300040","","USD","${total.toFixed(2)}","${snapDate}"`);
-    }
-
+    const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company','Odoo Account ID','Account Code','Account Name','Account Type','Currency','Balance (USD)','Snapshot Date'];
+    const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) => hdrs2.map(h => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${label}_detail_${asOfDate}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${label}-detail.csv"`);
     res.send('\uFEFF' + csvLines2.join('\n'));
   });
 
