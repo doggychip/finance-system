@@ -125,7 +125,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(rows.reverse());
   });
 
-  // Cash & bank account balances — categorized
+  // Cash & bank account balances â categorized
   router.get('/cash-balances', (req, res) => {
     const requestedDate = (req.query.as_of_date as string) || '';
 
@@ -181,7 +181,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
 
     // Non-OW Total "Cash" = fiat bank accounts only + Xterio Foundation
-    // This excludes crypto — matches the "Cash" sub-line in consolidated BS
+    // This excludes crypto â matches the "Cash" sub-line in consolidated BS
     const FIAT_CURRENCIES_FOR_CASH = ['USD', 'CNY', 'SGD'];
     const nonOWBankCash = nonOWRows.filter((r: any) => FIAT_CURRENCIES_FOR_CASH.includes(r.currency)).reduce((s: number, r: any) => s + r.balance, 0);
     // Foundation period: use user-requested date directly, not snapshot date
@@ -241,7 +241,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
-  // Cash balances over time — supports daily, weekly, monthly periods
+  // Cash balances over time â supports daily, weekly, monthly periods
   router.get('/cash-history', (req, res) => {
     const period = (req.query.period as string) || 'monthly';
     const limit = parseInt(req.query.limit as string) || 90;
@@ -383,7 +383,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(withBalance);
   });
 
-  // Revenue vs Expenses monthly — all time
+  // Revenue vs Expenses monthly â all time
   router.get('/revenue-vs-expenses', (_req, res) => {
     const rows = db.prepare(`
       SELECT
@@ -773,7 +773,7 @@ export function dashboardRoutes(db: Database.Database): Router {
             ? (db.prepare(`SELECT amount_usd FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code = 'FOUNDATION_IC' AND period = ? LIMIT 1`).get(foundationPeriodBs) as any)
             : null;
           const foundationLiabilitiesBs = foundationICRowBs?.amount_usd ?? 1369636;
-          // Xterio Foundation — hardcoded from spreadsheet (as at 28.02.2026)
+          // Xterio Foundation â hardcoded from spreadsheet (as at 28.02.2026)
           const balances: Record<string, number> = {
             'ASSETS': 5942149,
             'CURRENT_ASSETS': 5942149,
@@ -836,7 +836,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         for (const line of BS_LINES) {
           if (line.computed_from) continue;
           if (line.odoo_types) {
-            // For current_balance, no need for date_filter — Odoo already computes it
+            // For current_balance, no need for date_filter â Odoo already computes it
             // But we need to handle the P&L split differently
             // current_balance already includes all-time for equity, and current P&L
             if (line.date_filter === 'current_year' || line.date_filter === 'prior_years') {
@@ -1010,7 +1010,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         }
       }
 
-      // Compute derived lines — multiple passes for nested dependencies
+      // Compute derived lines â multiple passes for nested dependencies
       for (let pass = 0; pass < 10; pass++) {
         let resolved = 0;
         for (const line of BS_LINES) {
@@ -1074,7 +1074,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       for (const row of icBalances) icByType[row.odoo_type] = row.balance;
     }
 
-    // Build IC elimination balances — negate IC amounts per odoo_type
+    // Build IC elimination balances â negate IC amounts per odoo_type
     const icElimination: Record<string, number> = {};
     for (const line of BS_LINES) {
       if (line.computed_from) continue;
@@ -1579,7 +1579,7 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
 
-  // ── Foundation Manual Balances: GET all rows for a period ──
+  // ââ Foundation Manual Balances: GET all rows for a period ââ
   router.get('/foundation-balances', (req, res) => {
     try {
       const period = (req.query.period as string) || '';
@@ -1596,7 +1596,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
-  // ── Foundation Manual Balances: PATCH a single row ──
+  // ââ Foundation Manual Balances: PATCH a single row ââ
   router.patch('/foundation-balances/:id', (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1609,7 +1609,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
-  // ── Foundation Manual Balances: POST new period rows ──
+  // ââ Foundation Manual Balances: POST new period rows ââ
   router.post('/foundation-balances', (req, res) => {
     try {
       const { period, rows } = req.body as { period: string; rows: Array<{ account_code: string; account_name: string; category: string; amount_local: number; currency: string; exchange_rate: number }> };
@@ -1627,7 +1627,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
   });
 
-  // ── Generic manual-balances API (entity param) ──
+  // ââ Generic manual-balances API (entity param) ââ
   router.get('/manual-balances', (req, res) => {
     try {
       const entity = (req.query.entity as string) || '';
@@ -1802,7 +1802,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       }
     }
 
-    // === PER-FUNCTION WATERFALL: Net Assets → Cash breakdown ===
+    // === PER-FUNCTION WATERFALL: Net Assets â Cash breakdown ===
     const buildWaterfall = (companyIds: number[]) => {
       if (companyIds.length === 0) return { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: 0, cash_crypto: 0 };
       const ph = companyIds.map(() => '?').join(',');
@@ -1878,7 +1878,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       ORDER BY ABS(net) DESC LIMIT 5
     `).all(currentSnap) as any[];
 
-    // Cash by entity group for chart — split into bank and crypto
+    // Cash by entity group for chart â split into bank and crypto
     const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
     const entityCash: any[] = [];
     // Get per-entity bank vs crypto split
@@ -1910,7 +1910,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     }
     entityCash.sort((a, b) => b.cash - a.cash);
 
-    // Cash trend from snapshots — aggregated weekly (use latest snapshot per ISO week)
+    // Cash trend from snapshots â aggregated weekly (use latest snapshot per ISO week)
     const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
     // Group snapshots by ISO week, keep only the latest snapshot per week
     const weeklySnaps: any[] = [];
@@ -2014,7 +2014,7 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json({ snapshot_date: snapDate, accounts: categorized });
   });
 
-  // OW Closing Balance history — breakdown by line item across snapshots
+  // OW Closing Balance history â breakdown by line item across snapshots
   router.get('/ow-closing', (req, res) => {
     const owCompanyIds = ENTITY_GROUPS
       .filter(g => ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name) && !g.is_subtotal)
@@ -2039,7 +2039,7 @@ export function dashboardRoutes(db: Database.Database): Router {
       `).all(s.snapshot_date, ...owCompanyIds) as any[];
 
       // Categorize into closing balance line items matching Excel definition
-      // Only include curated line items — exclude equity, P&L, fixed assets, non-current assets
+      // Only include curated line items â exclude equity, P&L, fixed assets, non-current assets
       let cash = 0, orFromXterio = 0, ar = 0, noteReceivable = 0;
       let payables = 0, accrualExp = 0, thrackle = 0;
 
@@ -2047,23 +2047,23 @@ export function dashboardRoutes(db: Database.Database): Router {
         const code = r.code;
         const bal = r.balance;
 
-        // Cash (asset_cash — bank 100xxx + crypto 10Wxxx)
+        // Cash (asset_cash â bank 100xxx + crypto 10Wxxx)
         if (r.account_type === 'asset_cash') {
           cash += bal;
         }
-        // OR From Xterio — ALL intercompany accounts (303xxx)
+        // OR From Xterio â ALL intercompany accounts (303xxx)
         else if (code.startsWith('303')) {
           orFromXterio += bal;
         }
-        // AR — Accounts Receivable (101000)
+        // AR â Accounts Receivable (101000)
         else if (code === '101000') {
           ar += bal;
         }
-        // NoteReceivable — Other Receivable (101010) + other current assets
+        // NoteReceivable â Other Receivable (101010) + other current assets
         else if (code === '101010' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') {
           noteReceivable += bal;
         }
-        // Payables — Trade Payables (300030, 300000)
+        // Payables â Trade Payables (300030, 300000)
         else if (code === '300030' || code === '300000') {
           payables += bal;
         }
@@ -2071,7 +2071,7 @@ export function dashboardRoutes(db: Database.Database): Router {
         else if (code === '301000' || code === '302010') {
           accrualExp += bal;
         }
-        // Thrackle Loan — Other Payables non-trade (300040, 300050)
+        // Thrackle Loan â Other Payables non-trade (300040, 300050)
         else if (code === '300040' || code === '300050') {
           thrackle += bal;
         }
@@ -2157,6 +2157,21 @@ export function dashboardRoutes(db: Database.Database): Router {
     `).all(snapDate, ...companyIds) as any[];
     const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company', 'Account Code', 'Account Name', 'Account Type', 'Currency', 'Balance (USD)', 'Snapshot Date'];
     const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) => hdrs2.map(h => { const v = r[h]; return typeof v === 'number' ? v.toFixed(2) : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
+    // Holdings-specific: add calculation summary rows
+    if (card === 'holdings') {
+      const na = rows.reduce((s: number, r: any) => {
+        const t: string = r['Account Type'] || '';
+        return t.startsWith('asset_') || t.startsWith('liability_') ? s + (r['Balance (USD)'] || 0) : s;
+      }, 0);
+      const adj300040 = -(rows.filter((r: any) => r['Account Code'] === '300040').reduce((s: number, r: any) => s + (r['Balance (USD)'] || 0), 0));
+      const total = na + adj300040;
+      csvLines2.push('"","","","","","","" ');
+      csvLines2.push('"","","---- Summary / \u6c47\u603b ----","","","","" ');
+      csvLines2.push(`"","","\u5c0f\u8ba1 (asset_*+liability_*)","","USD","${na.toFixed(2)}","${snapDate}"`);
+      csvLines2.push(`"","300040","adj_300040 (300040\u52a0\u56de)","","USD","${adj300040.toFixed(2)}","${snapDate}"`);
+      csvLines2.push(`"HOLDINGS\u51c0\u8d44\u4ea7","","= \u5c0f\u8ba1 + adj_300040","","USD","${total.toFixed(2)}","${snapDate}"`);
+    }
+
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${label}_detail_${asOfDate}.csv"`);
     res.send('\uFEFF' + csvLines2.join('\n'));
