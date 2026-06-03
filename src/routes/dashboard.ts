@@ -2109,5 +2109,42 @@ export function dashboardRoutes(db: Database.Database): Router {
     });
   });
 
+    // GET /api/dashboard/card-detail-csv — account balance CSV per dashboard card
+    router.get('/card-detail-csv', (req, res) => {
+          const card = (req.query.card as string) || '';
+          const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
+          const snapRow = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get(asOfDate) as any;
+          const snapDate = snapRow?.snapshot_date;
+          const xterioNames = ['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK'];
+          const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
+          const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
+          const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name) && !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
+          const allIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
+          if (card === 'foundation') {
+                  const period = asOfDate.slice(0, 7);
+                  const rows = db.prepare(`SELECT entity, account_code, account_name, period, amount_usd, currency, notes FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?`).all(period) as any[];
+                  const hdrs = ['Entity','Account Code','Account Name','Period','Currency','Amount (USD)','Notes'];
+                  const lines = [hdrs.map(h => `"${h}"`).join(',')];
+                  for (const r of rows) lines.push([`"${r.entity}"`,`"${r.account_code}"`,`"${(r.account_name||'').replace(/"/g,'""')}"`,`"${r.period}"`,`"${r.currency||'USD'}"`, (r.amount_usd??0).toFixed(2),`"${(r.notes||'').replace(/"/g,'""')}"`].join(','));
+                  res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="Foundation_detail_${period}.csv"`);
+                  return res.send('\uFEFF' + lines.join('\n'));
+          }
+          let companyIds: number[] = [], label = '', extraFilter = '';
+          if (card === 'total_group') { companyIds = allIds; label = 'Total_Group'; }
+          else if (card === 'xterio') { companyIds = getIds(xterioNames); label = 'Xterio'; }
+          else if (card === 'holdings') { companyIds = getIds(holdingsNames); label = 'Holdings'; }
+          else if (card === 'ow') { companyIds = getIds(owNames); label = 'OW'; }
+          else if (card === 'cash_fiat') { companyIds = allIds; label = 'Cash_Fiat'; extraFilter = ` AND ab.account_type = 'asset_cash' AND (ab.asset_type IS NULL OR ab.asset_type != 'Crypto')`; }
+          else if (card === 'cash_crypto') { companyIds = allIds; label = 'Cash_Crypto'; extraFilter = ` AND ab.asset_type = 'Crypto'`; }
+          else { res.status(400).json({ error: 'Unknown card: ' + card }); return; }
+          if (!companyIds.length || !snapDate) { res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="${label}_${asOfDate}.csv"`); res.send('No snapshot data'); return; }
+          const ph = companyIds.map(() => '?').join(',');
+          const rows = db.prepare(`SELECT ab.company_name AS "Company", ab.account_code AS "Account Code", ab.account_name AS "Account Name", ab.account_type AS "Account Type", COALESCE(ab.asset_type,'') AS "Asset Type", COALESCE(ab.currency,'USD') AS "Currency", ab.balance AS "Balance (USD)", ab.snapshot_date AS "Snapshot Date" FROM account_balances ab WHERE ab.snapshot_date = ? AND ab.company_id IN (${ph})${extraFilter} ORDER BY ab.company_name, ab.account_code`).all(snapDate, ...companyIds) as any[];
+          const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company','Account Code','Account Name','Account Type','Asset Type','Currency','Balance (USD)','Snapshot Date'];
+          const lines = [hdrs2.map(h=>`"${h}"`).join(','), ...rows.map((r:any)=>hdrs2.map(h=>{const v=r[h]; return typeof v==='number'?v.toFixed(2):`"${String(v??'').replace(/"/g,'""')}"`;}).join(','))];
+          res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="${label}_detail_${asOfDate}.csv"`);
+          res.send('\uFEFF' + lines.join('\n'));
+    });
+
   return router;
 }
