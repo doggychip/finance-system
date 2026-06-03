@@ -149,18 +149,14 @@ export function getCashPosition(asOfDate?: string, companyId?: number): CashPosi
   }));
 
   const byCompanyMap = new Map<number, CompanyCash>();
-  let bank = 0;
-  let crypto = 0;
   for (const l of lines) {
     const c =
       byCompanyMap.get(l.company_id) ??
       { company_id: l.company_id, company_name: l.company_name, bank: 0, crypto: 0, total: 0 };
     if (l.cash_kind === 'bank') {
       c.bank += l.balance;
-      bank += l.balance;
     } else {
       c.crypto += l.balance;
-      crypto += l.balance;
     }
     c.total += l.balance;
     byCompanyMap.set(l.company_id, c);
@@ -175,10 +171,21 @@ export function getCashPosition(asOfDate?: string, companyId?: number): CashPosi
     }))
     .sort((a, b) => b.total - a.total);
 
+  // Derive consolidated totals from the per-entity rounded figures so the
+  // headline total always equals the sum of the entity breakdown shown to the
+  // user. Summing raw line balances and rounding once at the end (the previous
+  // approach) double-rounds against the per-entity rounding and can drift a cent
+  // -- a number a controller can't sign because it doesn't tie out.
+  const totals = {
+    bank: round2(by_company.reduce((s, c) => s + c.bank, 0)),
+    crypto: round2(by_company.reduce((s, c) => s + c.crypto, 0)),
+    total: round2(by_company.reduce((s, c) => s + c.total, 0)),
+  };
+
   return {
     as_of_date: snapshot,
     filters: { company_id: companyId ?? null },
-    totals: { bank: round2(bank), crypto: round2(crypto), total: round2(bank + crypto) },
+    totals,
     by_company,
     lines,
   };
