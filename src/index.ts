@@ -19,6 +19,7 @@ import { seedFoundationIC } from './data/foundation-ic-seed';
 import { migrateHistoricalCash } from './db/migrate-historical-cash';
 import { seedHistoricalCash } from './db/seed-historical-cash';
 import { historicalCashRoutes } from './routes/historical-cash';
+import { exportRoutes } from './routes/export';
 import { mountMcp } from './mcp/mount';
 import { createOAuthProvider } from './mcp/oauth';
 
@@ -116,6 +117,7 @@ app.use('/api/chat', chatRoutes(db));
 app.use('/api/tasks', taskRoutes(db));
 app.use('/api/alerts-tasks', alertsTasksRoutes(db));
 app.use('/api/historical-cash', historicalCashRoutes(db));
+app.use('/api/export', exportRoutes(db));
 
 mountMcp(app, {
   dbPath,
