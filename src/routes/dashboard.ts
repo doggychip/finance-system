@@ -1444,19 +1444,18 @@ router.get('/executive-summary', (req, res) => {
       if (!r?.na) { const lp = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period; if (lp) r = db.prepare(q).get(lp) as any; }
       return { net_assets: r?.na || 0, cash_usd: r?.ca || 0 };
     }
-    function getNetAssets(ids: number[], asOf: string): number {
+    function getNetAssets(ids: number[], asOf: string, excludeFixedAssets = false): number {
       if (!ids.length) return 0;
       const ph = ids.map(() => '?').join(',');
-      const yr = new Date(asOf + 'T00:00:00Z').getFullYear().toString();
-      const allTime = db.prepare(`SELECT a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type IN ('asset_cash','asset_receivable','asset_current','asset_fixed','asset_non_current','liability_payable','liability_current','liability_non_current','equity') GROUP BY a.odoo_type`).all(asOf, ...ids) as any[];
-      const cyPL = db.prepare(`SELECT a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date>? AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type IN ('income','income_other','expense','expense_depreciation','expense_direct_cost') GROUP BY a.odoo_type`).all(yr + '-01-01', asOf, ...ids) as any[];
-      const bt: Record<string, number> = {}, bc: Record<string, number> = {};
-      for (const r of allTime) bt[r.odoo_type] = r.bal;
-      for (const r of cyPL) bc[r.odoo_type] = r.bal;
-      const assets = (bt['asset_cash']||0)+(bt['asset_receivable']||0)+(bt['asset_current']||0)+(bt['asset_fixed']||0)+(bt['asset_non_current']||0);
-      const liabs = (bt['liability_payable']||0)+(bt['liability_current']||0)+(bt['liability_non_current']||0);
-      const netIncome = -((bc['income']||0)+(bc['income_other']||0))+((bc['expense']||0)+(bc['expense_depreciation']||0)+(bc['expense_direct_cost']||0));
-      return assets + liabs + (bt['equity']||0) + netIncome;
+      const assetTypes = excludeFixedAssets
+        ? `'asset_cash','asset_receivable','asset_current','asset_prepayments','liability_current','liability_payable','liability_non_current','liability_credit_card'`
+        : `'asset_cash','asset_receivable','asset_current','asset_prepayments','asset_fixed','asset_non_current','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
+      const rows = db.prepare(`SELECT a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type IN (${assetTypes}) AND a.code != '300040' GROUP BY a.odoo_type`).all(asOf, ...ids) as any[];
+      const bt: Record<string, number> = {};
+      for (const r of rows) bt[r.odoo_type] = r.bal;
+      const assets = (bt['asset_cash']||0)+(bt['asset_receivable']||0)+(bt['asset_current']||0)+(bt['asset_prepayments']||0)+(excludeFixedAssets?0:((bt['asset_fixed']||0)+(bt['asset_non_current']||0)));
+      const liabs = (bt['liability_payable']||0)+(bt['liability_current']||0)+(bt['liability_non_current']||0)+(bt['liability_credit_card']||0);
+      return assets + liabs;
     }
     function getCash(ids: number[], asOf: string): { fiat: number; crypto: number } {
       if (!ids.length) return { fiat: 0, crypto: 0 };
@@ -1468,7 +1467,7 @@ router.get('/executive-summary', (req, res) => {
     }
     const fn = getFoundation(foundationPeriod), fp = getFoundation(priorFoundPeriod);
     const xNA = getNetAssets(XTERIO_IDS, asOfDate), xNAp = getNetAssets(XTERIO_IDS, priorDate);
-    const oNA = getNetAssets(OW_IDS, asOfDate), oNAp = getNetAssets(OW_IDS, priorDate);
+    const oNA = getNetAssets(OW_IDS, asOfDate, true), oNAp = getNetAssets(OW_IDS, priorDate, true);
     const hNA = getNetAssets(HOLDINGS_IDS, asOfDate), hNAp = getNetAssets(HOLDINGS_IDS, priorDate);
     const xC = getCash(XTERIO_IDS, asOfDate), oC = getCash(OW_IDS, asOfDate);
     const hC = getCash(HOLDINGS_IDS, asOfDate), aC = getCash(ALL_IDS, asOfDate);
