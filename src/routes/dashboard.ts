@@ -543,11 +543,18 @@ export function dashboardRoutes(db: Database.Database): Router {
 
     for (const company of companies) {
       const rows = db.prepare(`
-        SELECT account_type, SUM(balance) as balance
-        FROM account_balances
-        WHERE company_id = ? AND snapshot_date = ?
-        GROUP BY account_type
-      `).all(company.company_id, snapDate) as any[];
+        SELECT ab.account_type, SUM(ab.balance) as balance
+        FROM account_balances ab
+        INNER JOIN (
+          SELECT account_odoo_id, MAX(snapshot_date) as max_date
+          FROM account_balances
+          WHERE company_id = ? AND snapshot_date <= ?
+          GROUP BY account_odoo_id
+        ) latest ON ab.account_odoo_id = latest.account_odoo_id
+                 AND ab.snapshot_date = latest.max_date
+                 AND ab.company_id = ?
+        GROUP BY ab.account_type
+      `).all(company.company_id, snapDate, company.company_id) as any[];
 
       const byType: Record<string, number> = {};
       for (const r of rows) byType[r.account_type] = r.balance;
@@ -569,11 +576,19 @@ export function dashboardRoutes(db: Database.Database): Router {
 
       // Get equity account detail for breakdown
       const equityAccounts = db.prepare(`
-        SELECT account_code, account_name, balance
-        FROM account_balances
-        WHERE company_id = ? AND snapshot_date = ? AND account_type = 'equity' AND ABS(balance) > 0.01
-        ORDER BY ABS(balance) DESC
-      `).all(company.company_id, snapDate) as any[];
+        SELECT ab.account_code, ab.account_name, ab.balance
+        FROM account_balances ab
+        INNER JOIN (
+          SELECT account_odoo_id, MAX(snapshot_date) as max_date
+          FROM account_balances
+          WHERE company_id = ? AND snapshot_date <= ?
+          GROUP BY account_odoo_id
+        ) latest ON ab.account_odoo_id = latest.account_odoo_id
+                 AND ab.snapshot_date = latest.max_date
+                 AND ab.company_id = ?
+        WHERE ab.account_type = 'equity' AND ABS(ab.balance) > 0.01
+        ORDER BY ABS(ab.balance) DESC
+      `).all(company.company_id, snapDate, company.company_id) as any[];
 
       // Categorize equity accounts
       let retainedEarnings = 0, shareCapitals = 0, capitalInWallet = 0, otherEquity = 0;
