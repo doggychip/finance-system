@@ -401,9 +401,9 @@
     async function loadTimeCharts() {
       var limit = periodLimit(currentPeriod);
       var label = periodLabel(currentPeriod);
-      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow &mdash; ' + label;
-      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows &mdash; ' + label;
-      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance &mdash; ' + label;
+      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow \u2014 ' + label;
+      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows \u2014 ' + label;
+      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance \u2014 ' + label;
 
       var results = await Promise.all([
         (await fetch('/api/dashboard/cash-history?period=' + currentPeriod + '&limit=' + limit)).json(),
