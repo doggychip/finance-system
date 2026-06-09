@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cash ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Finance Dashboard</title>
+  <title>Cash ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Finance Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <style>
@@ -132,7 +132,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>Cash <span style="font-size:12px;color:#8b8fa3;font-weight:400" title="Cash = Fiat (USD/CNY/SGD) + Crypto (BNB/ETH/XTR/UST/WBN/USC/SHI/SPE). All entities. Data from Odoo account_balances snapshots.">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Data: All entities, Fiat+Crypto, from Odoo snapshots</span></h1>
+    <h1>Cash <span style="font-size:12px;color:#8b8fa3;font-weight:400" title="Cash = Fiat (USD/CNY/SGD) + Crypto (BNB/ETH/XTR/UST/WBN/USC/SHI/SPE). All entities. Data from Odoo account_balances snapshots.">ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Data: All entities, Fiat+Crypto, from Odoo snapshots</span></h1>
     <div class="nav">
       <a href="/">Overview</a>
       <a href="/reports.html">Reports</a>
@@ -176,26 +176,26 @@
 
     <!-- Charts -->
     <div class="card fullwidth">
-      <div class="card-header"><h2 id="balanceChartTitle">Cumulative Net Cash Flow ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Monthly</h2></div>
+      <div class="card-header"><h2 id="balanceChartTitle">Cumulative Net Cash Flow ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Monthly</h2></div>
       <div class="chart-container"><canvas id="balanceTimeChart"></canvas></div>
     </div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><h2 id="flowChartTitle">Inflows vs Outflows ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Monthly</h2></div>
+        <div class="card-header"><h2 id="flowChartTitle">Inflows vs Outflows ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Monthly</h2></div>
         <div class="chart-container"><canvas id="flowChart"></canvas></div>
       </div>
       <div class="card"><h2>Bank Account Distribution (Fiat)</h2><div class="chart-container"><canvas id="distributionChart"></canvas></div></div>
     </div>
     <div class="card fullwidth">
-      <div class="card-header"><h2 id="accountHistoryTitle">Per-Account Balance ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Monthly</h2></div>
+      <div class="card-header"><h2 id="accountHistoryTitle">Per-Account Balance ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Monthly</h2></div>
       <div class="chart-container" style="height:400px"><canvas id="accountHistoryChart"></canvas></div>
     </div>
 
     <!-- Category boxes: Cash (Bank) -->
     <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--green)">Cash (Bank)</div>
     <div class="grid-2" style="margin-bottom:16px">
-      <div class="category-box cash-current-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>ÃÂÃÂ¦ÃÂÃÂ´ÃÂÃÂ»ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ Current<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashCurrentCount">--</div></div><div class="box-total text-green" id="cashCurrentTotal">--</div></div><div class="box-list" id="cashCurrentList"><div class="box-empty">Loading...</div></div></div>
-      <div class="category-box cash-fixed-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>ÃÂÃÂ¥ÃÂÃÂ®ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ Fixed Deposit<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashFixedCount">--</div></div><div class="box-total" style="color:#22d3ee" id="cashFixedTotal">--</div></div><div class="box-list" id="cashFixedList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box cash-current-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ»ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Current<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashCurrentCount">--</div></div><div class="box-total text-green" id="cashCurrentTotal">--</div></div><div class="box-list" id="cashCurrentList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box cash-fixed-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Fixed Deposit<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashFixedCount">--</div></div><div class="box-total" style="color:#22d3ee" id="cashFixedTotal">--</div></div><div class="box-list" id="cashFixedList"><div class="box-empty">Loading...</div></div></div>
     </div>
 
     <!-- Category boxes: Crypto -->
@@ -230,7 +230,7 @@
   </div>
 
   <script>
-    // ÃÂÃÂ¨ÃÂÃÂ¿ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂªÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ¤ÃÂÃÂ©ÃÂÃÂ¯ÃÂÃÂ¼ÃÂÃÂÃÂÃÂ¦ÃÂÃÂ ÃÂÃÂ¼ÃÂÃÂ¥ÃÂÃÂ¼ÃÂÃÂ YYYY-MM-DD
+    // ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¿ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂ YYYY-MM-DD
     function lastDayOfPrevMonth() {
       var d = new Date();
       return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
@@ -305,7 +305,7 @@
 
       var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
 
-      // Hero total: use executive-summary (ÃÂÃÂ¤ÃÂÃÂ¼ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ®ÃÂÃÂ¡ÃÂÃÂ¥ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¥ÃÂÃÂ¾ÃÂÃÂ, same as Overview Cash Breakdown)
+      // Hero total: use executive-summary (ÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¾ÃÂÃÂÃÂÃÂ, same as Overview Cash Breakdown)
       // total_cash_fiat + total_cash_crypto already includes Foundation from manual_balances
       var totalFiat = execData.total_cash_fiat || 0;
       var totalCrypto = execData.total_cash_crypto || 0;
@@ -401,9 +401,9 @@
     async function loadTimeCharts() {
       var limit = periodLimit(currentPeriod);
       var label = periodLabel(currentPeriod);
-      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ' + label;
-      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ' + label;
-      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ' + label;
+      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ' + label;
+      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ' + label;
+      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ' + label;
 
       var results = await Promise.all([
         (await fetch('/api/dashboard/cash-history?period=' + currentPeriod + '&limit=' + limit)).json(),
@@ -454,7 +454,7 @@
       });
     }
 
-    // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Cash Position ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
+    // ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Cash Position ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ
     var LAYOUT = [
       { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
       { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
@@ -501,10 +501,10 @@
       });
       if (snaps.length >= 1) {
         var _lastDay = lastDayOfPrevMonth();
-        // As of: ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¾ÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ¨ÃÂÃÂ¿ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂ¿ÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ¼ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ¶ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ¿ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ«ÃÂÃÂ¯ÃÂÃÂ¼ÃÂÃÂ
+        // As of: ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¾ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¿ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¿ÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¿ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂ
         var asOfSnap = snaps.find(function(s) { return s.snapshot_date <= _lastDay; }) || snaps[0];
         asOf.value = asOfSnap.snapshot_date;
-        // Prior: ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¾ÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ«ÃÂÃÂ¯ÃÂÃÂ¼ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ«ÃÂÃÂ¥ÃÂÃÂ¾ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂªÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂ¸ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ¤ÃÂÃÂ©ÃÂÃÂ¯ÃÂÃÂ¼ÃÂÃÂ
+        // Prior: ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¾ÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¾ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¤ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¼ÃÂÃÂÃÂÃÂ
         var _d = new Date(_lastDay + 'T00:00:00');
         var _prevPrevLastDay = new Date(_d.getFullYear(), _d.getMonth(), 0).toISOString().slice(0, 10);
         var priorSnap = snaps.find(function(s) { return s.snapshot_date <= _prevPrevLastDay; }) || snaps[1] || snaps[0];
@@ -623,12 +623,12 @@
     setInterval(function() { loadCashBalances(); loadTimeCharts(); }, 5 * 60 * 1000);
   
     var CARD_INFO = {
-      cash_total: { title: 'Total Cash & Crypto ÃÂ¢ÃÂÃÂ Construction', formula: '<strong>Total</strong> = Fiat Cash + Crypto Assets', rows: [['Entities included','Xterio + Holdings + OW + Foundation'],['Data source','Odoo snapshots (Fiat + Crypto)'],['Update frequency','Synced from Odoo on demand'],['Note','Includes all cash, deposits, and on-chain crypto']] }
+      cash_total: { title: 'Total Cash & Crypto  -  Construction', formula: '<strong>Total</strong> = Fiat Cash + Crypto Assets', rows: [['Entities included','Xterio + Holdings + OW + Foundation'],['Data source','Odoo snapshots (Fiat + Crypto)'],['Update frequency','Synced from Odoo on demand'],['Note','Includes all cash, deposits, and on-chain crypto']] }
     ,
-      cash_accounts: { title: 'Cash Accounts Ã¢ÂÂ Construction', formula: '<strong>Cash Accounts</strong> = Total number of active cash/bank/crypto accounts', rows: [['Scope','All entities, all currencies'],['Includes','Bank accounts, crypto wallets, MMA accounts'],['Data source','Odoo account list'],['Note','Includes both positive and overdrawn accounts']] },
-      cash_positive: { title: 'Positive Accounts Ã¢ÂÂ Construction', formula: '<strong>Positive Accounts</strong> = Accounts with balance > 0', rows: [['Scope','All entities'],['Condition','Current balance > $0'],['Data source','Odoo snapshots']] },
-      cash_negative: { title: 'Negative / Overdrawn Ã¢ÂÂ Construction', formula: '<strong>Negative Accounts</strong> = Accounts with balance < 0', rows: [['Scope','All entities'],['Condition','Current balance < $0'],['Typical causes','Timing differences, overdrafts, wallet gas fees'],['Data source','Odoo snapshots']] },
-      cash_largest: { title: 'Largest Account Ã¢ÂÂ Construction', formula: '<strong>Largest Account</strong> = Account with the highest positive balance', rows: [['Scope','All entities, all currencies'],['Valuation','USD equivalent at spot rate'],['Data source','Odoo snapshots']] }
+      cash_accounts: { title: 'Cash Accounts  -  Construction', formula: '<strong>Cash Accounts</strong> = Total number of active cash/bank/crypto accounts', rows: [['Scope','All entities, all currencies'],['Includes','Bank accounts, crypto wallets, MMA accounts'],['Data source','Odoo account list'],['Note','Includes both positive and overdrawn accounts']] },
+      cash_positive: { title: 'Positive Accounts  -  Construction', formula: '<strong>Positive Accounts</strong> = Accounts with balance > 0', rows: [['Scope','All entities'],['Condition','Current balance > $0'],['Data source','Odoo snapshots']] },
+      cash_negative: { title: 'Negative / Overdrawn  -  Construction', formula: '<strong>Negative Accounts</strong> = Accounts with balance < 0', rows: [['Scope','All entities'],['Condition','Current balance < $0'],['Typical causes','Timing differences, overdrafts, wallet gas fees'],['Data source','Odoo snapshots']] },
+      cash_largest: { title: 'Largest Account  -  Construction', formula: '<strong>Largest Account</strong> = Account with the highest positive balance', rows: [['Scope','All entities, all currencies'],['Valuation','USD equivalent at spot rate'],['Data source','Odoo snapshots']] }
     };
     // Card info modal functions
     function showCardInfo(card) {
