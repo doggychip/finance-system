@@ -125,8 +125,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(rows.reverse());
   });
 
-  // Cash & bank account balances Ã¢ÂÂ categorized
-// ─── /cash-balances ──────────────────────────────────────────────────────────
+  // Cash & bank account balances ÃÂ¢ÃÂÃÂ categorized
+// âââ /cash-balances ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/cash-balances', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -167,7 +167,7 @@ router.get('/cash-balances', (req, res) => {
       ROUND(SUM(amount_local * exchange_rate), 2) as balance
     FROM manual_balances
     WHERE entity = 'Xterio Foundation'
-      AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+      AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
       AND period = ?
     GROUP BY account_code, account_name
     HAVING ABS(balance) > 0.01
@@ -189,7 +189,7 @@ router.get('/cash-balances', (req, res) => {
           ROUND(SUM(amount_local * exchange_rate), 2) as balance
         FROM manual_balances
         WHERE entity = 'Xterio Foundation'
-          AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+          AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
           AND period = ?
         GROUP BY account_code, account_name
         HAVING ABS(balance) > 0.01
@@ -369,7 +369,7 @@ router.get('/cash-balances', (req, res) => {
     res.json(withBalance);
   });
 
-  // Revenue vs Expenses monthly Ã¢ÂÂ all time
+  // Revenue vs Expenses monthly ÃÂ¢ÃÂÃÂ all time
   router.get('/revenue-vs-expenses', (_req, res) => {
     const rows = db.prepare(`
       SELECT
@@ -501,7 +501,7 @@ router.get('/cash-balances', (req, res) => {
   });
 
   // Multi-company balance sheet summary (all companies side by side)
-// ─── /balance-sheet-all ──────────────────────────────────────────────────────
+// âââ /balance-sheet-all ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/balance-sheet-all', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -696,7 +696,7 @@ router.get('/balance-sheet-all', (req, res) => {
   });
 
   // Consolidated balance sheet with entity groupings
-// ─── /consolidated-bs ────────────────────────────────────────────────────────
+// âââ /consolidated-bs ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/consolidated-bs', (req, res) => {
   // Compute directly from journal entries (no account_balances dependency)
   const snapshotDate = (req.query.as_of_date as string) ||
@@ -714,7 +714,7 @@ router.get('/consolidated-bs', (req, res) => {
       const latestPeriod = db.prepare(`
         SELECT period, SUM(amount_usd) as total_usd
         FROM manual_balances
-        WHERE entity = ? AND account_code NOT IN (${FOUNDATION_IC})
+        WHERE entity = ? AND account_code NOT IN ('FOUNDATION_IC')
         GROUP BY period
         ORDER BY period DESC
         LIMIT 1
@@ -805,7 +805,7 @@ router.get('/consolidated-bs', (req, res) => {
       if (line.account_codes) {
         balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
       } else if (line.odoo_types) {
-        if (line.cy_only) {
+        if (line.date_filter === 'current_year') {
           balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeCY[t] || 0), 0);
         } else {
           balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeAll[t] || 0), 0);
@@ -1131,7 +1131,7 @@ router.get('/consolidated-bs', (req, res) => {
   });
 
   // ====== Bank Account Detail ======
-// ─── /bank-accounts ──────────────────────────────────────────────────────────
+// âââ /bank-accounts ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/bank-accounts', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -1196,7 +1196,7 @@ router.get('/bank-accounts', (req, res) => {
            ROUND(SUM(amount_local * exchange_rate), 2) as balance
     FROM manual_balances
     WHERE entity = 'Xterio Foundation'
-      AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+      AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
       AND period = ?
     GROUP BY account_code
     HAVING ABS(balance) > 0.01
@@ -1209,7 +1209,7 @@ router.get('/bank-accounts', (req, res) => {
              ROUND(SUM(amount_local * exchange_rate), 2) as balance
       FROM manual_balances
       WHERE entity = 'Xterio Foundation'
-        AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+        AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
         AND period = ?
       GROUP BY account_code
       HAVING ABS(balance) > 0.01
@@ -1292,7 +1292,7 @@ router.get('/bank-accounts', (req, res) => {
   });
 
 
-  // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances: GET all rows for a period Ã¢ÂÂÃ¢ÂÂ
+  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances: GET all rows for a period ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
   router.get('/foundation-balances', (req, res) => {
     try {
       const period = (req.query.period as string) || '';
@@ -1309,7 +1309,7 @@ router.get('/bank-accounts', (req, res) => {
     }
   });
 
-  // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances: PATCH a single row Ã¢ÂÂÃ¢ÂÂ
+  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances: PATCH a single row ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
   router.patch('/foundation-balances/:id', (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1322,7 +1322,7 @@ router.get('/bank-accounts', (req, res) => {
     }
   });
 
-  // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances: POST new period rows Ã¢ÂÂÃ¢ÂÂ
+  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances: POST new period rows ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
   router.post('/foundation-balances', (req, res) => {
     try {
       const { period, rows } = req.body as { period: string; rows: Array<{ account_code: string; account_name: string; category: string; amount_local: number; currency: string; exchange_rate: number }> };
@@ -1340,7 +1340,7 @@ router.get('/bank-accounts', (req, res) => {
     }
   });
 
-  // Ã¢ÂÂÃ¢ÂÂ Generic manual-balances API (entity param) Ã¢ÂÂÃ¢ÂÂ
+  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Generic manual-balances API (entity param) ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
   router.get('/manual-balances', (req, res) => {
     try {
       const entity = (req.query.entity as string) || '';
@@ -1379,7 +1379,7 @@ router.get('/bank-accounts', (req, res) => {
   });
 
   // List available balance snapshots
-// ─── /snapshots ───────────────────────────────────────────────────────────────
+// âââ /snapshots âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // List available balance snapshots (derived from journal entry dates)
 router.get('/snapshots', (_req, res) => {
   // Return the last day of each month for which we have journal entries
@@ -1402,7 +1402,7 @@ router.get('/snapshots', (_req, res) => {
 
   res.json({ snapshots });
 });
-// ─── /executive-summary ──────────────────────────────────────────────────────
+// âââ /executive-summary ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/executive-summary', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
   const currentYear = new Date().getFullYear().toString();
@@ -1493,13 +1493,13 @@ router.get('/executive-summary', (req, res) => {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   })();
   let foundationData = db.prepare(`
-    SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET}) THEN amount_usd ELSE 0 END) as cash_usd
+    SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET') THEN amount_usd ELSE 0 END) as cash_usd
     FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?
   `).get(foundationPeriod) as any;
   if (!foundationData?.net_assets) {
     const latestP = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
     if (latestP) foundationData = db.prepare(`
-      SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET}) THEN amount_usd ELSE 0 END) as cash_usd
+      SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET') THEN amount_usd ELSE 0 END) as cash_usd
       FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?
     `).get(latestP) as any;
   }
@@ -1649,7 +1649,7 @@ router.get('/executive-summary', (req, res) => {
     ic_imbalances,
   });
 });
-// ─── /ow-accounts ────────────────────────────────────────────────────────────
+// âââ /ow-accounts ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/ow-accounts', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -1698,7 +1698,7 @@ router.get('/ow-accounts', (req, res) => {
 
   res.json({ as_of_date: asOfDate, accounts });
 });
-// ─── /ow-closing ─────────────────────────────────────────────────────────────
+// âââ /ow-closing âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/ow-closing', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -1755,12 +1755,12 @@ router.get('/ow-closing', (req, res) => {
 
   res.json({ as_of_date: asOfDate, months: result });
 });
-// ─── /card-detail-csv ────────────────────────────────────────────────────────
+// âââ /card-detail-csv ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 router.get('/card-detail-csv', (req, res) => {
   const card = (req.query.card as string) || '';
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
-  // ── Foundation: manual_balances ──────────────────────────────────────────────
+  // ââ Foundation: manual_balances ââââââââââââââââââââââââââââââââââââââââââââââ
   if (card === 'foundation') {
     const foundationPeriod = (() => {
       const d = new Date(asOfDate + 'T00:00:00Z');
@@ -1773,7 +1773,7 @@ router.get('/card-detail-csv', (req, res) => {
              amount_local AS "Amount Local", exchange_rate AS "Exchange Rate",
              ROUND(amount_local * exchange_rate, 2) AS "Balance USD"
       FROM manual_balances
-      WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+      WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
         AND period = ?
       ORDER BY account_code
     `).all(foundationPeriod) as any[];
@@ -1787,7 +1787,7 @@ router.get('/card-detail-csv', (req, res) => {
                  amount_local AS "Amount Local", exchange_rate AS "Exchange Rate",
                  ROUND(amount_local * exchange_rate, 2) AS "Balance USD"
           FROM manual_balances
-          WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+          WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
             AND period = ?
           ORDER BY account_code
         `).all(latestPeriod) as any[];
@@ -1803,7 +1803,7 @@ router.get('/card-detail-csv', (req, res) => {
     return res.send('\uFEFF' + csvLines.join('\n'));
   }
 
-  // ── All other cards: JE-based ─────────────────────────────────────────────────
+  // ââ All other cards: JE-based âââââââââââââââââââââââââââââââââââââââââââââââââ
   const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
   const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
   const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name)).flatMap((g: any) => g.company_ids as number[]);
@@ -1877,13 +1877,13 @@ router.get('/card-detail-csv', (req, res) => {
              ROUND(amount_local * exchange_rate, 2) AS "Balance USD",
              ? AS "Snapshot Date"
       FROM manual_balances
-      WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+      WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
         AND period = ?
       ORDER BY account_code
     `).all(dateStr, foundationPeriod2) as any[];
 
     if (!foundRows2.length) {
-      const latestPeriod2 = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET}) ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+      const latestPeriod2 = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET') ORDER BY period DESC LIMIT 1`).get() as any)?.period;
       if (latestPeriod2) {
         foundRows2 = db.prepare(`
           SELECT entity AS "Company", NULL AS "Odoo Account ID",
@@ -1893,7 +1893,7 @@ router.get('/card-detail-csv', (req, res) => {
                  ROUND(amount_local * exchange_rate, 2) AS "Balance USD",
                  ? AS "Snapshot Date"
           FROM manual_balances
-          WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+          WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET')
             AND period = ?
           ORDER BY account_code
         `).all(dateStr, latestPeriod2) as any[];
