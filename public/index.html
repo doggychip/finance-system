@@ -289,7 +289,7 @@
         // Level 1: Total Group Net Assets
         var totalGroupNA = data.total_group_net_assets || 0;
         document.getElementById('heroTotalNA').textContent = fmt(totalGroupNA);
-        var _displayDate = document.getElementById('asOfDate').value || data.snapshot_date;
+        var _displayDate = data.snapshot_date;
         document.getElementById('heroTotalNASub').textContent = 'As of ' + _displayDate + ' | Foundation + Xterio + Holdings + OW';
 
         // Level 2: 4 Function Net Assets
@@ -341,9 +341,9 @@
 
         // Level 4: Cash Fiat & Crypto totals
         document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
-        document.getElementById('heroCashFiatSub').textContent = 'As of ' + (document.getElementById('asOfDate').value || data.snapshot_date) + ' | All entities incl. Foundation';
+        document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | All entities incl. Foundation';
         document.getElementById('heroCashCrypto').textContent = fmt(data.total_cash_crypto);
-        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + (document.getElementById('asOfDate').value || data.snapshot_date) + ' | All entities';
+        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snapshot_date + ' | All entities';
 
         // Cash trend chart
         if (data.cash_trend && data.cash_trend.length > 0) {
@@ -372,7 +372,7 @@
           });
         }
 
-        document.getElementById('snapInfo').textContent = 'Data as of ' + (document.getElementById('asOfDate').value || data.snapshot_date) + (data.prior_date ? ' | Prior: ' + data.prior_date : '');
+        document.getElementById('snapInfo').textContent = 'Data as of ' + data.snapshot_date + (data.prior_date ? ' | Prior: ' + data.prior_date : '');
       } catch (err) {
         console.error(err);
       }
