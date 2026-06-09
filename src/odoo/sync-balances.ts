@@ -33,28 +33,17 @@ const COMPANIES = [
   { id: 28, name: 'PLAY ALGORITHM' },
 ];
 
+// Sync balances from Odoo using journal line aggregation as of a specific date.
+// asOfDate: Odoo accounting date (YYYY-MM-DD). Balances are the sum of all
+//   posted journal lines with date <= asOfDate. This is the Odoo data date,
+//   not the sync run date. Defaults to today if not provided.
 export async function syncBalances(
   odoo: OdooClient,
-  db: Database.Database
+  db: Database.Database,
+  asOfDate?: string
 ): Promise<BalanceSyncResult> {
-  // Determine snapshot date from Odoo's latest posted journal entry date
-  // This reflects the actual data date in Odoo, not the sync run date
-  let snapshotDate = new Date().toISOString().slice(0, 10); // fallback
-  try {
-    const latestMoves = await odoo.execute('account.move', 'search_read',
-      [[['state', '=', 'posted']]],
-      { fields: ['date'], order: 'date desc', limit: 1 }
-    ) as any[];
-    if (latestMoves && latestMoves.length > 0 && latestMoves[0].date) {
-      // date field is returned as 'YYYY-MM-DD' string from Odoo
-      const odooDate = String(latestMoves[0].date).slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(odooDate)) {
-        snapshotDate = odooDate;
-      }
-    }
-  } catch (e) {
-    console.warn('[sync-balances] Could not determine Odoo data date, using today:', e);
-  }
+  const snapshotDate = asOfDate || new Date().toISOString().slice(0, 10);
+
   const result: BalanceSyncResult = {
     companies_synced: 0,
     accounts_synced: 0,
@@ -62,10 +51,7 @@ export async function syncBalances(
     errors: [],
   };
 
-  // One-time cleanup: rows tagged with legacy 'CRYPTO' sentinel (set before we
-  // stored real currency_id) lose their specific currency after this fix. Map
-  // them to 'UST' so the new classifier still treats them as crypto; real
-  // per-account currency will be overwritten on the next fresh sync.
+  // One-time cleanup: rows tagged with legacy 'CRYPTO' sentinel
   db.prepare(`UPDATE account_balances SET currency = 'UST' WHERE currency = 'CRYPTO'`).run();
 
   const upsert = db.prepare(`
@@ -85,38 +71,61 @@ export async function syncBalances(
 
   for (const company of COMPANIES) {
     try {
-      console.log(`[sync-balances] Fetching balances for ${company.name} (${company.id})...`);
+      console.log(`[sync-balances] Fetching ${company.name} (${company.id}) as of ${snapshotDate}...`);
 
-      // Use Odoo's current_balance with company context
-      const accts = await odoo.execute('account.account', 'search_read',
-        [[['company_ids', 'in', [company.id]]]],
+      // Aggregate posted journal lines up to snapshotDate
+      // date <= snapshotDate ensures we only include Odoo entries up to that date
+      const grouped = await odoo.execute('account.move.line', 'read_group',
+        [[
+          ['company_id', '=', company.id],
+          ['parent_state', '=', 'posted'],
+          ['date', '<=', snapshotDate],
+        ]],
         {
-          fields: ['id', 'code', 'name', 'current_balance', 'account_type', 'currency_id'],
-          context: { 'allowed_company_ids': [company.id] },
-          limit: 2000,
+          fields: ['account_id', 'balance'],
+          groupby: ['account_id'],
+          lazy: false,
         }
       ) as any[];
 
-      const tx = db.transaction(() => {
-        // Wipe any prior rows for this company+snapshot to prevent stale entries
-        // (accounts zeroed/removed in Odoo would otherwise linger, since we skip
-        // near-zero balances below and upsert only matches by account_odoo_id).
-        deleteCompanySnapshot.run(company.id, snapshotDate);
-        for (const a of accts) {
-          if (Math.abs(a.current_balance) < 0.01) continue;
-          const code = a.code || '';
-          const name = a.name || '';
-          const accountType = a.account_type || '';
-          if (!code) continue;
+      // Fetch account details (code, name, type, currency) for non-zero accounts
+      const accountIds = grouped
+        .filter(g => Math.abs(g.balance) >= 0.01)
+        .map(g => (g.account_id as [number, string])[0]);
 
-          // Determine currency from Odoo currency_id; fallback to USD
+      let accountDetails: Record<number, { code: string; name: string; account_type: string; currency: string }> = {};
+      if (accountIds.length > 0) {
+        const accts = await odoo.execute('account.account', 'search_read',
+          [[['id', 'in', accountIds]]],
+          {
+            fields: ['id', 'code', 'name', 'account_type', 'currency_id'],
+            context: { 'allowed_company_ids': [company.id] },
+          }
+        ) as any[];
+        for (const a of accts) {
           const currencyRef = a.currency_id as [number, string] | false;
-          const currency = (currencyRef && currencyRef[1]) ? currencyRef[1] : 'USD';
+          accountDetails[a.id as number] = {
+            code: (a.code as string) || '',
+            name: (a.name as string) || '',
+            account_type: (a.account_type as string) || '',
+            currency: (currencyRef && currencyRef[1]) ? currencyRef[1] : 'USD',
+          };
+        }
+      }
+
+      const tx = db.transaction(() => {
+        // Wipe prior rows for this company+snapshot to prevent stale entries
+        deleteCompanySnapshot.run(company.id, snapshotDate);
+        for (const g of grouped) {
+          if (Math.abs(g.balance) < 0.01) continue;
+          const acctId = (g.account_id as [number, string])[0];
+          const detail = accountDetails[acctId];
+          if (!detail || !detail.code) continue;
 
           upsert.run(
             company.id, company.name,
-            a.id, code, name, accountType, currency,
-            a.current_balance, snapshotDate
+            acctId, detail.code, detail.name, detail.account_type, detail.currency,
+            g.balance, snapshotDate
           );
           result.accounts_synced++;
         }
@@ -129,6 +138,6 @@ export async function syncBalances(
     }
   }
 
-  console.log(`[sync-balances] Done: ${result.companies_synced} companies, ${result.accounts_synced} accounts`);
+  console.log(`[sync-balances] Done: ${result.companies_synced} companies, ${result.accounts_synced} accounts as of ${snapshotDate}`);
   return result;
 }
