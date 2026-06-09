@@ -850,37 +850,36 @@
 
   <script>
   (function() {
-    const COMPANIES = [
-      {id:1,name:'LTECH'},{id:23,name:'LTECH W3'},
-      {id:17,name:'XLABS'},{id:18,name:'XLABS W3'},
-      {id:21,name:'PRIVILEGE HK'},{id:22,name:'LSTATION'},
-      {id:5,name:'GAMEPHILOS'},{id:6,name:'GAMEPHILOS W3'},
-      {id:7,name:'MAOFAN'},{id:10,name:'DIFANHA'},
-      {id:2,name:'SHADOWCAY'},{id:3,name:'SHADOWCAY W3'},
-      {id:4,name:'CHAOYING'},{id:12,name:'COS GAMES'},
-      {id:13,name:'DIREWOLF'},{id:14,name:'COS GAMES W3'},
-      {id:11,name:'PALIO W3'},{id:9,name:'BJ TUDONG'},
-      {id:19,name:'LHOLDINGS'},{id:20,name:'LHOLDINGS W3'},
-      {id:8,name:'QUANTUMMIND'},
-      {id:15,name:'OVERWORLD'},{id:16,name:'OVERWORLD W3'},
-      {id:30,name:'REACH LABS'},{id:31,name:'ROUGH HOUSE'},
-      {id:28,name:'PLAY ALGORITHM'}
-    ];
-    const box = document.getElementById('exportCompanies');
-    COMPANIES.forEach(c => {
-      const lbl = document.createElement('label');
-      lbl.style.cssText = 'display:flex;align-items:center;gap:0.35rem;color:#cbd5e1;font-size:0.8rem;cursor:pointer;';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = c.id; cb.className = 'exp-cb'; cb.checked = true;
-      cb.style.accentColor = '#3b82f6';
-      lbl.appendChild(cb); lbl.appendChild(document.createTextNode(c.name));
-      box.appendChild(lbl);
-    });
-    const d = new Date(); d.setMonth(d.getMonth() - 1);
+        // Companies populated dynamically from Odoo (see populateExportCompanies)
+    if (window._odooCompanies && window._odooCompanies.length) {
+      populateExportCompanies(window._odooCompanies);
+    }
+        const d = new Date(); d.setMonth(d.getMonth() - 1);
     document.getElementById('exportMonth').value = d.toISOString().slice(0,7);
   })();
 
   function exportSelectAll(v) { document.querySelectorAll('.exp-cb').forEach(c => c.checked = v); }
+
+  function populateExportCompanies(companies) {
+    var box = document.getElementById('exportCompanies');
+    if (!box) return;
+    box.innerHTML = '';
+    companies.forEach(function(c) {
+      var lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:0.35rem;color:#cbd5e1;font-size:0.8rem;cursor:pointer;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'exp-cb';
+      cb.value = c.id;
+      cb.checked = true;
+      cb.style.accentColor = '#3b82f6';
+      var span = document.createElement('span');
+      span.textContent = c.name;
+      lbl.appendChild(cb);
+      lbl.appendChild(span);
+      box.appendChild(lbl);
+    });
+  }
 
   function getExportParams() {
     const month = document.getElementById('exportMonth').value;
@@ -1037,6 +1036,7 @@
       var data = await r.json();
       if (data.error) throw new Error(data.error);
       window._odooCompanies = data;
+      populateExportCompanies(data);
       window._companiesLoaded = true;
       statusEl.style.color = '#40c057';
       statusEl.textContent = data.length + ' companies loaded from Odoo.';
