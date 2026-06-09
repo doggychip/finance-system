@@ -1244,10 +1244,36 @@ router.get('/bank-accounts', (req, res) => {
     group: getGroup(row.company_id),
   }));
 
+  // Build groups format for frontend display (by entity group)
+  const allBankAccounts = [...accounts, ...foundationAccounts];
+  const bankByGroup: Record<string, any[]> = {};
+  for (const a of allBankAccounts) {
+    const gName = a.group || 'Other';
+    if (!bankByGroup[gName]) bankByGroup[gName] = [];
+    bankByGroup[gName].push({
+      code: a.account_code,
+      name: a.account_name,
+      current_balance: a.balance,
+      prior_balance: a.prior_balance,
+      change: a.change,
+      asset_type: ['BNB','ETH','XTR','UST','WBN','USC','SHI','SPE','USDT','USDC','BTC'].includes(a.currency) ? 'Crypto' : 'Cash',
+      currency: a.currency,
+      company_name: a.company_name,
+      company_id: a.company_id,
+    });
+  }
+  const bankGroups = Object.entries(bankByGroup).map(([name, accs]) => ({
+    name,
+    accounts: accs,
+    total_current: accs.reduce((s: number, a: any) => s + (a.current_balance || 0), 0),
+    total_cash_current: accs.filter((a: any) => a.asset_type !== 'Crypto').reduce((s: number, a: any) => s + (a.current_balance || 0), 0),
+    total_crypto_current: accs.filter((a: any) => a.asset_type === 'Crypto').reduce((s: number, a: any) => s + (a.current_balance || 0), 0),
+  }));
   res.json({
     as_of_date: asOfDate,
     prior_date: priorDate,
-    accounts: [...accounts, ...foundationAccounts],
+    accounts: allBankAccounts,
+    groups: bankGroups,
   });
 });
   router.get('/xterio-foundation', (_req, res) => {
@@ -1453,12 +1479,35 @@ router.get('/executive-summary', (req, res) => {
     const hC = getCash(HOLDINGS_IDS, asOfDate), aC = getCash(ALL_IDS, asOfDate);
     const total_cash_fiat = aC.fiat + fn.cash_usd, total_cash_crypto = aC.crypto;
     const total_cash_all = total_cash_fiat + total_cash_crypto;
-    const waterfall = [
-      { label: 'Xterio', key: 'xterio', bold: false, cash_fiat: xC.fiat + fn.cash_usd, cash_crypto: xC.crypto, net_assets: xNA + fn.net_assets },
-      { label: 'Holdings', key: 'holdings', bold: false, cash_fiat: hC.fiat, cash_crypto: hC.crypto, net_assets: hNA },
-      { label: 'OW', key: 'ow', bold: false, cash_fiat: oC.fiat, cash_crypto: oC.crypto, net_assets: oNA },
-      { label: 'Total', key: 'total', bold: true, cash_fiat: total_cash_fiat, cash_crypto: total_cash_crypto, net_assets: xNA + fn.net_assets + hNA + oNA },
-    ];
+    // Per-group waterfall: Net Assets breakdown into components
+    function buildWFBreakdown(ids: number[]): any {
+      if (!ids.length) return { adj_300040: 0, receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: 0, cash_crypto: 0 };
+      const ph = ids.map(() => '?').join(',');
+      const cryptoCurrencies = new Set(['USDT','ETH','BTC','USDC','BNB','XTR','UST','WBN','USC','SHI','SPE']);
+      const q = (w: string) => (db.prepare(`SELECT COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as t FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE ${w}`).get(asOfDate, ...ids) as any)?.t || 0;
+      const cashRows = db.prepare(`SELECT COALESCE(MAX(li.currency),'USD') as currency, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY a.id`).all(asOfDate, ...ids) as any[];
+      let cash_fiat = 0, cash_crypto = 0;
+      for (const r of cashRows) { if (cryptoCurrencies.has(r.currency)) cash_crypto += r.bal; else cash_fiat += r.bal; }
+      return {
+        adj_300040: q(`a.code='300040'`),
+        receivable: q(`a.odoo_type='asset_receivable'`),
+        payable: q(`a.odoo_type IN ('liability_payable','liability_current') AND a.code NOT LIKE '303%'`),
+        intercompany: q(`a.code LIKE '303%'`),
+        deposit: q(`a.code='202000'`),
+        cash_fiat,
+        cash_crypto,
+      };
+    }
+    const wfXterio = buildWFBreakdown(XTERIO_IDS);
+    const wfHoldings = buildWFBreakdown(HOLDINGS_IDS);
+    const wfOW = buildWFBreakdown(OW_IDS);
+    const wfFoundation = { adj_300040: 0, receivable: 0, payable: 0, intercompany: -(fn.net_assets - fn.cash_usd), deposit: 0, cash_fiat: fn.cash_usd, cash_crypto: 0 };
+    const waterfall = {
+      foundation: { net_assets: fn.net_assets, ...wfFoundation },
+      xterio: { net_assets: xNA + fn.net_assets, ...wfXterio },
+      holdings: { net_assets: hNA, ...wfHoldings },
+      ow: { net_assets: oNA, ...wfOW },
+    };
     let monthly_burn = 0;
     if (ALL_IDS.length > 0) {
       const tma = (() => { const d = new Date(asOfDate + 'T00:00:00Z'); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); })();
@@ -1470,9 +1519,22 @@ router.get('/executive-summary', (req, res) => {
     let cash_trend: any[] = [];
     if (ALL_IDS.length > 0) {
       const tPh = ALL_IDS.map(() => '?').join(',');
-      const tRows = db.prepare(`SELECT strftime('%Y-%m',je.date) as month, SUM(CASE WHEN li.currency NOT IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as fd, SUM(CASE WHEN li.currency IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as cd FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.company_id IN (${tPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY month ORDER BY month`).all(...ALL_IDS) as any[];
-      let cf = 0, cc = 0;
-      cash_trend = tRows.map(r => { cf += r.fd; cc += r.cd; return { month: r.month, total_fiat: cf, total_crypto: cc }; }).slice(-24);
+      const NON_OW_IDS = [...XTERIO_IDS, ...HOLDINGS_IDS];
+      const nowPh = NON_OW_IDS.length > 0 ? NON_OW_IDS.map(() => '?').join(',') : '0';
+      const owTrendPh = OW_IDS.length > 0 ? OW_IDS.map(() => '?').join(',') : '0';
+      const nowTrendRows = NON_OW_IDS.length > 0 ? db.prepare(`SELECT strftime('%Y-%m',je.date) as month, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as delta FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.company_id IN (${nowPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY month ORDER BY month`).all(...NON_OW_IDS) as any[] : [];
+      const owTrendRows = OW_IDS.length > 0 ? db.prepare(`SELECT strftime('%Y-%m',je.date) as month, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as delta FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.company_id IN (${owTrendPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY month ORDER BY month`).all(...OW_IDS) as any[] : [];
+      const nowMap: Record<string,number> = {}; let nowCum = 0;
+      for (const r of nowTrendRows) { nowCum += r.delta; nowMap[r.month] = nowCum; }
+      const owMap: Record<string,number> = {}; let owCum = 0;
+      for (const r of owTrendRows) { owCum += r.delta; owMap[r.month] = owCum; }
+      const allTrendMonths = [...new Set([...Object.keys(nowMap),...Object.keys(owMap)])].sort();
+      let lastNow = 0, lastOw = 0;
+      cash_trend = allTrendMonths.map(month => {
+        if (nowMap[month] !== undefined) lastNow = nowMap[month];
+        if (owMap[month] !== undefined) lastOw = owMap[month];
+        return { date: month + '-30', non_ow: lastNow + fn.cash_usd, ow: lastOw };
+      }).slice(-24);
     }
     let entity_cash: any[] = [{ company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
     if (ALL_IDS.length > 0) {
