@@ -14,7 +14,7 @@ import {
 export function syncRoutes(db: Database.Database): Router {
   const router = Router();
 
-  // Full sync — pulls everything from Odoo
+  // Full sync â pulls everything from Odoo
   router.post('/full', async (_req, res) => {
     _req.socket.setTimeout(300000); // 5 minutes
     try {
@@ -137,7 +137,7 @@ export function syncRoutes(db: Database.Database): Router {
       if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
         return res.status(400).json({ error: 'as_of_date required (YYYY-MM-DD)' });
       }
-      // Reject far-future dates — sentinel values like 9999-01-01 caused
+      // Reject far-future dates â sentinel values like 9999-01-01 caused
       // Odoo to return aggregate-since-beginning data that polluted snapshots.
       const maxFuture = new Date();
       maxFuture.setDate(maxFuture.getDate() + 30);
@@ -154,5 +154,24 @@ export function syncRoutes(db: Database.Database): Router {
     }
   });
 
-  return router;
+  
+// List all companies from Odoo (res.company)
+router.get('/companies', async (_req, res) => {
+  try {
+    const odoo = createOdooClient();
+    await odoo.authenticate();
+    const companies = await odoo.searchRead(
+      'res.company',
+      [],
+      ['id', 'name'],
+      { order: 'id asc', limit: 200 }
+    );
+    res.json(companies);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+return router;
 }
