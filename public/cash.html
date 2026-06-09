@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cash â Finance Dashboard</title>
+  <title>Cash Ã¢ÂÂ Finance Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <style>
@@ -35,7 +35,7 @@
     .hero .sub { font-size: 14px; color: var(--text-dim); }
 
     .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; position: relative; }
     .stat-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
     .stat-card .value { font-size: 24px; font-weight: 700; }
 
@@ -132,7 +132,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>Cash <span style="font-size:12px;color:#8b8fa3;font-weight:400" title="Cash = Fiat (USD/CNY/SGD) + Crypto (BNB/ETH/XTR/UST/WBN/USC/SHI/SPE). All entities. Data from Odoo account_balances snapshots.">â Data: All entities, Fiat+Crypto, from Odoo snapshots</span></h1>
+    <h1>Cash <span style="font-size:12px;color:#8b8fa3;font-weight:400" title="Cash = Fiat (USD/CNY/SGD) + Crypto (BNB/ETH/XTR/UST/WBN/USC/SHI/SPE). All entities. Data from Odoo account_balances snapshots.">Ã¢ÂÂ Data: All entities, Fiat+Crypto, from Odoo snapshots</span></h1>
     <div class="nav">
       <a href="/">Overview</a>
       <a href="/reports.html">Reports</a>
@@ -153,7 +153,7 @@
   <div class="container">
     <!-- Hero -->
     <div class="hero">
-      <div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('cash_total')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('cash_total')">⊕</button></div>
+      <div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('cash_total')">â</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('cash_total')">â</button></div>
       <div class="label">Total Cash&Crypto (All Entities)</div>
       <div class="total" id="heroTotal">--</div>
       <div class="sub" id="heroSub">Loading...</div>
@@ -161,10 +161,10 @@
 
     <!-- Stats -->
     <div class="stats-row">
-      <div class="stat-card"><div class="label">Cash Accounts</div><div class="value" id="statCount">--</div></div>
-      <div class="stat-card"><div class="label">Positive Accounts</div><div class="value text-green" id="statPositive">--</div></div>
-      <div class="stat-card"><div class="label">Negative / Overdrawn</div><div class="value text-red" id="statNegative">--</div></div>
-      <div class="stat-card"><div class="label">Largest Account</div><div class="value" id="statLargest">--</div></div>
+      <div class="stat-card"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('cash_accounts')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('cash_accounts')">⊕</button></div><div class="label">Cash Accounts</div><div class="value" id="statCount">--</div></div>
+      <div class="stat-card"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('cash_positive')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('cash_positive')">⊕</button></div><div class="label">Positive Accounts</div><div class="value text-green" id="statPositive">--</div></div>
+      <div class="stat-card"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('cash_negative')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('cash_negative')">⊕</button></div><div class="label">Negative / Overdrawn</div><div class="value text-red" id="statNegative">--</div></div>
+      <div class="stat-card"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('cash_largest')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('cash_largest')">⊕</button></div><div class="label">Largest Account</div><div class="value" id="statLargest">--</div></div>
     </div>
 
     <!-- Period toggle -->
@@ -176,26 +176,26 @@
 
     <!-- Charts -->
     <div class="card fullwidth">
-      <div class="card-header"><h2 id="balanceChartTitle">Cumulative Net Cash Flow â Monthly</h2></div>
+      <div class="card-header"><h2 id="balanceChartTitle">Cumulative Net Cash Flow Ã¢ÂÂ Monthly</h2></div>
       <div class="chart-container"><canvas id="balanceTimeChart"></canvas></div>
     </div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><h2 id="flowChartTitle">Inflows vs Outflows â Monthly</h2></div>
+        <div class="card-header"><h2 id="flowChartTitle">Inflows vs Outflows Ã¢ÂÂ Monthly</h2></div>
         <div class="chart-container"><canvas id="flowChart"></canvas></div>
       </div>
       <div class="card"><h2>Bank Account Distribution (Fiat)</h2><div class="chart-container"><canvas id="distributionChart"></canvas></div></div>
     </div>
     <div class="card fullwidth">
-      <div class="card-header"><h2 id="accountHistoryTitle">Per-Account Balance â Monthly</h2></div>
+      <div class="card-header"><h2 id="accountHistoryTitle">Per-Account Balance Ã¢ÂÂ Monthly</h2></div>
       <div class="chart-container" style="height:400px"><canvas id="accountHistoryChart"></canvas></div>
     </div>
 
     <!-- Category boxes: Cash (Bank) -->
     <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--green)">Cash (Bank)</div>
     <div class="grid-2" style="margin-bottom:16px">
-      <div class="category-box cash-current-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>æ´»æ Current<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashCurrentCount">--</div></div><div class="box-total text-green" id="cashCurrentTotal">--</div></div><div class="box-list" id="cashCurrentList"><div class="box-empty">Loading...</div></div></div>
-      <div class="category-box cash-fixed-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>å®æ Fixed Deposit<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashFixedCount">--</div></div><div class="box-total" style="color:#22d3ee" id="cashFixedTotal">--</div></div><div class="box-list" id="cashFixedList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box cash-current-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Ã¦Â´Â»Ã¦ÂÂ Current<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashCurrentCount">--</div></div><div class="box-total text-green" id="cashCurrentTotal">--</div></div><div class="box-list" id="cashCurrentList"><div class="box-empty">Loading...</div></div></div>
+      <div class="category-box cash-fixed-box collapsible open"><div class="box-header" onclick="this.parentElement.classList.toggle('open')"><div><h3>Ã¥Â®ÂÃ¦ÂÂ Fixed Deposit<span class="box-toggle">&#9660;</span></h3><div class="box-count" id="cashFixedCount">--</div></div><div class="box-total" style="color:#22d3ee" id="cashFixedTotal">--</div></div><div class="box-list" id="cashFixedList"><div class="box-empty">Loading...</div></div></div>
     </div>
 
     <!-- Category boxes: Crypto -->
@@ -230,7 +230,7 @@
   </div>
 
   <script>
-    // è¿åä¸ä¸ªææåä¸å¤©ï¼æ ¼å¼ YYYY-MM-DD
+    // Ã¨Â¿ÂÃ¥ÂÂÃ¤Â¸ÂÃ¤Â¸ÂªÃ¦ÂÂÃ¦ÂÂÃ¥ÂÂÃ¤Â¸ÂÃ¥Â¤Â©Ã¯Â¼ÂÃ¦Â Â¼Ã¥Â¼Â YYYY-MM-DD
     function lastDayOfPrevMonth() {
       var d = new Date();
       return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
@@ -305,7 +305,7 @@
 
       var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
 
-      // Hero total: use executive-summary (ä¼è®¡å£å¾, same as Overview Cash Breakdown)
+      // Hero total: use executive-summary (Ã¤Â¼ÂÃ¨Â®Â¡Ã¥ÂÂ£Ã¥Â¾Â, same as Overview Cash Breakdown)
       // total_cash_fiat + total_cash_crypto already includes Foundation from manual_balances
       var totalFiat = execData.total_cash_fiat || 0;
       var totalCrypto = execData.total_cash_crypto || 0;
@@ -401,9 +401,9 @@
     async function loadTimeCharts() {
       var limit = periodLimit(currentPeriod);
       var label = periodLabel(currentPeriod);
-      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow â ' + label;
-      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows â ' + label;
-      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance â ' + label;
+      document.getElementById('balanceChartTitle').textContent = 'Cumulative Net Cash Flow Ã¢ÂÂ ' + label;
+      document.getElementById('flowChartTitle').textContent = 'Inflows vs Outflows Ã¢ÂÂ ' + label;
+      document.getElementById('accountHistoryTitle').textContent = 'Per-Account Balance Ã¢ÂÂ ' + label;
 
       var results = await Promise.all([
         (await fetch('/api/dashboard/cash-history?period=' + currentPeriod + '&limit=' + limit)).json(),
@@ -454,7 +454,7 @@
       });
     }
 
-    // ââ Cash Position ââ
+    // Ã¢ÂÂÃ¢ÂÂ Cash Position Ã¢ÂÂÃ¢ÂÂ
     var LAYOUT = [
       { type: 'parent', name: 'Libeccio Wholly Owned (Xterio)' },
       { type: 'entity', key: 'LTECH, LTECH W3', label: 'Libecciotech', companies: ['LTECH', 'LTECH W3'] },
@@ -501,10 +501,10 @@
       });
       if (snaps.length >= 1) {
         var _lastDay = lastDayOfPrevMonth();
-        // As of: æ¾ææ¥è¿ä¸ææ«çå¿«ç§ï¼ä¸è¶è¿ä¸ææ«ï¼
+        // As of: Ã¦ÂÂ¾Ã¦ÂÂÃ¦ÂÂ¥Ã¨Â¿ÂÃ¤Â¸ÂÃ¦ÂÂÃ¦ÂÂ«Ã§ÂÂÃ¥Â¿Â«Ã§ÂÂ§Ã¯Â¼ÂÃ¤Â¸ÂÃ¨Â¶ÂÃ¨Â¿ÂÃ¤Â¸ÂÃ¦ÂÂÃ¦ÂÂ«Ã¯Â¼Â
         var asOfSnap = snaps.find(function(s) { return s.snapshot_date <= _lastDay; }) || snaps[0];
         asOf.value = asOfSnap.snapshot_date;
-        // Prior: æ¾ä¸ä¸ææ«ï¼ä¸ææ«å¾åæ¨ä¸ä¸ªæçæåä¸å¤©ï¼
+        // Prior: Ã¦ÂÂ¾Ã¤Â¸ÂÃ¤Â¸ÂÃ¦ÂÂÃ¦ÂÂ«Ã¯Â¼ÂÃ¤Â¸ÂÃ¦ÂÂÃ¦ÂÂ«Ã¥Â¾ÂÃ¥ÂÂÃ¦ÂÂ¨Ã¤Â¸ÂÃ¤Â¸ÂªÃ¦ÂÂÃ§ÂÂÃ¦ÂÂÃ¥ÂÂÃ¤Â¸ÂÃ¥Â¤Â©Ã¯Â¼Â
         var _d = new Date(_lastDay + 'T00:00:00');
         var _prevPrevLastDay = new Date(_d.getFullYear(), _d.getMonth(), 0).toISOString().slice(0, 10);
         var priorSnap = snaps.find(function(s) { return s.snapshot_date <= _prevPrevLastDay; }) || snaps[1] || snaps[0];
@@ -623,7 +623,12 @@
     setInterval(function() { loadCashBalances(); loadTimeCharts(); }, 5 * 60 * 1000);
   
     var CARD_INFO = {
-      cash_total: { title: 'Total Cash & Crypto — Construction', formula: '<strong>Total</strong> = Fiat Cash + Crypto Assets', rows: [['Entities included','Xterio + Holdings + OW + Foundation'],['Data source','Odoo snapshots (Fiat + Crypto)'],['Update frequency','Synced from Odoo on demand'],['Note','Includes all cash, deposits, and on-chain crypto']] }
+      cash_total: { title: 'Total Cash & Crypto â Construction', formula: '<strong>Total</strong> = Fiat Cash + Crypto Assets', rows: [['Entities included','Xterio + Holdings + OW + Foundation'],['Data source','Odoo snapshots (Fiat + Crypto)'],['Update frequency','Synced from Odoo on demand'],['Note','Includes all cash, deposits, and on-chain crypto']] }
+    ,
+      cash_accounts: { title: 'Cash Accounts — Construction', formula: '<strong>Cash Accounts</strong> = Total number of active cash/bank/crypto accounts', rows: [['Scope','All entities, all currencies'],['Includes','Bank accounts, crypto wallets, MMA accounts'],['Data source','Odoo account list'],['Note','Includes both positive and overdrawn accounts']] },
+      cash_positive: { title: 'Positive Accounts — Construction', formula: '<strong>Positive Accounts</strong> = Accounts with balance > 0', rows: [['Scope','All entities'],['Condition','Current balance > $0'],['Data source','Odoo snapshots']] },
+      cash_negative: { title: 'Negative / Overdrawn — Construction', formula: '<strong>Negative Accounts</strong> = Accounts with balance < 0', rows: [['Scope','All entities'],['Condition','Current balance < $0'],['Typical causes','Timing differences, overdrafts, wallet gas fees'],['Data source','Odoo snapshots']] },
+      cash_largest: { title: 'Largest Account — Construction', formula: '<strong>Largest Account</strong> = Account with the highest positive balance', rows: [['Scope','All entities, all currencies'],['Valuation','USD equivalent at spot rate'],['Data source','Odoo snapshots']] }
     };
     // Card info modal functions
     function showCardInfo(card) {
