@@ -125,8 +125,8 @@ export function dashboardRoutes(db: Database.Database): Router {
     res.json(rows.reverse());
   });
 
-  // Cash & bank account balances ÃÂ¢ÃÂÃÂ categorized
-// âââ /cash-balances ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Cash & bank account balances ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ categorized
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /cash-balances Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/cash-balances', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -369,7 +369,7 @@ router.get('/cash-balances', (req, res) => {
     res.json(withBalance);
   });
 
-  // Revenue vs Expenses monthly ÃÂ¢ÃÂÃÂ all time
+  // Revenue vs Expenses monthly ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ all time
   router.get('/revenue-vs-expenses', (_req, res) => {
     const rows = db.prepare(`
       SELECT
@@ -501,7 +501,7 @@ router.get('/cash-balances', (req, res) => {
   });
 
   // Multi-company balance sheet summary (all companies side by side)
-// âââ /balance-sheet-all ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /balance-sheet-all Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/balance-sheet-all', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -696,7 +696,7 @@ router.get('/balance-sheet-all', (req, res) => {
   });
 
   // Consolidated balance sheet with entity groupings
-// âââ /consolidated-bs ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /consolidated-bs Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/consolidated-bs', (req, res) => {
   // Compute directly from journal entries (no account_balances dependency)
   const snapshotDate = (req.query.as_of_date as string) ||
@@ -1131,7 +1131,7 @@ router.get('/consolidated-bs', (req, res) => {
   });
 
   // ====== Bank Account Detail ======
-// âââ /bank-accounts ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /bank-accounts Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/bank-accounts', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -1292,7 +1292,7 @@ router.get('/bank-accounts', (req, res) => {
   });
 
 
-  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances: GET all rows for a period ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+  // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Foundation Manual Balances: GET all rows for a period ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
   router.get('/foundation-balances', (req, res) => {
     try {
       const period = (req.query.period as string) || '';
@@ -1309,7 +1309,7 @@ router.get('/bank-accounts', (req, res) => {
     }
   });
 
-  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances: PATCH a single row ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+  // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Foundation Manual Balances: PATCH a single row ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
   router.patch('/foundation-balances/:id', (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1322,7 +1322,7 @@ router.get('/bank-accounts', (req, res) => {
     }
   });
 
-  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances: POST new period rows ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+  // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Foundation Manual Balances: POST new period rows ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
   router.post('/foundation-balances', (req, res) => {
     try {
       const { period, rows } = req.body as { period: string; rows: Array<{ account_code: string; account_name: string; category: string; amount_local: number; currency: string; exchange_rate: number }> };
@@ -1340,7 +1340,7 @@ router.get('/bank-accounts', (req, res) => {
     }
   });
 
-  // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Generic manual-balances API (entity param) ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+  // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Generic manual-balances API (entity param) ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
   router.get('/manual-balances', (req, res) => {
     try {
       const entity = (req.query.entity as string) || '';
@@ -1379,7 +1379,7 @@ router.get('/bank-accounts', (req, res) => {
   });
 
   // List available balance snapshots
-// âââ /snapshots âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /snapshots Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 // List available balance snapshots (derived from journal entry dates)
 router.get('/snapshots', (_req, res) => {
   // Return the last day of each month for which we have journal entries
@@ -1402,254 +1402,168 @@ router.get('/snapshots', (_req, res) => {
 
   res.json({ snapshots });
 });
-// âââ /executive-summary ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── /executive-summary ──────────────────────────────────────────────────────
 router.get('/executive-summary', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
-  const currentYear = new Date().getFullYear().toString();
 
-  // Entity group definitions for this summary
+  const priorDate = (() => {
+    const d = new Date(asOfDate + 'T00:00:00Z');
+    d.setDate(0);
+    return d.toISOString().slice(0, 10);
+  })();
+
   const XTERIO_IDS = ENTITY_GROUPS
     .filter((g: any) => !g.is_subtotal && !g.is_manual &&
-      ['LTECH', 'LTECH W3', 'AOD', 'XLABS', 'XLAB W3', 'PRIVILEGE HK'].includes(g.name))
+      ['LTECH','LTECH W3','AOD','XLABS','XLAB W3','PRIVILEGE HK'].some((n:string) => g.name.includes(n)))
     .flatMap((g: any) => g.company_ids as number[]);
   const OW_IDS = ENTITY_GROUPS
     .filter((g: any) => !g.is_subtotal && !g.is_manual &&
-      ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name))
+      ['OW','Reach','Rough house','Keystone'].some((n:string) => g.name.includes(n)))
     .flatMap((g: any) => g.company_ids as number[]);
   const HOLDINGS_IDS = ENTITY_GROUPS
     .filter((g: any) => !g.is_subtotal && !g.is_manual &&
-      ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'].includes(g.name))
+      ['CS','Palios','LHOLDINGS','QUANTUMMIND'].some((n:string) => g.name.includes(n)))
     .flatMap((g: any) => g.company_ids as number[]);
   const ALL_IDS = ENTITY_GROUPS
     .filter((g: any) => !g.is_subtotal && !g.is_manual)
     .flatMap((g: any) => g.company_ids as number[]);
 
-  function getNetAssets(companyIds: number[]) {
-    if (!companyIds.length) return { assets: 0, liabilities: 0, equity: 0, net_income: 0, net_assets: 0 };
-    const ph = companyIds.map(() => '?').join(',');
-
-    const allTimeRows = db.prepare(`
-      SELECT a.odoo_type,
-             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+  function getNetAssets(ids: number[], asOf: string) {
+    if (!ids.length) return 0;
+    const ph = ids.map(() => '?').join(',');
+    const yr = new Date(asOf + 'T00:00:00Z').getFullYear().toString();
+    const allTime = db.prepare(`
+      SELECT a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal
       FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.date <= ?
-        AND je.company_id IN (${ph})
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type != ''
+      INNER JOIN journal_entries je ON je.id=li.journal_entry_id
+        AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id=li.account_id
+      WHERE a.odoo_type IN ('asset_cash','asset_receivable','asset_current','asset_fixed','asset_non_current',
+        'liability_payable','liability_current','liability_non_current','equity')
       GROUP BY a.odoo_type
-    `).all(asOfDate, ...companyIds) as any[];
-
-    const byType: Record<string, number> = {};
-    for (const r of allTimeRows) byType[r.odoo_type] = r.balance;
-
-    const cyRows = db.prepare(`
-      SELECT a.odoo_type,
-             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    `).all(asOf, ...ids) as any[];
+    const cyPL = db.prepare(`
+      SELECT a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal
       FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.date > ? AND je.date <= ?
-        AND je.company_id IN (${ph})
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type IN ('income', 'income_other', 'expense', 'expense_depreciation', 'expense_direct_cost')
+      INNER JOIN journal_entries je ON je.id=li.journal_entry_id
+        AND je.status='posted' AND je.date>? AND je.date<=? AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id=li.account_id
+      WHERE a.odoo_type IN ('income','income_other','expense','expense_depreciation','expense_direct_cost')
       GROUP BY a.odoo_type
-    `).all(currentYear + '-01-01', asOfDate, ...companyIds) as any[];
-
-    const byCY: Record<string, number> = {};
-    for (const r of cyRows) byCY[r.odoo_type] = r.balance;
-
-    const assets = (byType['asset_cash'] || 0) + (byType['asset_receivable'] || 0) +
-                   (byType['asset_current'] || 0) + (byType['asset_fixed'] || 0) +
-                   (byType['asset_non_current'] || 0);
-    const liabilities = (byType['liability_payable'] || 0) + (byType['liability_current'] || 0) +
-                        (byType['liability_non_current'] || 0);
-    const equity = byType['equity'] || 0;
-    const revenue = (byCY['income'] || 0) + (byCY['income_other'] || 0);
-    const expenses = (byCY['expense'] || 0) + (byCY['expense_depreciation'] || 0) +
-                     (byCY['expense_direct_cost'] || 0);
-    const net_income = -(revenue - expenses);
-
-    return { assets, liabilities, equity, net_income, net_assets: assets + liabilities + equity + net_income };
+    `).all(yr+'-01-01', asOf, ...ids) as any[];
+    const bt: Record<string,number>={};
+    for (const r of allTime) bt[r.odoo_type]=r.bal;
+    const bc: Record<string,number>={};
+    for (const r of cyPL) bc[r.odoo_type]=r.bal;
+    return (bt['asset_cash']||0)+(bt['asset_receivable']||0)+(bt['asset_current']||0)+
+           (bt['asset_fixed']||0)+(bt['asset_non_current']||0)+
+           (bt['liability_payable']||0)+(bt['liability_current']||0)+(bt['liability_non_current']||0)+
+           (bt['equity']||0)-((bc['income']||0)+(bc['income_other']||0))+
+           ((bc['expense']||0)+(bc['expense_depreciation']||0)+(bc['expense_direct_cost']||0));
   }
 
-  function getCash(companyIds: number[]) {
-    if (!companyIds.length) return 0;
-    const ph = companyIds.map(() => '?').join(',');
-    const row = db.prepare(`
-      SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as total
+  function getCashByType(ids: number[], asOf: string) {
+    if (!ids.length) return {fiat:0,crypto:0};
+    const ph = ids.map(() => '?').join(',');
+    const rows = db.prepare(`
+      SELECT COALESCE(MAX(li.currency),'USD') as currency,
+             COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal
       FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.date <= ?
-        AND je.company_id IN (${ph})
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type = 'asset_cash'
-    `).get(asOfDate, ...companyIds) as any;
-    return row?.total || 0;
+      INNER JOIN journal_entries je ON je.id=li.journal_entry_id
+        AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id=li.account_id
+      WHERE a.odoo_type='asset_cash'
+      GROUP BY a.id
+    `).all(asOf, ...ids) as any[];
+    const crypto = new Set(['USDT','ETH','BTC','USDC']);
+    let fiat=0, cry=0;
+    for (const r of rows) { if (crypto.has(r.currency)) cry+=r.bal; else fiat+=r.bal; }
+    return {fiat, crypto:cry};
   }
 
-  // Foundation manual balances
-  const foundationPeriod = (() => {
-    const d = new Date(asOfDate + 'T00:00:00Z');
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-  })();
-  let foundationData = db.prepare(`
-    SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET') THEN amount_usd ELSE 0 END) as cash_usd
-    FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?
-  `).get(foundationPeriod) as any;
-  if (!foundationData?.net_assets) {
-    const latestP = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
-    if (latestP) foundationData = db.prepare(`
-      SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC', 'FOUNDATION_NET') THEN amount_usd ELSE 0 END) as cash_usd
-      FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?
-    `).get(latestP) as any;
+  const fp = (() => { const d=new Date(asOfDate+'T00:00:00Z'); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+  const pp = (() => { const d=new Date(priorDate+'T00:00:00Z'); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+
+  function getFoundation(period: string) {
+    let r = db.prepare(`SELECT SUM(amount_usd) as na, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') THEN amount_usd ELSE 0 END) as ca FROM manual_balances WHERE entity='Xterio Foundation' AND period=?`).get(period) as any;
+    if (!r?.na) {
+      const lp = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+      if (lp) r = db.prepare(`SELECT SUM(amount_usd) as na, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') THEN amount_usd ELSE 0 END) as ca FROM manual_balances WHERE entity='Xterio Foundation' AND period=?`).get(lp) as any;
+    }
+    return {net_assets: r?.na||0, cash_usd: r?.ca||0};
   }
-  const foundationNetAssets = foundationData?.net_assets || 0;
-  const foundationCash = foundationData?.cash_usd || 0;
 
-  // Get net assets by group
-  const xterioNA = getNetAssets(XTERIO_IDS);
-  const owNA = getNetAssets(OW_IDS);
-  const holdingsNA = getNetAssets(HOLDINGS_IDS);
-  const allNA = getNetAssets(ALL_IDS);
+  const fn = getFoundation(fp), fp2 = getFoundation(pp);
+  const xNA=getNetAssets(XTERIO_IDS,asOfDate), xNAp=getNetAssets(XTERIO_IDS,priorDate);
+  const oNA=getNetAssets(OW_IDS,asOfDate), oNAp=getNetAssets(OW_IDS,priorDate);
+  const hNA=getNetAssets(HOLDINGS_IDS,asOfDate), hNAp=getNetAssets(HOLDINGS_IDS,priorDate);
 
-  // Cash totals
-  const xterioCash = getCash(XTERIO_IDS) + foundationCash;
-  const owCash = getCash(OW_IDS);
-  const holdingsCash = getCash(HOLDINGS_IDS);
-  const totalCash = xterioCash + owCash + holdingsCash;
+  const xC=getCashByType(XTERIO_IDS,asOfDate);
+  const oC=getCashByType(OW_IDS,asOfDate);
+  const hC=getCashByType(HOLDINGS_IDS,asOfDate);
+  const aC=getCashByType(ALL_IDS,asOfDate);
 
-  // Waterfall: breakdown by group
-  const waterfall = [
-    { name: 'Xterio', net_assets: xterioNA.net_assets + foundationNetAssets, cash: xterioCash },
-    { name: 'OW', net_assets: owNA.net_assets, cash: owCash },
-    { name: 'Holdings', net_assets: holdingsNA.net_assets, cash: holdingsCash },
+  const total_cash_fiat=aC.fiat+fn.cash_usd;
+  const total_cash_crypto=aC.crypto;
+  const total_cash_all=total_cash_fiat+total_cash_crypto;
+  const non_ow_cash=xC.fiat+xC.crypto+hC.fiat+hC.crypto+fn.cash_usd;
+  const ow_cash=oC.fiat+oC.crypto;
+
+  const waterfall=[
+    {label:'Xterio',key:'xterio',bold:false,cash_fiat:xC.fiat+fn.cash_usd,cash_crypto:xC.crypto,net_assets:xNA+fn.net_assets},
+    {label:'Holdings',key:'holdings',bold:false,cash_fiat:hC.fiat,cash_crypto:hC.crypto,net_assets:hNA},
+    {label:'OW',key:'ow',bold:false,cash_fiat:oC.fiat,cash_crypto:oC.crypto,net_assets:oNA},
+    {label:'Total',key:'total',bold:true,cash_fiat:total_cash_fiat,cash_crypto:total_cash_crypto,net_assets:xNA+fn.net_assets+hNA+oNA},
   ];
 
-  // Per-entity cash breakdown
-  const entityCashRows = db.prepare(`
-    SELECT je.company_id, je.company_name,
-           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as cash
-    FROM line_items li
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted' AND je.date <= ?
-      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
-    INNER JOIN accounts a ON a.id = li.account_id
-    WHERE a.odoo_type = 'asset_cash'
-    GROUP BY je.company_id, je.company_name
-    HAVING ABS(cash) > 0.01
-    ORDER BY je.company_name
-  `).all(asOfDate, ...ALL_IDS) as any[];
+  const tma=(() => {const d=new Date(asOfDate+'T00:00:00Z');d.setMonth(d.getMonth()-3);return d.toISOString().slice(0,10);})();
+  const bPh=ALL_IDS.map(()=>'?').join(',');
+  const bRow=db.prepare(`SELECT COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as te FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date>? AND je.date<=? AND je.company_id IN (${bPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type IN ('expense','expense_direct_cost','expense_depreciation')`).get(tma,asOfDate,...ALL_IDS) as any;
+  const monthly_burn=(bRow?.te||0)/3;
+  const runway_months=monthly_burn>0?total_cash_all/monthly_burn:null;
 
-  const entity_cash = [
-    ...entityCashRows.map(r => ({ company_name: r.company_name, cash: r.cash })),
-    { company_name: 'Xterio Foundation', cash: foundationCash },
-  ];
+  const tPh=ALL_IDS.map(()=>'?').join(',');
+  const tRows=db.prepare(`SELECT strftime('%Y-%m',je.date) as month, SUM(CASE WHEN a.currency NOT IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as fd, SUM(CASE WHEN a.currency IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as cd FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.company_id IN (${tPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY month ORDER BY month`).all(...ALL_IDS) as any[];
+  let cf=0,cc=0;
+  const cash_trend=tRows.map(r=>{cf+=r.fd;cc+=r.cd;return{month:r.month,total_fiat:cf,total_crypto:cc};}).slice(-24);
 
-  // Burn rate: last 3 months expenses
-  const threeMonthsAgo = (() => {
-    const d = new Date(asOfDate + 'T00:00:00Z');
-    d.setMonth(d.getMonth() - 3);
-    return d.toISOString().slice(0, 10);
-  })();
-  const burnRow = db.prepare(`
-    SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as total_expense
-    FROM line_items li
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted'
-      AND je.date > ? AND je.date <= ?
-      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
-    INNER JOIN accounts a ON a.id = li.account_id
-    WHERE a.odoo_type IN ('expense', 'expense_direct_cost', 'expense_depreciation')
-  `).get(threeMonthsAgo, asOfDate, ...ALL_IDS) as any;
-  const monthlyBurn = (burnRow?.total_expense || 0) / 3;
-  const runway = monthlyBurn > 0 ? totalCash / monthlyBurn : null;
+  const ePh=ALL_IDS.map(()=>'?').join(',');
+  const eRows=db.prepare(`SELECT je.company_id,je.company_name, COALESCE(SUM(CASE WHEN a.currency NOT IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN a.currency IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as cr FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ePh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id,je.company_name ORDER BY je.company_name`).all(asOfDate,...ALL_IDS) as any[];
+  const entity_cash=[...eRows.map(r=>({company_id:r.company_id,company_name:r.company_name,cash_fiat:r.fi,cash_crypto:r.cr})),{company_id:22,company_name:'Xterio Foundation',cash_fiat:fn.cash_usd,cash_crypto:0}];
 
-  // 24-month cash trend
-  const cashTrendRows = db.prepare(`
-    SELECT strftime('%Y-%m', je.date) as month,
-           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as cumulative_cash
-    FROM line_items li
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted'
-      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
-    INNER JOIN accounts a ON a.id = li.account_id
-    WHERE a.odoo_type = 'asset_cash'
-    GROUP BY strftime('%Y-%m', je.date)
-    ORDER BY month DESC
-    LIMIT 24
-  `).all(...ALL_IDS) as any[];
-
-  const cash_trend = cashTrendRows.reverse().map(r => ({
-    month: r.month,
-    cash: r.cumulative_cash,
-  }));
-
-  // Overdrawn accounts
-  const overdrawnRows = db.prepare(`
-    SELECT je.company_name, a.code, a.name,
-           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-    FROM line_items li
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted' AND je.date <= ?
-      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
-    INNER JOIN accounts a ON a.id = li.account_id
-    WHERE a.odoo_type = 'asset_cash'
-    GROUP BY je.company_id, a.code, a.name
-    HAVING balance < -0.01
-    ORDER BY balance
-  `).all(asOfDate, ...ALL_IDS) as any[];
-
-  const overdrawn_alerts = overdrawnRows.map(r => ({
-    company_name: r.company_name,
-    account_code: r.code,
-    account_name: r.name,
-    balance: r.balance,
-  }));
-
-  // IC imbalances: 303xxx accounts should net to zero
-  const icRows = db.prepare(`
-    SELECT je.company_name,
-           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as ic_balance
-    FROM line_items li
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted' AND je.date <= ?
-      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
-    INNER JOIN accounts a ON a.id = li.account_id
-    WHERE a.code LIKE '303%'
-    GROUP BY je.company_id, je.company_name
-    HAVING ABS(ic_balance) > 100
-    ORDER BY ABS(ic_balance) DESC
-  `).all(asOfDate, ...ALL_IDS) as any[];
-
-  const ic_imbalances = icRows.map(r => ({
-    company_name: r.company_name,
-    ic_balance: r.ic_balance,
-  }));
+  const aPh=ALL_IDS.map(()=>'?').join(',');
+  const aRows=db.prepare(`SELECT je.company_name,a.code,a.name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${aPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id,a.code HAVING balance<-0.01 ORDER BY balance`).all(asOfDate,...ALL_IDS) as any[];
+  const icPh=ALL_IDS.map(()=>'?').join(',');
+  const icRows=db.prepare(`SELECT je.company_name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as ic_balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${icPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.code LIKE '303%' GROUP BY je.company_id,je.company_name HAVING ABS(ic_balance)>100 ORDER BY ABS(ic_balance) DESC`).all(asOfDate,...ALL_IDS) as any[];
 
   res.json({
-    as_of_date: asOfDate,
-    net_assets: {
-      xterio: xterioNA.net_assets + foundationNetAssets,
-      ow: owNA.net_assets,
-      holdings: holdingsNA.net_assets,
-      total: allNA.net_assets + foundationNetAssets,
-    },
-    cash: {
-      xterio: xterioCash,
-      ow: owCash,
-      holdings: holdingsCash,
-      total: totalCash,
-    },
+    snapshot_date: asOfDate,
+    prior_date: priorDate,
+    xterio_net_assets: xNA+fn.net_assets,
+    xterio_net_assets_prior: xNAp+fp2.net_assets,
+    foundation_net_assets: fn.net_assets,
+    foundation_net_assets_prior: fp2.net_assets,
+    holdings_net_assets: hNA,
+    holdings_net_assets_prior: hNAp,
+    ow_net_assets: oNA,
+    ow_net_assets_prior: oNAp,
+    total_group_net_assets: xNA+fn.net_assets+hNA+oNA,
     waterfall,
+    total_cash_fiat,
+    total_cash_crypto,
+    total_cash_all,
+    non_ow_cash,
+    ow_cash,
+    monthly_burn,
+    runway_months,
     entity_cash,
-    monthly_burn: monthlyBurn,
-    runway_months: runway,
     cash_trend,
-    overdrawn_alerts,
-    ic_imbalances,
+    alerts: aRows.map(r=>({company_name:r.company_name,account_code:r.code,account_name:r.name,balance:r.balance})),
+    ic_imbalances: icRows.map(r=>({company_name:r.company_name,ic_balance:r.ic_balance})),
   });
 });
-// âââ /ow-accounts ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /ow-accounts Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/ow-accounts', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -1698,7 +1612,7 @@ router.get('/ow-accounts', (req, res) => {
 
   res.json({ as_of_date: asOfDate, accounts });
 });
-// âââ /ow-closing âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /ow-closing Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/ow-closing', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
@@ -1755,12 +1669,12 @@ router.get('/ow-closing', (req, res) => {
 
   res.json({ as_of_date: asOfDate, months: result });
 });
-// âââ /card-detail-csv ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ /card-detail-csv Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 router.get('/card-detail-csv', (req, res) => {
   const card = (req.query.card as string) || '';
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
-  // ââ Foundation: manual_balances ââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ Foundation: manual_balances Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   if (card === 'foundation') {
     const foundationPeriod = (() => {
       const d = new Date(asOfDate + 'T00:00:00Z');
@@ -1803,7 +1717,7 @@ router.get('/card-detail-csv', (req, res) => {
     return res.send('\uFEFF' + csvLines.join('\n'));
   }
 
-  // ââ All other cards: JE-based âââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ All other cards: JE-based Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
   const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
   const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name)).flatMap((g: any) => g.company_ids as number[]);
