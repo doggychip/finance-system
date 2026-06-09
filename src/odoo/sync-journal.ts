@@ -7,6 +7,7 @@ export interface JournalSyncResult {
   updated: number;
   total: number;
   errors: string[];
+  deleted?: number;
 }
 
 function mapOdooState(state: string): 'draft' | 'posted' | 'void' {
@@ -24,7 +25,7 @@ export async function syncJournalEntries(
   db: Database.Database,
   options: { limit?: number; offset?: number; dateFrom?: string; dateTo?: string } = {}
 ): Promise<JournalSyncResult> {
-  const result: JournalSyncResult = { created: 0, updated: 0, total: 0, errors: [] };
+  const result: JournalSyncResult = { created: 0, updated: 0, total: 0, errors: [], deleted: 0 };
 
   // Build domain filter
   const domain: unknown[][] = [];
@@ -63,6 +64,7 @@ export async function syncJournalEntries(
 
   let offset = options.offset || 0;
   let remaining = totalCount;
+  const allSyncedOdooIds: number[] = [];
 
   while (remaining > 0) {
     const batchSize = Math.min(BATCH_SIZE, remaining);
@@ -79,6 +81,7 @@ export async function syncJournalEntries(
     if (odooEntries.length === 0) break;
 
     const entryOdooIds = odooEntries.map(e => e.id as number);
+    allSyncedOdooIds.push(...entryOdooIds);
 
     // 2. Fetch ALL line items for this batch in ONE call
     const allLines = await odoo.searchRead(
@@ -185,5 +188,32 @@ export async function syncJournalEntries(
   }
 
   console.log(`[sync-journal] Done: ${result.created} created, ${result.updated} updated, ${result.errors.length} errors`);
+
+  // Delete orphan entries: local entries in the synced date range that no longer exist in Odoo
+  if (options.dateFrom || options.dateTo) {
+    try {
+      const conditions: string[] = [];
+      const params: (string | number)[] = [];
+      if (options.dateFrom) { conditions.push('date >= ?'); params.push(options.dateFrom); }
+      if (options.dateTo) { conditions.push('date <= ?'); params.push(options.dateTo); }
+      const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+      const localEntries = db.prepare(
+        'SELECT id, odoo_id FROM journal_entries ' + whereClause
+      ).all(...params) as Array<{ id: string; odoo_id: number }>;
+      const syncedSet = new Set(allSyncedOdooIds);
+      const orphans = localEntries.filter(e => !syncedSet.has(e.odoo_id));
+      if (orphans.length > 0) {
+        console.log('[sync-journal] Deleting ' + orphans.length + ' orphan entries removed from Odoo...');
+        const delEntry = db.prepare('DELETE FROM journal_entries WHERE id = ?');
+        const delLines = db.prepare('DELETE FROM line_items WHERE journal_entry_id = ?');
+        db.transaction(() => { for (const o of orphans) { delLines.run(o.id); delEntry.run(o.id); } })();
+        result.deleted = orphans.length;
+        console.log('[sync-journal] Deleted ' + orphans.length + ' orphan entries.');
+      }
+    } catch (err) {
+      console.error('[sync-journal] Error during orphan cleanup:', err);
+    }
+  }
+
   return result;
 }
