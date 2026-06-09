@@ -37,7 +37,24 @@ export async function syncBalances(
   odoo: OdooClient,
   db: Database.Database
 ): Promise<BalanceSyncResult> {
-  const snapshotDate = new Date().toISOString().slice(0, 10);
+  // Determine snapshot date from Odoo's latest posted journal entry date
+  // This reflects the actual data date in Odoo, not the sync run date
+  let snapshotDate = new Date().toISOString().slice(0, 10); // fallback
+  try {
+    const latestMoves = await odoo.execute('account.move', 'search_read',
+      [[['state', '=', 'posted']]],
+      { fields: ['date'], order: 'date desc', limit: 1 }
+    ) as any[];
+    if (latestMoves && latestMoves.length > 0 && latestMoves[0].date) {
+      // date field is returned as 'YYYY-MM-DD' string from Odoo
+      const odooDate = String(latestMoves[0].date).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(odooDate)) {
+        snapshotDate = odooDate;
+      }
+    }
+  } catch (e) {
+    console.warn('[sync-balances] Could not determine Odoo data date, using today:', e);
+  }
   const result: BalanceSyncResult = {
     companies_synced: 0,
     accounts_synced: 0,
