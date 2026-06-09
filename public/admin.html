@@ -72,11 +72,105 @@
     <div style="display:flex;gap:8px;align-items:center"></div>
   </div>
 
-  undefined
-undefinedundefined
+  <style>
+    .admin-tabs { display:flex; gap:4px; padding:18px 24px 0; background:var(--surface); border-bottom:2px solid var(--border); }
+    .admin-tab-btn { padding:10px 22px; border:none; background:transparent; color:var(--text-dim); font-size:0.9rem; font-weight:600; cursor:pointer; border-radius:6px 6px 0 0; border-bottom:3px solid transparent; transition:all 0.15s; letter-spacing:0.04em; }
+    .admin-tab-btn:hover { color:var(--text); background:var(--surface2); }
+    .admin-tab-btn.active { color:#fff; border-bottom:3px solid var(--accent); background:var(--surface2); }
+    .admin-tab-pane { display:none; }
+    .admin-tab-pane.active { display:block; }
+  </style>
+  <div class="admin-tabs">
+    <button class="admin-tab-btn active" onclick="switchAdminTab('user-mgmt')">User &amp; Settings</button>
+    <button class="admin-tab-btn" onclick="switchAdminTab('odoo-mgt')">Odoo Sync MGT</button>
+  </div>
 
-<script>
+<div id="tab-user-mgmt" class="admin-tab-pane active">
+<div class="container" id="adminContent" style="display:block">
+    <!-- Create User -->
+    <div class="card">
+      <h2>Create New User</h2>
+      <div id="createMsg" class="msg"></div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Username</label>
+          <input type="text" id="newUsername" placeholder="username">
+        </div>
+        <div class="form-field">
+          <label>Display Name</label>
+          <input type="text" id="newDisplayName" placeholder="Full Name">
+        </div>
+        <div class="form-field">
+          <label>Password</label>
+          <input type="password" id="newPassword" placeholder="password">
+        </div>
+        <div class="form-field">
+          <label>Role</label>
+          <select id="newRole">
+            <option value="finance">Finance</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button class="btn primary" onclick="createUser()">Create</button>
+      </div>
+    </div>
 
+    <!-- User List -->
+    <div class="card">
+      <h2>All Users</h2>
+      <div id="resetMsg" class="msg"></div>
+      <div id="userTable"><p style="color:var(--text-dim)">Loading...</p></div>
+    </div>
+    <!-- Foundation Manual Balances -->
+    <div class="card">
+      <h2>Xterio Foundation â Manual Balances</h2>
+      <div id="foundationMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="foundationPeriod" onchange="loadFoundation()"></select>
+        <button class="btn primary" onclick="saveFoundation()">Save Changes</button>
+        <button class="btn" onclick="addNewPeriod()" id="btnAddPeriod" style="border-color:var(--green);color:var(--green)">+ Add Month</button>
+        <span id="foundationTotal" style="font-size:13px;color:var(--green);font-weight:700;margin-left:12px"></span>
+      </div>
+      <div id="foundationTable"><p style="color:var(--text-dim)">Loading...</p></div>
+    </div>
+
+    <!-- Foundation IC Payable -->
+    <div class="card">
+      <h2>Foundation IC Payable</h2>
+      <div id="foundationICMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="foundationICPeriod" onchange="loadFoundationIC()"></select>
+        <label style="font-size:12px;color:var(--text-dim);margin-left:12px">IC Payable (USD):</label>
+        <input type="number" step="0.01" id="foundationICAmount" style="width:160px">
+        <button class="btn primary" onclick="saveFoundationIC()">Save</button>
+      </div>
+    </div>
+
+    <!-- Keystone Foundation Manual Balances -->
+    <div class="card">
+      <h2>Keystone Foundation â Manual Balances</h2>
+      <div id="keystoneMsg" class="msg"></div>
+      <div class="period-selector">
+        <label style="font-size:12px;color:var(--text-dim)">Period:</label>
+        <select id="keystonePeriod" onchange="loadKeystone()"></select>
+        <button class="btn primary" onclick="saveKeystone()">Save Changes</button>
+        <button class="btn" onclick="addNewKeystonePeriod()" id="btnAddKeystonePeriod" style="border-color:var(--green);color:var(--green)">+ Add Month</button>
+        <span id="keystoneTotal" style="font-size:13px;color:var(--green);font-weight:700;margin-left:12px"></span>
+      </div>
+      <div id="keystoneTable"><p style="color:var(--text-dim)">Loading...</p></div>
+    </div>
+
+  </div>
+
+  <div id="accessDenied" class="access-denied" style="display:none;visibility:hidden">
+    <h2>Access Denied</h2>
+    <p>Admin privileges required. <a href="/" style="color:var(--accent)">Back to dashboard</a></p>
+  </div>
+
+
+  <script>
     var currentUser = window.getUser();
 
     function init() {
@@ -655,6 +749,614 @@ undefinedundefined
 
   </script>
 <script src="/chat-widget.js"></script>
+</div>
+<div id="tab-odoo-mgt" class="admin-tab-pane">
+  <div class="container">
+  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin:0;">Companies (from Odoo)</h2>
+      <button onclick="loadOdooCompanies()" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:0.83rem;">&#x21bb; Refresh</button>
+    </div>
+    <div id="companiesStatus" style="color:#8b9ab5;font-size:0.82rem;margin-bottom:10px;"></div>
+    <div id="companiesList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+  </div>
+  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin:0;">Entity Groups</h2>
+      <div style="display:flex;gap:8px;">
+        <button onclick="addEntityGroup()" style="background:#0ca678;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">+ Add Group</button>
+        <button onclick="saveEntityGroups()" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">&#x2713; Save</button>
+        <button onclick="resetEntityGroups()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">Reset Default</button>
+      </div>
+    </div>
+    <div id="entityGroupsStatus" style="color:#8b9ab5;font-size:0.82rem;margin-bottom:12px;"></div>
+    <div id="entityGroupsList"></div>
+  </div>
+
+  </div>
+</div>
+
+<script>
+
+
+    var currentUser = window.getUser();
+
+    function init() {
+      if (!currentUser) {
+        window.location.href = '/login.html';
+        return;
+      }
+      // Show admin content for any logged-in user (server-side security via auth.js)
+      document.getElementById('adminContent').style.display = 'block';
+      loadUsers();
+      loadFoundationPeriods();
+      loadFoundationICPeriods();
+      loadKeystonePeriods();
+    }
+
+    async function loadUsers() {
+      var users = await (await fetch('/api/tasks/users')).json();
+      var el = document.getElementById('userTable');
+      if (!users.length) {
+        el.innerHTML = '<p style="color:var(--text-dim)">No users found</p>';
+        return;
+      }
+      el.innerHTML =
+        '<table><thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Role</th><th>Actions</th></tr></thead><tbody>' +
+        users.map(function(u) {
+          return '<tr>' +
+            '<td style="color:var(--text-dim)">' + u.id + '</td>' +
+            '<td>' + esc(u.username) + '</td>' +
+            '<td>' + esc(u.display_name) + '</td>' +
+            '<td><span class="badge ' + u.role + '">' + u.role + '</span></td>' +
+            '<td style="display:flex;gap:4px">' +
+              '<button class="btn" style="padding:4px 10px;font-size:11px" onclick="promptResetPassword(' + u.id + ', \'' + esc(u.display_name) + '\')">Reset Password</button>' +
+              (u.id !== currentUser.id ? '<button class="btn danger" style="padding:4px 10px;font-size:11px" onclick="deleteUser(' + u.id + ', \'' + esc(u.username) + '\')">Delete</button>' : '') +
+            '</td></tr>';
+        }).join('') +
+        '</tbody></table>';
+    }
+
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function showMsg(elId, text, type) {
+      var el = document.getElementById(elId);
+      el.className = 'msg ' + type;
+      el.textContent = text;
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 4000);
+    }
+
+    async function createUser() {
+      var username = document.getElementById('newUsername').value.trim();
+      var displayName = document.getElementById('newDisplayName').value.trim();
+      var password = document.getElementById('newPassword').value;
+      var role = document.getElementById('newRole').value;
+
+      if (!username || !displayName || !password) {
+        showMsg('createMsg', 'All fields are required', 'error');
+        return;
+      }
+
+      try {
+        var res = await fetch('/api/tasks/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, password: password, display_name: displayName, role: role })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          showMsg('createMsg', data.error || 'Failed to create user', 'error');
+          return;
+        }
+        showMsg('createMsg', 'User "' + data.display_name + '" created successfully', 'success');
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newDisplayName').value = '';
+        document.getElementById('newPassword').value = '';
+        loadUsers();
+      } catch (e) {
+        showMsg('createMsg', 'Network error', 'error');
+      }
+    }
+
+    function promptResetPassword(userId, displayName) {
+      var newPw = prompt('Enter new password for ' + displayName + ':');
+      if (!newPw) return;
+      if (newPw.length < 4) {
+        showMsg('resetMsg', 'Password must be at least 4 characters', 'error');
+        return;
+      }
+      resetPassword(userId, newPw, displayName);
+    }
+
+    async function resetPassword(userId, newPassword, displayName) {
+      try {
+        var res = await fetch('/api/tasks/users/' + userId + '/password', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_password: newPassword, requester_id: currentUser.id })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          showMsg('resetMsg', data.error || 'Failed to reset password', 'error');
+          return;
+        }
+        showMsg('resetMsg', 'Password reset for ' + displayName, 'success');
+      } catch (e) {
+        showMsg('resetMsg', 'Network error', 'error');
+      }
+    }
+
+    async function deleteUser(userId, username) {
+      if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+      try {
+        var res = await fetch('/api/tasks/users/' + userId + '?requester_id=' + currentUser.id, { method: 'DELETE' });
+        var data = await res.json().catch(function() { return {}; });
+        if (!res.ok) {
+          showMsg('resetMsg', data.error || ('Failed to delete user (HTTP ' + res.status + ')'), 'error');
+          return;
+        }
+        showMsg('resetMsg', 'User "' + username + '" deleted', 'success');
+        loadUsers();
+      } catch (e) {
+        showMsg('resetMsg', 'Network error', 'error');
+      }
+    }
+
+    init();
+
+    // Ã¢ÂÂÃ¢ÂÂ Foundation Manual Balances Ã¢ÂÂÃ¢ÂÂ
+    var foundationRows = [];
+
+    async function loadFoundationPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances')).json();
+        var existingPeriods = (data.periods || []);
+        // Generate all months from earliest existing to current month
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        // Find earliest: existingPeriods is desc, so last element is earliest
+        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
+        var parts = earliest.split('-');
+        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = cy * 12 + cm;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+        var sel = document.getElementById('foundationPeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        // Default to current month
+        sel.value = currentPeriod;
+        loadFoundation();
+      } catch(e) {
+        console.error(e);
+        showMsg('foundationMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadFoundation() {
+      var period = document.getElementById('foundationPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + period)).json();
+        foundationRows = data.rows;
+        if (!foundationRows.length) {
+          document.getElementById('foundationTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
+            'No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevMonth(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('foundationTotal').textContent = '';
+        } else {
+          renderFoundationTable(foundationRows);
+        }
+      } catch(e) {
+        showMsg('foundationMsg', 'Failed to load data', 'error');
+      }
+    }
+
+    function renderFoundationTable(rows) {
+      if (!rows.length) {
+        document.getElementById('foundationTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+        return;
+      }
+      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
+      var totalUSD = 0;
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>CHF Amount</th><th>FX Rate (CHF/USD)</th><th>USD Amount</th></tr></thead><tbody>';
+      cats.forEach(function(cat) {
+        html += '<tr class="cat-header"><td colspan="5">' + cat + '</td></tr>';
+        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
+          totalUSD += r.amount_local * r.exchange_rate;
+          html += '<tr data-id="' + r.id + '">' +
+            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
+            '<td>' + r.account_name + '</td>' +
+            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcRow(this,' + r.id + ')" style="width:140px"></td>' +
+            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcRow(this,' + r.id + ')" style="width:90px"></td>' +
+            '<td id="usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '</tr>';
+        });
+      });
+      html += '<tr class="total-row"><td colspan="4">Total USD</td><td id="foundationTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('foundationTable').innerHTML = html;
+      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(totalUSD);
+    }
+
+    function fmt(n) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
+
+    function recalcRow(input, id) {
+      var row = foundationRows.find(function(r) { return r.id === id; });
+      if (!row) return;
+      var tr = input.closest('tr');
+      var chf = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
+      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
+      var usd = chf * fx;
+      document.getElementById('usd_' + id).textContent = fmt(usd);
+      // update total
+      var total = 0;
+      foundationRows.forEach(function(r) {
+        var t = document.querySelector('tr[data-id="' + r.id + '"]');
+        if (!t) return;
+        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
+        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
+        total += c * f;
+      });
+      var tc = document.getElementById('foundationTotalCell');
+      if (tc) tc.textContent = fmt(total);
+      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(total);
+    }
+
+    async function saveFoundation() {
+      var saved = 0, failed = 0;
+      for (var r of foundationRows) {
+        var tr = document.querySelector('tr[data-id="' + r.id + '"]');
+        if (!tr) continue;
+        var chf = parseFloat(tr.querySelectorAll('input')[0].value);
+        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        try {
+          var res = await fetch('/api/dashboard/foundation-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount_local: chf, exchange_rate: fx })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) {
+        showMsg('foundationMsg', saved + ' rows saved successfully', 'success');
+      } else {
+        showMsg('foundationMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      }
+      loadFoundation();
+    }
+
+    function addNewPeriod() {
+      var sel = document.getElementById('foundationPeriod');
+      var now = new Date();
+      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      sel.value = currentPeriod;
+      loadFoundation();
+    }
+
+    async function copyFromPrevMonth(period) {
+      // Calculate previous month
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + prevPeriod)).json();
+        if (!data.rows.length) {
+          showMsg('foundationMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
+          return;
+        }
+        // Post new rows for current period based on prev month
+        var newRows = data.rows.map(function(r) {
+          return {
+            account_code: r.account_code,
+            account_name: r.account_name,
+            category: r.category,
+            amount_local: r.amount_local,
+            currency: r.currency || 'CHF',
+            exchange_rate: r.exchange_rate
+          };
+        });
+        var res = await fetch('/api/dashboard/foundation-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('foundationMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
+          await loadFoundationPeriods();
+          document.getElementById('foundationPeriod').value = period;
+          loadFoundation();
+        } else {
+          showMsg('foundationMsg', 'Failed to copy data', 'error');
+        }
+      } catch(e) {
+        showMsg('foundationMsg', 'Error: ' + e.message, 'error');
+      }
+    }
+
+    // Ã¢ÂÂÃ¢ÂÂ Foundation IC Payable Ã¢ÂÂÃ¢ÂÂ
+    var FOUNDATION_IC_ENTITY = 'Xterio Foundation';
+    var FOUNDATION_IC_CODE = 'FOUNDATION_IC';
+    var foundationICRow = null;
+
+    async function loadFoundationICPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY))).json();
+        var existingPeriods = (data.periods || []);
+
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        var startYear = 2025, startMonth = 5;
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = startYear * 12 + startMonth;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+
+        var sel = document.getElementById('foundationICPeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        sel.value = currentPeriod;
+        loadFoundationIC();
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadFoundationIC() {
+      var period = document.getElementById('foundationICPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY) + '&period=' + period)).json();
+        foundationICRow = (data.rows || []).find(function(r) { return r.account_code === FOUNDATION_IC_CODE; }) || null;
+        document.getElementById('foundationICAmount').value = foundationICRow ? foundationICRow.amount_usd : 0;
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to load IC data', 'error');
+      }
+    }
+
+    async function saveFoundationIC() {
+      var period = document.getElementById('foundationICPeriod').value;
+      var amount = parseFloat(document.getElementById('foundationICAmount').value) || 0;
+      try {
+        if (foundationICRow && foundationICRow.id) {
+          var res = await fetch('/api/dashboard/manual-balances/' + foundationICRow.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: FOUNDATION_IC_ENTITY, amount_local: amount, exchange_rate: 1 })
+          });
+          if (!res.ok) throw new Error('save failed');
+        } else {
+          var res = await fetch('/api/dashboard/manual-balances', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entity: FOUNDATION_IC_ENTITY,
+              period: period,
+              rows: [{ account_code: FOUNDATION_IC_CODE, account_name: 'IC Payable (USD)', category: 'IC', amount_local: amount, currency: 'USD', exchange_rate: 1 }]
+            })
+          });
+          if (!res.ok) throw new Error('save failed');
+        }
+        showMsg('foundationICMsg', 'IC Payable saved for ' + period, 'success');
+        loadFoundationIC();
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to save: ' + e.message, 'error');
+      }
+    }
+
+    // Ã¢ÂÂÃ¢ÂÂ Keystone Foundation Manual Balances Ã¢ÂÂÃ¢ÂÂ
+    var keystoneRows = [];
+    var KEYSTONE_ENTITY = 'Keystone Foundation';
+
+    async function loadKeystonePeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY))).json();
+        var existingPeriods = (data.periods || []);
+
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        var startYear = 2025, startMonth = 5;
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = startYear * 12 + startMonth;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+
+        var sel = document.getElementById('keystonePeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        sel.value = currentPeriod;
+        loadKeystone();
+      } catch(e) {
+        console.error(e);
+        showMsg('keystoneMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadKeystone() {
+      var period = document.getElementById('keystonePeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + period)).json();
+        keystoneRows = data.rows || [];
+        if (!keystoneRows.length) {
+          document.getElementById('keystoneTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
+            'No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevKeystone(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('keystoneTotal').textContent = '';
+        } else {
+          renderKeystoneTable(keystoneRows);
+        }
+      } catch(e) {
+        showMsg('keystoneMsg', 'Failed to load data', 'error');
+      }
+    }
+
+    function renderKeystoneTable(rows) {
+      if (!rows.length) {
+        document.getElementById('keystoneTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+        return;
+      }
+      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
+      var totalUSD = 0;
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>Amount (Local)</th><th>Currency</th><th>FX Rate</th><th>USD Amount</th></tr></thead><tbody>';
+      cats.forEach(function(cat) {
+        html += '<tr class="cat-header"><td colspan="6">' + cat + '</td></tr>';
+        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
+          totalUSD += r.amount_local * r.exchange_rate;
+          html += '<tr data-id="' + r.id + '">' +
+            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
+            '<td>' + r.account_name + '</td>' +
+            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:140px"></td>' +
+            '<td>' + (r.currency || 'USD') + '</td>' +
+            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:90px"></td>' +
+            '<td id="keystone_usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '</tr>';
+        });
+      });
+      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="keystoneTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('keystoneTable').innerHTML = html;
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(totalUSD);
+    }
+
+    function recalcKeystoneRow(input, id) {
+      var row = keystoneRows.find(function(r) { return r.id === id; });
+      if (!row) return;
+      var tr = input.closest('tr');
+      var amt = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
+      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
+      var usd = amt * fx;
+      document.getElementById('keystone_usd_' + id).textContent = fmt(usd);
+      // update total
+      var total = 0;
+      keystoneRows.forEach(function(r) {
+        var t = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
+        if (!t) return;
+        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
+        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
+        total += c * f;
+      });
+      var tc = document.getElementById('keystoneTotalCell');
+      if (tc) tc.textContent = fmt(total);
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(total);
+    }
+
+    async function saveKeystone() {
+      if (!keystoneRows || !keystoneRows.length) {
+        showMsg('keystoneMsg', 'No rows to save. Copy from previous month or add a row first.', 'error');
+        return;
+      }
+      var saved = 0, failed = 0;
+      for (var r of keystoneRows) {
+        var tr = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
+        if (!tr) continue;
+        var amt = parseFloat(tr.querySelectorAll('input')[0].value);
+        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        if (isNaN(amt) || isNaN(fx)) { failed++; continue; }
+        try {
+          var res = await fetch('/api/dashboard/manual-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: KEYSTONE_ENTITY, amount_local: amt, exchange_rate: fx })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) {
+        showMsg('keystoneMsg', saved + ' rows saved successfully', 'success');
+      } else {
+        showMsg('keystoneMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      }
+      loadKeystone();
+    }
+
+    function addNewKeystonePeriod() {
+      var sel = document.getElementById('keystonePeriod');
+      var now = new Date();
+      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      sel.value = currentPeriod;
+      loadKeystone();
+    }
+
+    async function copyFromPrevKeystone(period) {
+      // Calculate previous month
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + prevPeriod)).json();
+        if (!data.rows.length) {
+          showMsg('keystoneMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
+          return;
+        }
+        // Post new rows for current period based on prev month
+        var newRows = data.rows.map(function(r) {
+          return {
+            account_code: r.account_code,
+            account_name: r.account_name,
+            category: r.category,
+            amount_local: r.amount_local,
+            currency: r.currency || 'USD',
+            exchange_rate: r.exchange_rate
+          };
+        });
+        var res = await fetch('/api/dashboard/manual-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity: KEYSTONE_ENTITY, period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('keystoneMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
+          await loadKeystonePeriods();
+          document.getElementById('keystonePeriod').value = period;
+          loadKeystone();
+        } else {
+          showMsg('keystoneMsg', 'Failed to copy data', 'error');
+        }
+      } catch(e) {
+        showMsg('keystoneMsg', 'Error: ' + e.message, 'error');
+      }
+    }
+
+  </script>
+<script src="/chat-widget.js"></script>
 
     <!-- Odoo Sync -->
   <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
@@ -889,7 +1591,7 @@ undefinedundefined
   });
   // --- end Odoo Sync functions ---
 
-  // ── Admin Tab Switching ──────────────────────────────────────────────
+  // ââ Admin Tab Switching ââââââââââââââââââââââââââââââââââââââââââââââ
   function switchAdminTab(tabId) {
     document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
@@ -904,7 +1606,7 @@ undefinedundefined
     }
   }
 
-  // ── Companies from Odoo ──────────────────────────────────────────────
+  // ââ Companies from Odoo ââââââââââââââââââââââââââââââââââââââââââââââ
   window._odooCompanies = [];
   window._companiesLoaded = false;
 
@@ -931,7 +1633,7 @@ undefinedundefined
     }
   }
 
-  // ── Entity Groups ────────────────────────────────────────────────────
+  // ââ Entity Groups ââââââââââââââââââââââââââââââââââââââââââââââââââââ
   window._entityGroups = [];
   window._entityGroupsLoaded = false;
 
@@ -1051,7 +1753,9 @@ undefinedundefined
     }
   }
 
+
 </script>
+
 
 </body>
 </html>
