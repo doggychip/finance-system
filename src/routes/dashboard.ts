@@ -8,7 +8,7 @@ export function dashboardRoutes(db: Database.Database): Router {
   // Overview stats
   router.get('/stats', (_req, res) => {
     const accountCount = (db.prepare('SELECT COUNT(*) as count FROM accounts WHERE is_active = 1').get() as any).count;
-    const journalCount = (db.prepare('SELECT COUNT(*) as count FROM journal_entries').get() as any).count;
+    const journalCount = (db.prepare('SELECThh COUNT(*) as count FROM journal_entries').get() as any).count;
     const postedCount = (db.prepare("SELECT COUNT(*) as count FROM journal_entries WHERE status = 'posted'").get() as any).count;
     const invoiceCount = (db.prepare('SELECT COUNT(*) as count FROM invoices').get() as any).count;
     const paymentCount = (db.prepare('SELECT COUNT(*) as count FROM payments').get() as any).count;
@@ -1470,14 +1470,14 @@ router.get('/executive-summary', (req, res) => {
     let cash_trend: any[] = [];
     if (ALL_IDS.length > 0) {
       const tPh = ALL_IDS.map(() => '?').join(',');
-      const tRows = db.prepare(`SELECT strftime('%Y-%m',je.date) as month, SUM(CASE WHEN a.currency NOT IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as fd, SUM(CASE WHEN a.currency IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as cd FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.company_id IN (${tPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY month ORDER BY month`).all(...ALL_IDS) as any[];
+      const tRows = db.prepare(`SELECT strftime('%Y-%m',je.date) as month, SUM(CASE WHEN li.currency NOT IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as fd, SUM(CASE WHEN li.currency IN ('USDT','ETH','BTC','USDC') THEN COALESCE(li.debit,0)-COALESCE(li.credit,0) ELSE 0 END) as cd FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.company_id IN (${tPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY month ORDER BY month`).all(...ALL_IDS) as any[];
       let cf = 0, cc = 0;
       cash_trend = tRows.map(r => { cf += r.fd; cc += r.cd; return { month: r.month, total_fiat: cf, total_crypto: cc }; }).slice(-24);
     }
     let entity_cash: any[] = [{ company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
     if (ALL_IDS.length > 0) {
       const ePh = ALL_IDS.map(() => '?').join(',');
-      const eRows = db.prepare(`SELECT je.company_id, je.company_name, COALESCE(SUM(CASE WHEN a.currency NOT IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN a.currency IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as cr FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ePh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id, je.company_name ORDER BY je.company_name`).all(asOfDate, ...ALL_IDS) as any[];
+      const eRows = db.prepare(`SELECT je.company_id, je.company_name, COALESCE(SUM(CASE WHEN li.currency NOT IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN li.currency IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as cr FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ePh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id, je.company_name ORDER BY je.company_name`).all(asOfDate, ...ALL_IDS) as any[];
       entity_cash = [...eRows.map(r => ({ company_id: r.company_id, company_name: r.company_name, cash_fiat: r.fi, cash_crypto: r.cr })), { company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
     }
     let alerts: any[] = [], ic_imbalances: any[] = [];
@@ -1671,11 +1671,11 @@ router.get('/card-detail-csv', (req, res) => {
   }
   else if (card === 'cash_fiat') {
     companyIds = allIds; label = 'Cash-Fiat';
-    typeFilter = `AND a.odoo_type = 'asset_cash' AND a.currency != 'USDT' AND a.currency != 'ETH' AND a.currency != 'BTC'`;
+    typeFilter = `AND a.odoo_type = 'asset_cash' AND li.currency != 'USDT' AND li.currency != 'ETH' AND li.currency != 'BTC'`;
   }
   else if (card === 'cash_crypto') {
     companyIds = allIds; label = 'Cash-Crypto';
-    typeFilter = `AND a.odoo_type = 'asset_cash' AND (a.currency = 'USDT' OR a.currency = 'ETH' OR a.currency = 'BTC')`;
+    typeFilter = `AND a.odoo_type = 'asset_cash' AND (li.currency = 'USDT' OR li.currency = 'ETH' OR li.currency = 'BTC')`;
   }
   else return res.status(400).json({ error: 'Unknown card: ' + card });
 
