@@ -20,6 +20,7 @@ import { migrateHistoricalCash } from './db/migrate-historical-cash';
 import { seedHistoricalCash } from './db/seed-historical-cash';
 import { historicalCashRoutes } from './routes/historical-cash';
 import { exportRoutes } from './routes/export';
+import { configRoutes } from './routes/config';
 import { mountMcp } from './mcp/mount';
 import { createOAuthProvider } from './mcp/oauth';
 
@@ -45,7 +46,7 @@ app.use(
     resourceName: 'Xterio Finance MCP',
     // The SDK's default DCR limit is 20/hour, and since we don't set Express
     // "trust proxy", express-rate-limit keys every request on the single Zeabur
-    // ingress IP — making it effectively GLOBAL. That let claude.ai's connect
+    // ingress IP â making it effectively GLOBAL. That let claude.ai's connect
     // attempts hit 429 ("Couldn't register"). Raise it; registration is harmless
     // here (every client is still gated by the shared-password /authorize login).
     clientRegistrationOptions: {
@@ -89,7 +90,7 @@ if (authUser && authPass) {
 
 app.use(express.json());
 
-// Serve dashboard — check dist/public (production) and public/ (dev)
+// Serve dashboard â check dist/public (production) and public/ (dev)
 // Disable caching for HTML files
 const publicDir = path.join(__dirname, 'public');
 const devPublicDir = path.join(process.cwd(), 'public');
@@ -118,6 +119,7 @@ app.use('/api/tasks', taskRoutes(db));
 app.use('/api/alerts-tasks', alertsTasksRoutes(db));
 app.use('/api/historical-cash', historicalCashRoutes(db));
 app.use('/api/export', exportRoutes(db));
+app.use('/api/config', configRoutes());
 
 mountMcp(app, {
   dbPath,
