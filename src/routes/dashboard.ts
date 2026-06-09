@@ -1441,7 +1441,10 @@ router.get('/executive-summary', (req, res) => {
     function getFoundation(period: string) {
       const q = `SELECT SUM(amount_usd) as na, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') THEN amount_usd ELSE 0 END) as ca FROM manual_balances WHERE entity='Xterio Foundation' AND period=?`;
       let r = db.prepare(q).get(period) as any;
-      if (!r?.na) { const lp = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period; if (lp) r = db.prepare(q).get(lp) as any; }
+      if (!r?.na) {
+        const lp = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' AND period <= ? GROUP BY period HAVING SUM(amount_usd) != 0 ORDER BY period DESC LIMIT 1`).get(period) as any)?.period;
+        if (lp) r = db.prepare(q).get(lp) as any;
+      }
       return { net_assets: r?.na || 0, cash_usd: r?.ca || 0 };
     }
     function getNetAssets(ids: number[], asOf: string, excludeFixedAssets = false): number {
