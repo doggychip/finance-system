@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { syncBalances } from '../odoo/sync-balances';
-import { syncHistoricalBalances } from '../odoo/sync-historical-balances';
 import { createOdooClient } from '../odoo/client';
 import {
   runFullSync,
@@ -118,12 +117,12 @@ export function syncRoutes(db: Database.Database): Router {
     }
   });
 
-  // Sync account balances using Odoo's current_balance (authoritative)
+  // Sync account balances using Odoo data as of today (journal line aggregation)
   router.post('/balances', async (_req, res) => {
     try {
       const odoo = createOdooClient();
       await odoo.authenticate();
-      const result = await syncBalances(odoo, db);
+      const result = await syncBalances(odoo, db, new Date().toISOString().slice(0, 10));
       res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -131,7 +130,7 @@ export function syncRoutes(db: Database.Database): Router {
     }
   });
 
-  // Sync historical balances for a specific date using Odoo's read_group
+  // Sync balances for a specific historical date (Odoo data date)
   router.post('/balances/historical', async (req, res) => {
     try {
       const asOfDate = req.body.as_of_date;
@@ -147,7 +146,7 @@ export function syncRoutes(db: Database.Database): Router {
       }
       const odoo = createOdooClient();
       await odoo.authenticate();
-      const result = await syncHistoricalBalances(odoo, db, asOfDate);
+      const result = await syncBalances(odoo, db, asOfDate);
       res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
