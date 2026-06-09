@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historical Cash — Finance Dashboard</title>
+  <title>Historical Cash â Finance Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -73,6 +73,24 @@
       .kpi-row { grid-template-columns: repeat(2, 1fr); }
       .chart-row, .pl-layout { grid-template-columns: 1fr; }
     }
+  
+    .kpi { position: relative; }
+    /* Card actions buttons */
+    .card-actions { position: absolute; top: 12px; right: 12px; display: flex; gap: 5px; z-index: 10; }
+    .card-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-dim); padding: 2px 5px; border-radius: 5px; line-height: 1; transition: color 0.15s, background 0.15s; }
+    .card-btn:hover { background: var(--surface2); }
+    .card-btn.info-btn:hover { color: var(--accent); }
+    .card-btn.dl-btn:hover { color: var(--cyan); }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:2000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px 30px; max-width:580px; width:92%; position:relative; max-height:82vh; overflow-y:auto; }
+    .modal-box h3 { font-size:15px; font-weight:700; margin-bottom:16px; }
+    .modal-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer; line-height:1; }
+    .modal-close:hover { color:var(--text); }
+    .info-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; gap:14px; }
+    .info-row:last-child { border-bottom:none; }
+    .info-row .lbl { color:var(--text-dim); white-space:nowrap; flex-shrink:0; }
+    .info-row .val { color:var(--text); text-align:right; }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -93,11 +111,11 @@
   <div class="container">
     <!-- KPI Row -->
     <div class="kpi-row" id="kpiRow">
-      <div class="kpi"><div class="label">Current Total</div><div class="value" id="kpiCurrent">—</div></div>
-      <div class="kpi"><div class="label">Fiat Deposits</div><div class="value" id="kpiFiat">—</div></div>
-      <div class="kpi"><div class="label">Fixed Crypto</div><div class="value" id="kpiCrypto">—</div></div>
-      <div class="kpi"><div class="label">WoW Change</div><div class="value" id="kpiWow">—</div></div>
-      <div class="kpi"><div class="label">From Peak</div><div class="value" id="kpiPeak">—</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_current')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_current')">⊕</button></div><div class="label">Current Total</div><div class="value" id="kpiCurrent">â</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_fiat')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_fiat')">⊕</button></div><div class="label">Fiat Deposits</div><div class="value" id="kpiFiat">â</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_crypto')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_crypto')">⊕</button></div><div class="label">Fixed Crypto</div><div class="value" id="kpiCrypto">â</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_wow')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_wow')">⊕</button></div><div class="label">WoW Change</div><div class="value" id="kpiWow">â</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_peak')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_peak')">⊕</button></div><div class="label">From Peak</div><div class="value" id="kpiPeak">â</div></div>
     </div>
 
     <!-- Tabs -->
@@ -111,11 +129,11 @@
     <!-- Cash Timeline Tab -->
     <div class="tab-content active" id="tab-timeline">
       <div class="chart-card">
-        <h3>Weekly Cash — Grand Total</h3>
+        <h3>Weekly Cash â Grand Total</h3>
         <div class="chart-wrap"><canvas id="chartTotal"></canvas></div>
       </div>
       <div class="chart-card">
-        <h3>Weekly Cash — By Project</h3>
+        <h3>Weekly Cash â By Project</h3>
         <div class="chart-wrap"><canvas id="chartProjects"></canvas></div>
       </div>
     </div>
@@ -149,12 +167,21 @@
     </div>
   </div>
 
+  
+  <!-- Card Info Modal -->
+  <div class="modal-overlay" id="cardInfoModal" onclick="if(event.target===this)closeCardModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeCardModal()">&#x2715;</button>
+      <h3 id="cardModalTitle"></h3>
+      <div id="cardModalBody"></div>
+    </div>
+  </div>
   <script src="/chat-widget.js"></script>
   <script>
     let DATA = null;
 
     function fmt(n) {
-      if (n == null) return '—';
+      if (n == null) return 'â';
       const abs = Math.abs(n);
       if (abs >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
       if (abs >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
@@ -162,7 +189,7 @@
     }
 
     function fmtFull(n) {
-      if (n == null) return '—';
+      if (n == null) return 'â';
       return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
 
@@ -401,6 +428,30 @@
     }
 
     loadData();
+  
+    var CARD_INFO = {
+      hist_current: { title: 'Current Total — Construction', formula: '<strong>Current Total</strong> = Fiat Cash + Crypto Assets (all entities)', rows: [['Scope','All entities: Xterio + Holdings + OW + Foundation'],['Data source','Weekly snapshot data'],['Update frequency','Weekly'],['Note','Point-in-time balance as of selected date']] },
+      hist_fiat: { title: 'Fiat Deposits — Construction', formula: '<strong>Fiat Deposits</strong> = Bank accounts + Fixed deposits (USD equivalent)', rows: [['Scope','All fiat bank accounts across entities'],['Currency','USD equivalent at spot rate'],['Excludes','Crypto, on-chain assets']] },
+      hist_crypto: { title: 'Fixed Crypto — Construction', formula: '<strong>Fixed Crypto</strong> = On-chain crypto holdings (USDC, USDT, ETH, BNB, etc.)', rows: [['Scope','All on-chain crypto holdings'],['Valuation','Market price at snapshot date'],['Excludes','DeFi positions, unclaimed rewards']] },
+      hist_wow: { title: 'WoW Change — Construction', formula: '<strong>WoW Change</strong> = Current Total vs Previous Week Total', rows: [['Calculation','Current week minus prior week'],['Includes','All cash and crypto movement']] },
+      hist_peak: { title: 'From Peak — Construction', formula: '<strong>From Peak</strong> = Current Total vs Historical Peak Total', rows: [['Calculation','Current vs all-time high in dataset'],['Note','Indicates drawdown from peak']] }
+    };
+    // Card info modal functions
+    function showCardInfo(card) {
+      var info = CARD_INFO[card]; if (!info) return;
+      document.getElementById('cardModalTitle').textContent = info.title;
+      var body = '<div class="info-formula">' + info.formula + '</div>';
+      body += info.rows.map(function(r){return '<div class="info-row"><span class="lbl">'+r[0]+'</span><span class="val">'+r[1]+'</span></div>';}).join('');
+      document.getElementById('cardModalBody').innerHTML = body;
+      document.getElementById('cardInfoModal').classList.add('open');
+    }
+    function closeCardModal() { document.getElementById('cardInfoModal').classList.remove('open'); }
+    function downloadCardDetail(card) {
+      var asOf = (document.getElementById('asOfDate') || {}).value || (new Date(new Date().getFullYear(), new Date().getMonth(), 0)).toISOString().split('T')[0];
+      var a = document.createElement('a');
+      a.href = '/api/dashboard/card-detail-csv?card=' + encodeURIComponent(card) + '&as_of_date=' + encodeURIComponent(asOf);
+      a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
   </script>
 </body>
 </html>
