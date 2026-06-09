@@ -1608,61 +1608,40 @@ router.get('/ow-accounts', (req, res) => {
 // ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ /ow-closing ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ
 router.get('/ow-closing', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
-
-  // OW group company IDs
   const owCompanyIds = ENTITY_GROUPS
     .filter((g: any) => !g.is_subtotal && !g.is_manual &&
       ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name))
     .flatMap((g: any) => g.company_ids as number[]);
-
-  if (!owCompanyIds.length) return res.json({ as_of_date: asOfDate, months: [] });
-
+  if (!owCompanyIds.length) return res.json({ as_of_date: asOfDate, months: [], snapshots: [], summary: { available_balance: 0, monthly_burn: 0, runway_months: null } });
   const ph = owCompanyIds.map(() => '?').join(',');
-
-  // Get end-of-month balances for the last 24 months
-  const monthsRows = db.prepare(`
-    SELECT DISTINCT strftime('%Y-%m', date) as month
-    FROM journal_entries
-    WHERE status = 'posted'
-      AND company_id IN (${ph})
-      AND date <= ?
-    ORDER BY month DESC
-    LIMIT 24
-  `).all(...owCompanyIds, asOfDate) as any[];
-
-  const months = monthsRows.map(r => r.month).reverse();
-
-  const result = months.map(month => {
-    const monthEnd = month + '-31'; // SQLite will clamp to last day
-    const lastDayRow = db.prepare(`SELECT MAX(date) as last_day FROM journal_entries WHERE status='posted' AND date LIKE ? AND company_id IN (${ph})`).get(month + '%', ...owCompanyIds) as any;
-    const lastDay = lastDayRow?.last_day || (month + '-01');
-
-    const balRow = db.prepare(`
-      SELECT
-        COALESCE(SUM(CASE WHEN a.odoo_type = 'asset_cash' THEN li.debit - li.credit ELSE 0 END), 0) as cash,
-        COALESCE(SUM(CASE WHEN a.odoo_type LIKE 'asset_%' AND a.odoo_type NOT IN ('asset_fixed','asset_non_current') THEN li.debit - li.credit ELSE 0 END), 0) as assets,
-        COALESCE(SUM(CASE WHEN a.odoo_type LIKE 'liability_%' THEN li.debit - li.credit ELSE 0 END), 0) as liabilities
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted'
-        AND je.date <= ?
-        AND je.company_id IN (${ph})
-      INNER JOIN accounts a ON a.id = li.account_id
-    `).get(lastDay, ...owCompanyIds) as any;
-
-    return {
-      month,
-      last_day: lastDay,
-      cash: balRow?.cash || 0,
-      assets: balRow?.assets || 0,
-      liabilities: balRow?.liabilities || 0,
-      net_assets: (balRow?.assets || 0) + (balRow?.liabilities || 0),
-    };
+  const monthsRows = db.prepare(`SELECT DISTINCT strftime('%Y-%m', date) as month FROM journal_entries WHERE status='posted' AND company_id IN (${ph}) AND date<=? ORDER BY month DESC LIMIT 24`).all(...owCompanyIds, asOfDate) as any[];
+  const months = monthsRows.map((r: any) => r.month).reverse();
+  const snapshots = months.map(month => {
+    const lastDayRow = db.prepare(`SELECT MAX(date) as ld FROM journal_entries WHERE status='posted' AND date LIKE ? AND company_id IN (${ph})`).get(month + '%', ...owCompanyIds) as any;
+    const lastDay = lastDayRow?.ld || (month + '-01');
+    const acctRows = db.prepare(`SELECT a.code, a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id GROUP BY a.id, a.code, a.odoo_type HAVING ABS(balance)>0.01`).all(lastDay, ...owCompanyIds) as any[];
+    let cash = 0, orFromXterio = 0, ar = 0, noteReceivable = 0, payables = 0, accrualExp = 0, thrackle = 0;
+    for (const r of acctRows) {
+      const code = r.code as string; const bal = r.balance as number;
+      if (r.odoo_type === 'asset_cash') { cash += bal; }
+      else if (code.startsWith('303')) { orFromXterio += bal; }
+      else if (code === '101000') { ar += bal; }
+      else if (code === '101010' || r.odoo_type === 'asset_current' || r.odoo_type === 'asset_prepayments') { noteReceivable += bal; }
+      else if (code === '300030' || code === '300000') { payables += bal; }
+      else if (code === '301000' || code === '302010') { accrualExp += bal; }
+      else if (code === '300040' || code === '300050') { thrackle += bal; }
+    }
+    const total = cash + orFromXterio + ar + noteReceivable + payables + accrualExp + thrackle;
+    return { date: lastDay, cash, or_from_xterio: orFromXterio, ar, note_receivable: noteReceivable, payables, accrual_exp: accrualExp, thrackle_loan: thrackle, total };
   });
-
-  res.json({ as_of_date: asOfDate, months: result });
+  const latestTotal = snapshots.length > 0 ? snapshots[snapshots.length - 1].total : 0;
+  const tma = (() => { const d = new Date(asOfDate + 'T00:00:00Z'); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); })();
+  const burnRow = db.prepare(`SELECT COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as te FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date>? AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type IN ('expense','expense_direct_cost')`).get(tma, asOfDate, ...owCompanyIds) as any;
+  const monthlyBurn = (burnRow?.te || 0) / 3;
+  const runwayMonths = monthlyBurn > 0 ? Math.round(latestTotal / monthlyBurn) : null;
+  const legacyMonths = snapshots.map(s => ({ month: s.date.substring(0,7), last_day: s.date, cash: s.cash, assets: s.cash + s.ar + s.note_receivable + s.or_from_xterio, liabilities: s.payables + s.accrual_exp + s.thrackle_loan, net_assets: s.total }));
+  res.json({ as_of_date: asOfDate, months: legacyMonths, snapshots, summary: { available_balance: latestTotal, monthly_burn: monthlyBurn, runway_months: runwayMonths }, snapshot_date: snapshots.length > 0 ? snapshots[snapshots.length-1].date : asOfDate });
 });
-// ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ /card-detail-csv ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ
 router.get('/card-detail-csv', (req, res) => {
   const card = (req.query.card as string) || '';
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
