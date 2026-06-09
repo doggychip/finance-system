@@ -66,7 +66,17 @@ export function exportRoutes(db: Database.Database): Router {
     `).all(...params) as any[];
 
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'No balance data found for this month/company selection' });
+      // Provide helpful info: what months have balance data for the requested companies?
+      const availRows = db.prepare(`
+        SELECT DISTINCT substr(snapshot_date,1,7) as month, company_name
+        FROM account_balances
+        WHERE company_id IN (${companiesParam ? companiesParam.split(',').map(() => '?').join(',') : '?'})
+        ORDER BY month DESC LIMIT 12
+      `).all(...(companiesParam ? companiesParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [])) as any[];
+      const availMonths = [...new Set((availRows as any[]).map((r: any) => r.month))].slice(0,6);
+      return res.status(404).json({
+        error: `No TB snapshot found for ${month}. Available months: ${availMonths.join(', ') || 'none'}`
+      });
     }
 
     const headers = ['Company ID', 'Company Name', 'Account Code', 'Account Name', 'Account Type', 'Currency', 'Balance', 'Snapshot Date'];
@@ -130,7 +140,23 @@ export function exportRoutes(db: Database.Database): Router {
     `).all(...params) as any[];
 
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'No journal data found for this month/company selection' });
+      // Provide helpful info: what months have journal data for the requested companies?
+      const companyIds = companiesParam ? companiesParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
+      const availRows = companyIds.length > 0
+        ? db.prepare(`
+            SELECT DISTINCT substr(je.date,1,7) as month, je.company_name
+            FROM journal_entries je
+            JOIN line_items li ON li.journal_entry_id = je.id
+            JOIN accounts a ON a.id = li.account_id
+            WHERE je.status = 'posted'
+              AND je.company_id IN (${companyIds.map(() => '?').join(',')})
+            ORDER BY month DESC LIMIT 12
+          `).all(...companyIds) as any[]
+        : [];
+      const availMonths = [...new Set(availRows.map((r: any) => r.month))].slice(0, 6);
+      return res.status(404).json({
+        error: `No journal entries found for ${month}. Latest available months: ${availMonths.join(', ') || 'none (journal not yet synced for these companies)'}`
+      });
     }
 
     const headers = ['Company ID', 'Company Name', 'Date', 'Reference', 'Entry Description', 'Status', 'Account Code', 'Account Name', 'Account Type', 'Debit', 'Credit', 'Amount (Currency)', 'Currency', 'Line Description'];
