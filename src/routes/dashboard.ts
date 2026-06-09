@@ -126,122 +126,108 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Cash & bank account balances Ã¢ÂÂ categorized
-  router.get('/cash-balances', (req, res) => {
-    const requestedDate = (req.query.as_of_date as string) || '';
+// ─── /cash-balances ──────────────────────────────────────────────────────────
+router.get('/cash-balances', (req, res) => {
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
-    // Find best snapshot
-    const snap = db.prepare(
-      requestedDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+  // JE-based: get all active cash accounts with their cumulative balances
+  const rows = db.prepare(`
+    SELECT
+      je.company_id,
+      je.company_name,
+      a.code,
+      a.name,
+      a.odoo_type,
+      COALESCE(MAX(li.currency), 'USD') as currency,
+      COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    FROM accounts a
+    INNER JOIN line_items li ON li.account_id = a.id
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.date <= ?
+    WHERE a.odoo_type = 'asset_cash' AND a.is_active = 1
+    GROUP BY je.company_id, a.code, a.name, a.odoo_type
+    HAVING ABS(balance) > 0.01
+    ORDER BY je.company_name, a.code
+  `).all(asOfDate) as any[];
 
-    if (!snap?.snapshot_date) {
-      return res.json({ cash: { accounts: [], total: 0 }, receivable: { accounts: [], total: 0 }, overdrawn: { accounts: [], total: 0 }, overworld: { accounts: [], total: 0 }, reach: { accounts: [], total: 0 }, grand_total: 0, non_ow_total: 0, snapshot_date: null });
+  // Also get Xterio Foundation cash from manual_balances
+  const foundationPeriod = (() => {
+    const d = new Date(asOfDate + 'T00:00:00Z');
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  })();
+  const foundationRows = db.prepare(`
+    SELECT
+      'Xterio Foundation' as company_name,
+      22 as company_id,
+      account_code as code,
+      account_name as name,
+      'asset_cash' as odoo_type,
+      'USD' as currency,
+      ROUND(SUM(amount_local * exchange_rate), 2) as balance
+    FROM manual_balances
+    WHERE entity = 'Xterio Foundation'
+      AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+      AND period = ?
+    GROUP BY account_code, account_name
+    HAVING ABS(balance) > 0.01
+  `).all(foundationPeriod) as any[];
+
+  // If no data for requested period, try latest available
+  let foundRows = foundationRows;
+  if (!foundRows.length) {
+    const latestPeriod = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+    if (latestPeriod) {
+      foundRows = db.prepare(`
+        SELECT
+          'Xterio Foundation' as company_name,
+          22 as company_id,
+          account_code as code,
+          account_name as name,
+          'asset_cash' as odoo_type,
+          'USD' as currency,
+          ROUND(SUM(amount_local * exchange_rate), 2) as balance
+        FROM manual_balances
+        WHERE entity = 'Xterio Foundation'
+          AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+          AND period = ?
+        GROUP BY account_code, account_name
+        HAVING ABS(balance) > 0.01
+      `).all(latestPeriod) as any[];
     }
+  }
 
-    const rows = db.prepare(`
-      SELECT company_id, company_name, account_code as code, account_name as name, account_type as odoo_type, COALESCE(currency, 'USD') as currency, balance
-      FROM account_balances
-      WHERE snapshot_date = ? AND (account_type = 'asset_cash' OR (account_type = 'asset_receivable' AND company_id IN (15, 16, 30, 31, 28)))
-      AND ABS(balance) > 0.01
-      ORDER BY balance DESC
-    `).all(snap.snapshot_date) as any[];
+  // Map company_id to entity group name
+  const OW_IDS = new Set([15, 16]);
+  const REACH_IDS = new Set([30]);
+  const KEYSTONE_IDS = new Set([28]);
+  const ROUGHHOUSE_IDS = new Set([31]);
 
-    // Map companies to entity groups
-    const companyToGroup: Record<number, string> = {};
-    for (const g of ENTITY_GROUPS) {
-      if (g.is_subtotal || g.is_manual) continue;
-      for (const cid of g.company_ids) companyToGroup[cid] = g.name;
-    }
+  function getGroup(companyId: number): string {
+    if (OW_IDS.has(companyId)) return 'OW';
+    if (REACH_IDS.has(companyId)) return 'Reach';
+    if (KEYSTONE_IDS.has(companyId)) return 'Keystone';
+    if (ROUGHHOUSE_IDS.has(companyId)) return 'Rough house';
+    return 'Xterio';
+  }
 
-    // Non-OW entity groups (for the hero total)
-    const nonOWGroups = new Set(['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK', 'CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
-    const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
+  const allRows = [...rows, ...foundRows];
+  const accounts = allRows.map(row => ({
+    company_id: row.company_id,
+    company_name: row.company_name,
+    account_code: row.code,
+    account_name: row.name,
+    account_type: row.odoo_type,
+    currency: row.currency,
+    balance: row.balance,
+    group: getGroup(row.company_id),
+  }));
 
-    const isNonOW = (r: any) => nonOWGroups.has(companyToGroup[r.company_id] || '');
-    const isOW = (r: any) => owGroups.has(companyToGroup[r.company_id] || '');
-
-    const nonOWRows = rows.filter(r => isNonOW(r) && r.odoo_type === 'asset_cash');
-    // OW grouping counts cash accounts only; OW receivables fall through to
-    // `remaining` so they land in the receivable bucket below. (Previously this
-    // lived as an off-git boot-time hotpatch on the compiled dist; ported to
-    // source 2026-06-02 so it's versioned and reviewable.)
-    const owRows = rows.filter(r => isOW(r) && r.odoo_type === 'asset_cash');
-    const remaining = rows.filter(r => !isOW(r) || r.odoo_type === 'asset_receivable');
-
-    const overdrawn = remaining.filter(r => r.balance < 0);
-    const receivable = remaining.filter(r => r.balance > 0 && r.odoo_type === 'asset_receivable');
-    const cash = remaining.filter(r => r.balance > 0 && r.odoo_type !== 'asset_receivable');
-
-    const sum = (arr: any[]) => arr.reduce((s: number, r: any) => s + r.balance, 0);
-
-    const overworld = owRows.filter(r => ['OW'].includes(companyToGroup[r.company_id] || ''));
-    const reach = owRows.filter(r => companyToGroup[r.company_id] === 'Reach');
-    const otherOW = owRows.filter(r => !['OW', 'Reach'].includes(companyToGroup[r.company_id] || ''));
-
-    // Non-OW Total "Cash" = fiat bank accounts only + Xterio Foundation
-    // This excludes crypto Ã¢ÂÂ matches the "Cash" sub-line in consolidated BS
-    const FIAT_CURRENCIES_FOR_CASH = ['USD', 'CNY', 'SGD'];
-    const nonOWBankCash = nonOWRows.filter((r: any) => FIAT_CURRENCIES_FOR_CASH.includes(r.currency)).reduce((s: number, r: any) => s + r.balance, 0);
-    // Foundation period: use user-requested date directly, not snapshot date
-    const _foundationDateCash = (requestedDate && requestedDate < '9000') ? requestedDate
-      : (snap.snapshot_date && snap.snapshot_date < '9000') ? snap.snapshot_date
-      : new Date().toISOString().slice(0, 10);
-    const foundationPeriodCash = _foundationDateCash.slice(0, 7);
-    const foundationRowsCash = foundationPeriodCash
-      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ? AND account_code != 'FOUNDATION_IC'`).all(foundationPeriodCash) as any[])
-      : [];
-    const foundationCashLegacy = foundationRowsCash.length
-      ? foundationRowsCash.reduce((s: number, r: any) => s + r.amount_local * r.exchange_rate, 0)
-      : 5942149;  // fallback
-    const nonOWCash = nonOWBankCash + foundationCashLegacy;
-
-    // Split cash into fiat bank vs crypto by currency field
-    const FIAT_CURRENCIES = ['USD', 'CNY', 'SGD'];
-    const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
-    const allPositiveCash = [...cash];
-    const isCrypto = (r: any) => CRYPTO_CURRENCIES.includes(r.currency);
-    const isFiat = (r: any) => !isCrypto(r);
-    const isFixedDeposit = (name: string) => /time deposit|mma/i.test(name);
-    const isHotWallet = (name: string) => /integrated|segregate|mt ledger/i.test(name);
-    const isColdWallet = (name: string) => /cold wallet|safe wallet/i.test(name);
-    const isDefi = (name: string) => /defi/i.test(name);
-
-    const cash_current = allPositiveCash.filter(r => isFiat(r) && !isFixedDeposit(r.name));
-    const cash_fixed = allPositiveCash.filter(r => isFiat(r) && isFixedDeposit(r.name));
-    const crypto_hot = allPositiveCash.filter(r => isCrypto(r) && isHotWallet(r.name));
-    const crypto_cold = allPositiveCash.filter(r => isCrypto(r) && isColdWallet(r.name));
-    const crypto_defi = allPositiveCash.filter(r => isCrypto(r) && isDefi(r.name));
-    const crypto_other = allPositiveCash.filter(r => isCrypto(r) && !isHotWallet(r.name) && !isColdWallet(r.name) && !isDefi(r.name));
-    const cash_current_all = [...cash_current];
-
-    const total_cash_bank = sum(cash_current_all) + sum(cash_fixed);
-    const total_crypto = sum(crypto_hot) + sum(crypto_cold) + sum(crypto_defi) + sum(crypto_other);
-
-    res.json({
-      // New split categories
-      cash_current: { accounts: cash_current_all, total: sum(cash_current_all) },
-      cash_fixed: { accounts: cash_fixed, total: sum(cash_fixed) },
-      crypto_hot: { accounts: crypto_hot, total: sum(crypto_hot) },
-      crypto_cold: { accounts: crypto_cold, total: sum(crypto_cold) },
-      crypto_defi: { accounts: crypto_defi, total: sum(crypto_defi) },
-      crypto_other: { accounts: crypto_other, total: sum(crypto_other) },
-      total_cash: total_cash_bank,
-      total_crypto: total_crypto,
-      // Backward-compatible fields
-      cash: { accounts: cash, total: sum(cash) },
-      receivable: { accounts: receivable, total: sum(receivable) },
-      overdrawn: { accounts: overdrawn, total: sum(overdrawn) },
-      overworld: { accounts: [...overworld, ...otherOW], total: sum(overworld) + sum(otherOW) },
-      reach: { accounts: reach, total: sum(reach) },
-      grand_total: sum(remaining),
-      non_ow_total: nonOWCash,
-      snapshot_date: snap.snapshot_date,
-    });
+  res.json({
+    as_of_date: asOfDate,
+    accounts,
   });
-
-  // Cash balances over time Ã¢ÂÂ supports daily, weekly, monthly periods
+});
   router.get('/cash-history', (req, res) => {
     const period = (req.query.period as string) || 'monthly';
     const limit = parseInt(req.query.limit as string) || 90;
@@ -515,133 +501,95 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Multi-company balance sheet summary (all companies side by side)
-  router.get('/balance-sheet-all', (req, res) => {
-    const requestedDate = (req.query.as_of_date as string) || '';
+// ─── /balance-sheet-all ──────────────────────────────────────────────────────
+router.get('/balance-sheet-all', (req, res) => {
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
-    // Find closest snapshot
-    const latestSnap = db.prepare(
-      requestedDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+  // Get all companies
+  const companies = db.prepare(`SELECT DISTINCT company_id, company_name FROM journal_entries WHERE status = 'posted' ORDER BY company_name`).all() as any[];
 
-    const snapDate = latestSnap?.snapshot_date;
+  if (companies.length === 0) return res.json({ as_of_date: asOfDate, companies: [] });
 
-    if (!snapDate) {
-      return res.json([]);
-    }
+  const results = companies.map(company => {
+    const companyId = company.company_id;
+    const currentYear = new Date().getFullYear().toString();
 
-    // Get all companies from snapshot
-    const companies = db.prepare(`
-      SELECT DISTINCT company_id, company_name
-      FROM account_balances WHERE snapshot_date = ?
-      ORDER BY company_name
-    `).all(snapDate) as any[];
+    // All-time balances per odoo_type
+    const allTimeRows = db.prepare(`
+      SELECT a.odoo_type,
+             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted'
+        AND je.company_id = ?
+        AND je.date <= ?
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type != ''
+      GROUP BY a.odoo_type
+    `).all(companyId, asOfDate) as any[];
 
-    const result: any[] = [];
-    const plTypes = ['income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation'];
+    const byTypeAll: Record<string, number> = {};
+    for (const row of allTimeRows) byTypeAll[row.odoo_type] = row.balance;
 
-    for (const company of companies) {
-      const rows = db.prepare(`
-        SELECT ab.account_type, SUM(ab.balance) as balance
-        FROM account_balances ab
-        INNER JOIN (
-          SELECT account_odoo_id, MAX(snapshot_date) as max_date
-          FROM account_balances
-          WHERE company_id = ? AND snapshot_date <= ?
-          GROUP BY account_odoo_id
-        ) latest ON ab.account_odoo_id = latest.account_odoo_id
-                 AND ab.snapshot_date = latest.max_date
-                 AND ab.company_id = ?
-        GROUP BY ab.account_type
-      `).all(company.company_id, snapDate, company.company_id) as any[];
+    // Current year P&L types
+    const cyRows = db.prepare(`
+      SELECT a.odoo_type,
+             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted'
+        AND je.company_id = ?
+        AND je.date > ?
+        AND je.date <= ?
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type IN ('income', 'income_other', 'expense', 'expense_depreciation', 'expense_direct_cost')
+      GROUP BY a.odoo_type
+    `).all(companyId, currentYear + '-01-01', asOfDate) as any[];
 
-      const byType: Record<string, number> = {};
-      for (const r of rows) byType[r.account_type] = r.balance;
+    const byTypeCY: Record<string, number> = {};
+    for (const row of cyRows) byTypeCY[row.odoo_type] = row.balance;
 
-      const bankCash = byType['asset_cash'] || 0;
-      const receivable = byType['asset_receivable'] || 0;
-      const currentAssets = byType['asset_current'] || 0;
-      const prepayments = byType['asset_prepayments'] || 0;
-      const fixedAssets = byType['asset_fixed'] || 0;
-      const nonCurrentAssets = byType['asset_non_current'] || 0;
+    // Compute standard BS fields
+    const cash = byTypeAll['asset_cash'] || 0;
+    const receivable = byTypeAll['asset_receivable'] || 0;
+    const currentAssets = byTypeAll['asset_current'] || 0;
+    const fixedAssets = byTypeAll['asset_fixed'] || 0;
+    const nonCurrentAssets = byTypeAll['asset_non_current'] || 0;
+    const payable = byTypeAll['liability_payable'] || 0;
+    const currentLiabilities = byTypeAll['liability_current'] || 0;
+    const nonCurrentLiabilities = byTypeAll['liability_non_current'] || 0;
+    const equity = byTypeAll['equity'] || 0;
 
-      const payable = byType['liability_payable'] || 0;
-      const currentLiab = (byType['liability_current'] || 0) + (byType['liability_credit_card'] || 0);
-      const nonCurrentLiab = byType['liability_non_current'] || 0;
+    // Net income = revenue - expenses (current year)
+    const revenue = (byTypeCY['income'] || 0) + (byTypeCY['income_other'] || 0);
+    const expenses = (byTypeCY['expense'] || 0) + (byTypeCY['expense_depreciation'] || 0) + (byTypeCY['expense_direct_cost'] || 0);
+    const netIncome = -(revenue - expenses); // debit = expense positive, credit = revenue negative in JE
 
-      const equity = byType['equity'] || 0;
-      const equityUnaffected = byType['equity_unaffected'] || 0;
-      const pl = plTypes.reduce((s, t) => s + (byType[t] || 0), 0);
+    const totalAssets = cash + receivable + currentAssets + fixedAssets + nonCurrentAssets;
+    const totalLiabilities = payable + currentLiabilities + nonCurrentLiabilities;
+    const totalEquity = equity + netIncome;
 
-      // Get equity account detail for breakdown
-      const equityAccounts = db.prepare(`
-        SELECT ab.account_code, ab.account_name, ab.balance
-        FROM account_balances ab
-        INNER JOIN (
-          SELECT account_odoo_id, MAX(snapshot_date) as max_date
-          FROM account_balances
-          WHERE company_id = ? AND snapshot_date <= ?
-          GROUP BY account_odoo_id
-        ) latest ON ab.account_odoo_id = latest.account_odoo_id
-                 AND ab.snapshot_date = latest.max_date
-                 AND ab.company_id = ?
-        WHERE ab.account_type = 'equity' AND ABS(ab.balance) > 0.01
-        ORDER BY ABS(ab.balance) DESC
-      `).all(company.company_id, snapDate, company.company_id) as any[];
-
-      // Categorize equity accounts
-      let retainedEarnings = 0, shareCapitals = 0, capitalInWallet = 0, otherEquity = 0;
-      for (const ea of equityAccounts) {
-        if (ea.account_code === '310000' || ea.account_name.toLowerCase().includes('share capital')) shareCapitals += ea.balance;
-        else if (ea.account_code === '201000' || ea.account_name.toLowerCase().includes('capital in wallet')) capitalInWallet += ea.balance;
-        else if (ea.account_name.toLowerCase().includes('retained') || ea.account_code === '500000') retainedEarnings += ea.balance;
-        else otherEquity += ea.balance;
-      }
-
-      const totalCurrentAssets = bankCash + receivable + currentAssets + prepayments;
-      const totalAssets = totalCurrentAssets + fixedAssets + nonCurrentAssets;
-      const totalCurrentLiabilities = currentLiab + payable;
-      const totalLiabilities = totalCurrentLiabilities + nonCurrentLiab;
-      const totalEquity = equity + equityUnaffected + pl;
-
-      result.push({
-        company_id: company.company_id,
-        company_name: company.company_name,
-        assets: {
-          bank_cash: bankCash,
-          receivable,
-          current_assets: currentAssets,
-          prepayments,
-          total_current: totalCurrentAssets,
-          fixed_assets: fixedAssets,
-          non_current_assets: nonCurrentAssets,
-          total: totalAssets,
-        },
-        liabilities: {
-          payable,
-          current_liabilities: currentLiab,
-          total_current: totalCurrentLiabilities,
-          non_current_liabilities: nonCurrentLiab,
-          total: totalLiabilities,
-        },
-        equity: {
-          equity: totalEquity,
-          unallocated_earnings: equityUnaffected + pl,
-          retained_earnings: retainedEarnings + otherEquity,
-          share_capitals: shareCapitals,
-          capital_in_wallet: capitalInWallet,
-          total: totalEquity,
-        },
-        liabilities_plus_equity: totalLiabilities + totalEquity,
-      });
-    }
-
-    res.json(result);
+    return {
+      company_id: companyId,
+      company_name: company.company_name,
+      cash,
+      receivable,
+      current_assets: currentAssets,
+      fixed_assets: fixedAssets,
+      non_current_assets: nonCurrentAssets,
+      total_assets: totalAssets,
+      payable,
+      current_liabilities: currentLiabilities,
+      non_current_liabilities: nonCurrentLiabilities,
+      total_liabilities: totalLiabilities,
+      equity,
+      net_income: netIncome,
+      total_equity: totalEquity,
+    };
   });
 
-  // Per-entity cash flow statement
-  // Shows cash movements by account code for each company
+  res.json({ as_of_date: asOfDate, companies: results });
+});
   router.get('/cash-flow-statement', (req, res) => {
     const companyIds = req.query.companies
       ? (req.query.companies as string).split(',').map(Number)
@@ -748,284 +696,38 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // Consolidated balance sheet with entity groupings
-  router.get('/consolidated-bs', (req, res) => {
-    // Use Odoo's current_balance from account_balances table (authoritative)
-    // Falls back to JE computation if no balance snapshot exists
-    const snapshotDate = (req.query.as_of_date as string) || '';
+// ─── /consolidated-bs ────────────────────────────────────────────────────────
+router.get('/consolidated-bs', (req, res) => {
+  // Compute directly from journal entries (no account_balances dependency)
+  const snapshotDate = (req.query.as_of_date as string) ||
+    new Date().toISOString().slice(0, 10);
 
-    // Find latest snapshot date
-    const latestSnap = db.prepare(
-      snapshotDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-    ).get(...(snapshotDate ? [snapshotDate] : [])) as any;
+  const asOfDate = snapshotDate || '2099-12-31';
+  const dateFilter = asOfDate ? `AND je.date <= '${asOfDate.replace(/'/g, '')}'` : '';
 
-    const useBalanceTable = !!latestSnap?.snapshot_date;
-    const snapDate = latestSnap?.snapshot_date || '';
+  const groupBalances: Record<string, Record<string, number>> = {};
 
-    if (useBalanceTable) {
-      console.log(`[consolidated-bs] Using account_balances snapshot: ${snapDate}`);
-    } else {
-      console.log('[consolidated-bs] No balance snapshot found, falling back to JE computation');
-    }
+  for (const group of ENTITY_GROUPS) {
+    if (group.is_subtotal) continue;
 
-    // Step 1: Compute raw balances for non-subtotal groups
-    const groupBalances: Record<string, Record<string, number>> = {};
+    if (group.is_manual) {
+      const latestPeriod = db.prepare(`
+        SELECT period, SUM(amount_usd) as total_usd
+        FROM manual_balances
+        WHERE entity = ? AND account_code NOT IN (${FOUNDATION_IC})
+        GROUP BY period
+        ORDER BY period DESC
+        LIMIT 1
+      `).get(group.name) as any;
 
-    if (useBalanceTable) {
-      // === USE ODOO'S AUTHORITATIVE current_balance ===
-      for (const group of ENTITY_GROUPS) {
-        if (group.is_subtotal) continue;
-
-        // Handle manual entities (e.g. Xterio Foundation)
-        if (group.is_manual) {
-          // Foundation period: prefer user-requested date, else snapshot date
-          const _foundationDateBs = (snapshotDate && snapshotDate < '9000') ? snapshotDate
-            : (snapDate && snapDate < '9000') ? snapDate
-            : new Date().toISOString().slice(0, 10);
-          const foundationPeriodBs = _foundationDateBs.slice(0, 7);
-          const foundationICRowBs = foundationPeriodBs
-            ? (db.prepare(`SELECT amount_usd FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code = 'FOUNDATION_IC' AND period = ? LIMIT 1`).get(foundationPeriodBs) as any)
-            : null;
-          const foundationLiabilitiesBs = foundationICRowBs?.amount_usd ?? 1369636;
-          // Xterio Foundation Ã¢ÂÂ hardcoded from spreadsheet (as at 28.02.2026)
-          const balances: Record<string, number> = {
-            'ASSETS': 5942149,
-            'CURRENT_ASSETS': 5942149,
-            'BANK_CASH': 5942149,
-            'CASH': 5942149,
-            'DIGITAL_TOKEN': 0,
-            'RECEIVABLES': 0,
-            'A_107010': 0, 'A_101000': 0, 'A_101010': 0,
-            'CURRENT_ASSETS_OTHER': 0,
-            'PREPAYMENTS': 0,
-            'FIXED_ASSETS': 0,
-            'NON_CURRENT_ASSETS': 0,
-            'A_200000': 0, 'A_202000': 0,
-            'LIABILITIES': foundationLiabilitiesBs,
-            'CURRENT_LIABILITIES': 165000,
-            'A_303010': 0, 'A_303011': 0, 'A_303040': 0, 'A_303041': 0,
-            'A_303050': 0, 'A_303100': 0, 'A_303031': 165000,
-            'A_301000': 0, 'A_302010': 0,
-            'PAYABLES': 0, 'A_300030': 0,
-            'NON_CURRENT_LIABILITIES': 1204636,
-            'A_300040': 0, 'A_300050': 0, 'A_303030': 1204636,
-            'EQUITY': 4563853,
-            'EQUITY_RETAINED': -33889064,
-            'A_RETAINED_EARNINGS': -33889064,
-            'A_SHARE_CAPITALS': 0,
-            'A_CAPITAL_IN_WALLET': 0,
-            'CURRENT_YEAR_PL': 12831 + 38452916, // Current Year + Share Capitals (38,452,916)
-            'LIAB_EQUITY': 5933488,
-          };
-          // Zero out any BS line not explicitly set
-          for (const line of BS_LINES) {
-            if (!(line.code in balances)) balances[line.code] = 0;
-          }
-          groupBalances[group.name] = balances;
-          continue;
-        }
-
-        if (group.company_ids.length === 0) continue;
-
-        // Query account_balances for this group's companies
-        const placeholders = group.company_ids.map(() => '?').join(',');
-        const rows = db.prepare(`
-          SELECT account_code as code, account_type, SUM(balance) as balance
-          FROM account_balances
-          WHERE company_id IN (${placeholders}) AND snapshot_date = ?
-          GROUP BY account_code, account_type
-        `).all(...group.company_ids, snapDate) as any[];
-
-        // Build lookup by account_type and by code
-        const byType: Record<string, number> = {};
-        const byCode: Record<string, number> = {};
-        for (const r of rows) {
-          byType[r.account_type] = (byType[r.account_type] || 0) + r.balance;
-          byCode[r.code] = (byCode[r.code] || 0) + r.balance;
-        }
-
-        // Map BS_LINES leaf nodes
-        const currentYear = new Date().getFullYear().toString();
-        const balances: Record<string, number> = {};
-        for (const line of BS_LINES) {
-          if (line.computed_from) continue;
-          if (line.odoo_types) {
-            // For current_balance, no need for date_filter Ã¢ÂÂ Odoo already computes it
-            // But we need to handle the P&L split differently
-            // current_balance already includes all-time for equity, and current P&L
-            if (line.date_filter === 'current_year' || line.date_filter === 'prior_years') {
-              // For P&L split, use the total from Odoo (it's already correct)
-              // Odoo's equity type includes retained earnings
-              // Odoo's income/expense types include current P&L
-              balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byType[t] || 0), 0);
-            } else {
-              balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byType[t] || 0), 0);
-            }
-          } else if (line.account_codes) {
-            balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
-          } else if (line.account_codes_prefix) {
-            const prefix = line.account_codes_prefix;
-            balances[line.code] = Object.entries(byCode).reduce((s: number, [code, bal]) => {
-              return code.startsWith(prefix) ? s + bal : s;
-            }, 0);
-          }
-        }
-
-        // Resolve computed lines
-        for (let pass = 0; pass < 10; pass++) {
-          let resolved = 0;
-          for (const line of BS_LINES) {
-            if (!line.computed_from) continue;
-            if (line.code in balances) continue;
-            if (!line.computed_from.every((c: string) => c in balances)) continue;
-            balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
-            resolved++;
-          }
-          if (resolved === 0) break;
-        }
-
-        groupBalances[group.name] = balances;
-      }
-
-      // Compute subtotals
-      for (const group of ENTITY_GROUPS) {
-        if (!group.is_subtotal || !group.subtotal_groups) continue;
-        const balances: Record<string, number> = {};
-        for (const line of BS_LINES) {
-          balances[line.code] = group.subtotal_groups.reduce((sum: number, gname: string) => {
-            return sum + (groupBalances[gname]?.[line.code] || 0);
-          }, 0);
-        }
-        groupBalances[group.name] = balances;
-      }
-    } else {
-    // JE computation fallback (when no balance snapshot exists)
-    const asOfDate = snapshotDate || '2099-12-31';
-    const dateFilter = `AND je.date <= '${asOfDate.replace(/[^0-9-]/g, '')}'`;
-
-    for (const group of ENTITY_GROUPS) {
-      if (group.is_subtotal) continue;
-
-      // Handle manual entities (e.g. Xterio Foundation)
-      if (group.is_manual) {
-        const latestPeriod = db.prepare(`
-          SELECT period, SUM(amount_usd) as total_usd
-          FROM manual_balances
-          WHERE entity = ? AND account_code != 'FOUNDATION_IC'
-          GROUP BY period
-          ORDER BY period DESC
-          LIMIT 1
-        `).get(group.name) as any;
-
-        const balances: Record<string, number> = {};
-        // Put the total as Bank & Cash for the BS
-        const totalUsd = latestPeriod?.total_usd || 0;
-        balances['BANK_CASH'] = totalUsd;
-        // Zero out everything else
-        for (const line of BS_LINES) {
-          if (line.computed_from) continue;
-          if (!(line.code in balances)) balances[line.code] = 0;
-        }
-        // Compute derived
-        for (let pass = 0; pass < 10; pass++) {
-          let resolved = 0;
-          for (const line of BS_LINES) {
-            if (!line.computed_from) continue;
-            if (line.code in balances) continue;
-            const allReady = line.computed_from.every((c: string) => c in balances);
-            if (!allReady) continue;
-            balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
-            resolved++;
-          }
-          if (resolved === 0) break;
-        }
-        groupBalances[group.name] = balances;
-        continue;
-      }
-
-      if (group.company_ids.length === 0) continue;
-
-      const placeholders = group.company_ids.map(() => '?').join(',');
-
-      const currentYear = new Date().getFullYear().toString();
-
-      // All-time balances per odoo_type (up to as_of_date)
-      const allTimeBalances = db.prepare(`
-        SELECT a.odoo_type,
-          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-        FROM line_items li
-        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
-        INNER JOIN accounts a ON a.id = li.account_id
-        WHERE a.odoo_type != ''
-        GROUP BY a.odoo_type
-      `).all(...group.company_ids) as any[];
-
-      const byTypeAll: Record<string, number> = {};
-      for (const row of allTimeBalances) byTypeAll[row.odoo_type] = row.balance;
-
-      // Current year balances per odoo_type (up to as_of_date)
-      const currentYearBalances = db.prepare(`
-        SELECT a.odoo_type,
-          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-        FROM line_items li
-        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id IN (${placeholders})
-          AND je.date >= ? ${dateFilter}
-        INNER JOIN accounts a ON a.id = li.account_id
-        WHERE a.odoo_type != ''
-        GROUP BY a.odoo_type
-      `).all(...group.company_ids, currentYear + '-01-01') as any[];
-
-      const byTypeCY: Record<string, number> = {};
-      for (const row of currentYearBalances) byTypeCY[row.odoo_type] = row.balance;
-
-      // Also get balances per account code for account-specific lines
-      const allAccountCodes = BS_LINES
-        .filter(l => l.account_codes && !l.computed_from)
-        .flatMap(l => l.account_codes!);
-      const uniqueCodes = [...new Set(allAccountCodes)];
-
-      const byCode: Record<string, number> = {};
-      if (uniqueCodes.length > 0) {
-        const codeRows = db.prepare(`
-          SELECT a.code,
-            COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-          FROM line_items li
-          INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-            AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
-          INNER JOIN accounts a ON a.id = li.account_id
-          WHERE a.code IN (${uniqueCodes.map(() => '?').join(',')})
-          GROUP BY a.code
-        `).all(...group.company_ids, ...uniqueCodes) as any[];
-        for (const r of codeRows) byCode[r.code] = r.balance;
-      }
-
-      // Map BS_LINES leaf nodes
       const balances: Record<string, number> = {};
+      const totalUsd = latestPeriod?.total_usd || 0;
+      balances['BANK_CASH'] = totalUsd;
       for (const line of BS_LINES) {
         if (line.computed_from) continue;
-        if (line.odoo_types) {
-          if (line.date_filter === 'current_year') {
-            balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeCY[t] || 0), 0);
-          } else if (line.date_filter === 'prior_years') {
-            balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + ((byTypeAll[t] || 0) - (byTypeCY[t] || 0)), 0);
-          } else {
-            balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeAll[t] || 0), 0);
-          }
-        } else if (line.account_codes) {
-          balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
-        } else if (line.account_codes_prefix) {
-          // Sum all account codes starting with this prefix
-          const prefix = line.account_codes_prefix;
-          balances[line.code] = Object.entries(byCode).reduce((s: number, [code, bal]) => {
-            return code.startsWith(prefix) ? s + bal : s;
-          }, 0);
-        }
+        if (!(line.code in balances)) balances[line.code] = 0;
       }
 
-      // Compute derived lines Ã¢ÂÂ multiple passes for nested dependencies
       for (let pass = 0; pass < 10; pass++) {
         let resolved = 0;
         for (const line of BS_LINES) {
@@ -1040,136 +742,202 @@ export function dashboardRoutes(db: Database.Database): Router {
       }
 
       groupBalances[group.name] = balances;
+      continue;
     }
 
-    // Step 2: Compute subtotals
-    for (const group of ENTITY_GROUPS) {
-      if (!group.is_subtotal || !group.subtotal_groups) continue;
+    if (group.company_ids.length === 0) continue;
 
-      const balances: Record<string, number> = {};
+    const placeholders = group.company_ids.map(() => '?').join(',');
+    const currentYear = new Date().getFullYear().toString();
 
-      for (const line of BS_LINES) {
-        balances[line.code] = group.subtotal_groups.reduce((sum: number, gname: string) => {
-          return sum + (groupBalances[gname]?.[line.code] || 0);
-        }, 0);
-      }
+    const allTimeBalances = db.prepare(`
+      SELECT a.odoo_type,
+             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type != ''
+      GROUP BY a.odoo_type
+    `).all(...group.company_ids) as any[];
 
-      groupBalances[group.name] = balances;
-    }
-    } // end of else (JE computation fallback)
+    const byTypeAll: Record<string, number> = {};
+    for (const row of allTimeBalances) byTypeAll[row.odoo_type] = row.balance;
 
-    // Step 3: Compute IC elimination
-    // Intercompany accounts (303xxx) should net to zero in consolidation
-    const allCompanyIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
+    const currentYearBalances = db.prepare(`
+      SELECT a.odoo_type,
+             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.company_id IN (${placeholders})
+        AND je.date > ? ${dateFilter}
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type != ''
+      GROUP BY a.odoo_type
+    `).all(...group.company_ids, currentYear + '-01-01') as any[];
 
-    const icByType: Record<string, number> = {};
+    const byTypeCY: Record<string, number> = {};
+    for (const row of currentYearBalances) byTypeCY[row.odoo_type] = row.balance;
 
-    if (useBalanceTable) {
-      // Use account_balances for IC elimination
-      const icPlaceholders = allCompanyIds.map(() => '?').join(',');
-      const icRows = db.prepare(`
-        SELECT account_type, SUM(balance) as balance
-        FROM account_balances
-        WHERE company_id IN (${icPlaceholders}) AND snapshot_date = ? AND account_code LIKE '303%'
-        GROUP BY account_type
-      `).all(...allCompanyIds, snapDate) as any[];
-      for (const row of icRows) icByType[row.account_type] = row.balance;
-    } else {
-      const icPlaceholders = allCompanyIds.map(() => '?').join(',');
-      const icBalances = db.prepare(`
-        SELECT a.odoo_type,
-          COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    const allAccountCodes = BS_LINES
+      .filter(l => l.account_codes && !l.computed_from)
+      .flatMap(l => l.account_codes!);
+    const uniqueCodes = [...new Set(allAccountCodes)];
+
+    const byCode: Record<string, number> = {};
+    if (uniqueCodes.length > 0) {
+      const codeRows = db.prepare(`
+        SELECT a.code,
+               COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
         FROM line_items li
         INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id IN (${icPlaceholders})
+          AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
         INNER JOIN accounts a ON a.id = li.account_id
-        WHERE a.code LIKE '303%'
-        GROUP BY a.odoo_type
-      `).all(...allCompanyIds) as any[];
-      for (const row of icBalances) icByType[row.odoo_type] = row.balance;
+        WHERE a.code IN (${uniqueCodes.map(() => '?').join(',')})
+        GROUP BY a.code
+      `).all(...group.company_ids, ...uniqueCodes) as any[];
+      for (const r of codeRows) byCode[r.code] = r.balance;
     }
 
-    // Build IC elimination balances Ã¢ÂÂ negate IC amounts per odoo_type
-    const icElimination: Record<string, number> = {};
+    const balances: Record<string, number> = {};
     for (const line of BS_LINES) {
       if (line.computed_from) continue;
-      if (line.odoo_types) {
-        icElimination[line.code] = -line.odoo_types.reduce((s: number, t: string) => s + (icByType[t] || 0), 0);
+      if (line.account_codes) {
+        balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
+      } else if (line.odoo_types) {
+        if (line.cy_only) {
+          balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeCY[t] || 0), 0);
+        } else {
+          balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeAll[t] || 0), 0);
+        }
       } else {
-        icElimination[line.code] = 0;
+        balances[line.code] = 0;
       }
     }
-    // Resolve computed IC elimination
+
     for (let pass = 0; pass < 10; pass++) {
       let resolved = 0;
       for (const line of BS_LINES) {
         if (!line.computed_from) continue;
-        if (line.code in icElimination) continue;
-        const allReady = line.computed_from.every((c: string) => c in icElimination);
+        if (line.code in balances) continue;
+        const allReady = line.computed_from.every((c: string) => c in balances);
         if (!allReady) continue;
-        icElimination[line.code] = line.computed_from.reduce((s: number, c: string) => s + (icElimination[c] || 0), 0);
+        balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
         resolved++;
       }
       if (resolved === 0) break;
     }
 
-    // Step 4: Build response with IC elimination and consolidated columns
-    const columns = [
-      ...ENTITY_GROUPS.map(g => ({
-        name: g.name,
-        is_subtotal: g.is_subtotal || false,
-        is_elimination: false,
-        is_consolidated: false,
-      })),
-      { name: 'IC Elimination', is_subtotal: false, is_elimination: true, is_consolidated: false },
-      { name: 'Consolidated', is_subtotal: false, is_elimination: false, is_consolidated: true },
-    ];
+    groupBalances[group.name] = balances;
+  }
 
-    const totalIdx = ENTITY_GROUPS.findIndex(g => g.name === 'Total');
+  // Step 2: Compute subtotals
+  for (const group of ENTITY_GROUPS) {
+    if (!group.is_subtotal || !group.subtotal_groups) continue;
 
-    const rows = BS_LINES.map(line => {
-      const entityValues = ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0);
-      const totalVal = totalIdx >= 0 ? entityValues[totalIdx] : 0;
-      const icVal = icElimination[line.code] || 0;
-      const consolidatedVal = totalVal + icVal;
+    const balances: Record<string, number> = {};
+    for (const line of BS_LINES) {
+      balances[line.code] = group.subtotal_groups.reduce((sum: number, gname: string) => {
+        return sum + (groupBalances[gname]?.[line.code] || 0);
+      }, 0);
+    }
+    groupBalances[group.name] = balances;
+  }
 
-      return {
-        code: line.code,
-        label: line.label,
-        indent: line.indent,
-        is_total: line.is_total || false,
-        is_section: line.is_section || false,
-        values: [...entityValues, icVal, consolidatedVal],
-      };
-    });
+  // Step 3: Compute IC elimination (JE-based, with date filter)
+  const allCompanyIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(
+    (g: any) => g.company_ids as number[]
+  );
+  const icByType: Record<string, number> = {};
 
-    // Add check row
-    rows.push({
-      code: 'CHECK',
-      label: 'Check (should be 0)',
-      indent: 0,
-      is_total: false,
-      is_section: false,
-      values: [
-        ...ENTITY_GROUPS.map(g => {
-          const b = groupBalances[g.name] || {};
-          return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0);
-        }),
-        // IC elimination check
-        (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0),
-        // Consolidated check
-        (() => {
-          const totalBal = groupBalances['Total'] || {};
-          const t = (totalBal['ASSETS'] || 0) + (totalBal['LIABILITIES'] || 0) + (totalBal['EQUITY'] || 0);
-          return t + (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0);
-        })(),
-      ],
-    });
+  const icPlaceholders = allCompanyIds.map(() => '?').join(',');
+  const icBalances = db.prepare(`
+    SELECT a.odoo_type,
+           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    FROM line_items li
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted' AND je.company_id IN (${icPlaceholders}) ${dateFilter}
+    INNER JOIN accounts a ON a.id = li.account_id
+    WHERE a.code LIKE '303%'
+    GROUP BY a.odoo_type
+  `).all(...allCompanyIds) as any[];
+  for (const row of icBalances) icByType[row.odoo_type] = row.balance;
 
-    res.json({ columns, rows });
+  const icElimination: Record<string, number> = {};
+  for (const line of BS_LINES) {
+    if (line.computed_from) continue;
+    if (line.odoo_types) {
+      icElimination[line.code] = -line.odoo_types.reduce((s: number, t: string) => s + (icByType[t] || 0), 0);
+    } else {
+      icElimination[line.code] = 0;
+    }
+  }
+
+  for (let pass = 0; pass < 10; pass++) {
+    let resolved = 0;
+    for (const line of BS_LINES) {
+      if (!line.computed_from) continue;
+      if (line.code in icElimination) continue;
+      const allReady = line.computed_from.every((c: string) => c in icElimination);
+      if (!allReady) continue;
+      icElimination[line.code] = line.computed_from.reduce((s: number, c: string) => s + (icElimination[c] || 0), 0);
+      resolved++;
+    }
+    if (resolved === 0) break;
+  }
+
+  // Step 4: Build response
+  const columns = [
+    ...ENTITY_GROUPS.map(g => ({
+      name: g.name,
+      is_subtotal: g.is_subtotal || false,
+      is_elimination: false,
+      is_consolidated: false,
+    })),
+    { name: 'IC Elimination', is_subtotal: false, is_elimination: true, is_consolidated: false },
+    { name: 'Consolidated', is_subtotal: false, is_elimination: false, is_consolidated: true },
+  ];
+
+  const totalIdx = ENTITY_GROUPS.findIndex(g => g.name === 'Total');
+
+  const rows = BS_LINES.map(line => {
+    const entityValues = ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0);
+    const totalVal = totalIdx >= 0 ? entityValues[totalIdx] : 0;
+    const icVal = icElimination[line.code] || 0;
+    const consolidatedVal = totalVal + icVal;
+
+    return {
+      code: line.code,
+      label: line.label,
+      indent: line.indent,
+      is_total: line.is_total || false,
+      is_section: line.is_section || false,
+      values: [...entityValues, icVal, consolidatedVal],
+    };
   });
 
-  // IC Reconciliation report
+  rows.push({
+    code: 'CHECK',
+    label: 'Check (should be 0)',
+    indent: 0,
+    is_total: false,
+    is_section: false,
+    values: [
+      ...ENTITY_GROUPS.map(g => {
+        const b = groupBalances[g.name] || {};
+        return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0);
+      }),
+      (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0),
+      (() => {
+        const totalBal = groupBalances['Total'] || {};
+        const t = (totalBal['ASSETS'] || 0) + (totalBal['LIABILITIES'] || 0) + (totalBal['EQUITY'] || 0);
+        return t + (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0);
+      })(),
+    ],
+  });
+
+  res.json({ columns, rows });
+});
   router.get('/ic-reconciliation', (_req, res) => {
     // Get intercompany balances per company per account
     const rows = db.prepare(`
@@ -1363,195 +1131,125 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // ====== Bank Account Detail ======
-  router.get('/bank-accounts', (req, res) => {
-    const requestedDate = (req.query.as_of_date as string) || '';
-    const priorDate = req.query.prior_date as string || (() => {
-      const d = new Date(); d.setDate(d.getDate() - 7);
-      return d.toISOString().slice(0, 10);
-    })();
+// ─── /bank-accounts ──────────────────────────────────────────────────────────
+router.get('/bank-accounts', (req, res) => {
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
-    // Use account_balances if available
-    const snap = db.prepare(
-      requestedDate
-        ? `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-        : `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-    ).get(...(requestedDate ? [requestedDate] : [])) as any;
+  // Compute prior month end date
+  const priorDate = (() => {
+    const d = new Date(asOfDate + 'T00:00:00Z');
+    d.setDate(0); // last day of prior month
+    return d.toISOString().slice(0, 10);
+  })();
 
-    const priorSnap = db.prepare(
-      `SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`
-    ).get(priorDate) as any;
+  const rows = db.prepare(`
+    SELECT
+      je.company_id,
+      je.company_name,
+      a.code,
+      a.name,
+      a.odoo_type,
+      COALESCE(MAX(li.currency), 'USD') as currency,
+      COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    FROM accounts a
+    INNER JOIN line_items li ON li.account_id = a.id
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.date <= ?
+    WHERE a.odoo_type = 'asset_cash' AND a.is_active = 1
+    GROUP BY je.company_id, a.code, a.name, a.odoo_type
+    HAVING ABS(balance) > 0.01
+    ORDER BY je.company_name, a.code
+  `).all(asOfDate) as any[];
 
-    if (snap?.snapshot_date) {
-      // Use account_balances
-      // Get ALL cash accounts from both current and prior snapshots
-      const currentRows = db.prepare(`
-        SELECT company_id, company_name, account_code as code, account_name as name, account_type, COALESCE(currency, 'USD') as currency, balance
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
-        ORDER BY company_name, account_code
-      `).all(snap.snapshot_date) as any[];
+  const priorRows = db.prepare(`
+    SELECT
+      je.company_id,
+      a.code,
+      COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    FROM accounts a
+    INNER JOIN line_items li ON li.account_id = a.id
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.date <= ?
+    WHERE a.odoo_type = 'asset_cash' AND a.is_active = 1
+    GROUP BY je.company_id, a.code
+    HAVING ABS(balance) > 0.01
+  `).all(priorDate) as any[];
 
-      const priorRows = priorSnap?.snapshot_date ? db.prepare(`
-        SELECT company_id, company_name, account_code as code, account_name as name, account_type, COALESCE(currency, 'USD') as currency, balance
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
-      `).all(priorSnap.snapshot_date) as any[] : [];
+  const priorMap: Record<string, number> = {};
+  for (const r of priorRows) priorMap[`${r.company_id}:${r.code}`] = r.balance;
 
-      // Build maps for both snapshots
-      const currentMap: Record<string, any> = {};
-      for (const r of currentRows) currentMap[r.company_id + '|' + r.code] = r;
+  // Map company_id to group
+  const OW_IDS = new Set([15, 16, 28, 30, 31]);
+  function getGroup(companyId: number): string {
+    return OW_IDS.has(companyId) ? 'OW' : 'Xterio';
+  }
 
-      const priorMap: Record<string, any> = {};
-      for (const r of priorRows) priorMap[r.company_id + '|' + r.code] = r;
+  // Include Foundation manual balances
+  const foundationPeriod = (() => {
+    const d = new Date(asOfDate + 'T00:00:00Z');
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  })();
+  let foundRows = db.prepare(`
+    SELECT account_code as code, account_name as name,
+           ROUND(SUM(amount_local * exchange_rate), 2) as balance
+    FROM manual_balances
+    WHERE entity = 'Xterio Foundation'
+      AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+      AND period = ?
+    GROUP BY account_code
+    HAVING ABS(balance) > 0.01
+  `).all(foundationPeriod) as any[];
 
-      // Merge: all accounts from both snapshots
-      const allKeys = new Set([...Object.keys(currentMap), ...Object.keys(priorMap)]);
-
-      // Map to entity groups
-      const companyToGroup: Record<number, string> = {};
-      for (const g of ENTITY_GROUPS) {
-        if (g.is_subtotal || g.is_manual) continue;
-        for (const cid of g.company_ids) companyToGroup[cid] = g.name;
-      }
-
-      const accounts: any[] = [];
-      for (const key of allKeys) {
-        const cur = currentMap[key];
-        const pri = priorMap[key];
-        const row = cur || pri;
-        const currentBal = cur?.balance || 0;
-        const priorBal = pri?.balance || 0;
-        const change = currentBal - priorBal;
-        const changePct = priorBal !== 0 ? ((change / Math.abs(priorBal)) * 100) : 0;
-
-        accounts.push({
-          entity_group: companyToGroup[row.company_id] || 'Other',
-          company_name: row.company_name,
-          code: row.code,
-          name: row.name,
-          current_balance: currentBal,
-          prior_balance: priorBal,
-          change, change_pct: changePct,
-          asset_type: ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'].includes(row.currency) ? 'Crypto' : 'Cash',
-          currency: row.currency,
-        });
-      }
-
-      const byGroup: Record<string, any[]> = {};
-      for (const a of accounts) {
-        if (!byGroup[a.entity_group]) byGroup[a.entity_group] = [];
-        byGroup[a.entity_group].push(a);
-      }
-
-      const groups = Object.entries(byGroup).map(([name, accs]) => ({
-        name,
-        accounts: accs,
-        total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
-        total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
-        total_cash_current: accs.filter((a: any) => a.asset_type !== 'Crypto').reduce((s: number, a: any) => s + a.current_balance, 0),
-        total_crypto_current: accs.filter((a: any) => a.asset_type === 'Crypto').reduce((s: number, a: any) => s + a.current_balance, 0),
-        total_all: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
-      }));
-
-      groups.sort((a, b) => Math.abs(b.total_current) - Math.abs(a.total_current));
-      return res.json({ snapshot_date: snap.snapshot_date, prior_date: priorSnap?.snapshot_date || priorDate, groups });
-    }
-
-    // Fallback to old JE-based computation
-
-    const rows = db.prepare(`
-      SELECT
-        a.code, a.name, a.odoo_type,
-        je.company_name,
-        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as current_balance
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type = 'asset_cash'
-      GROUP BY a.code, a.name, a.odoo_type, je.company_name
-      HAVING ABS(current_balance) > 0.01
-      ORDER BY je.company_name, a.code
-    `).all() as any[];
-
-    // Get prior balances
-    const priorRows = db.prepare(`
-      SELECT
-        a.code, a.name,
-        je.company_name,
-        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted' AND je.date <= ?
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type = 'asset_cash'
-      GROUP BY a.code, a.name, je.company_name
+  if (!foundRows.length) {
+    const latestP = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+    if (latestP) foundRows = db.prepare(`
+      SELECT account_code as code, account_name as name,
+             ROUND(SUM(amount_local * exchange_rate), 2) as balance
+      FROM manual_balances
+      WHERE entity = 'Xterio Foundation'
+        AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+        AND period = ?
+      GROUP BY account_code
       HAVING ABS(balance) > 0.01
-    `).all(priorDate) as any[];
+    `).all(latestP) as any[];
+  }
 
-    const priorMap: Record<string, number> = {};
-    for (const r of priorRows) priorMap[r.company_name + '|' + r.code] = r.balance;
+  const foundationAccounts = foundRows.map((r: any) => ({
+    company_id: 22,
+    company_name: 'Xterio Foundation',
+    account_code: r.code,
+    account_name: r.name,
+    account_type: 'asset_cash',
+    currency: 'USD',
+    balance: r.balance,
+    prior_balance: null,
+    change: null,
+    group: 'Xterio',
+  }));
 
-    // Map to entity groups
-    const companyToGroup: Record<string, string> = {};
-    for (const g of ENTITY_GROUPS) {
-      if (g.is_subtotal) continue;
-      for (const cid of g.company_ids) {
-        // Find company name from data
-        const match = rows.find((r: any) => {
-          const companyRow = db.prepare('SELECT company_name FROM journal_entries WHERE company_id = ? LIMIT 1').get(cid) as any;
-          return companyRow?.company_name === r.company_name;
-        });
-        if (match) companyToGroup[match.company_name] = g.name;
-      }
-    }
-    // Fallback: map by company name lookup
-    const companyMap = db.prepare('SELECT DISTINCT company_id, company_name FROM journal_entries WHERE company_id IS NOT NULL').all() as any[];
-    for (const c of companyMap) {
-      for (const g of ENTITY_GROUPS) {
-        if (g.is_subtotal) continue;
-        if (g.company_ids.includes(c.company_id)) {
-          companyToGroup[c.company_name] = g.name;
-          break;
-        }
-      }
-    }
+  const accounts = rows.map(row => ({
+    company_id: row.company_id,
+    company_name: row.company_name,
+    account_code: row.code,
+    account_name: row.name,
+    account_type: row.odoo_type,
+    currency: row.currency,
+    balance: row.balance,
+    prior_balance: priorMap[`${row.company_id}:${row.code}`] ?? null,
+    change: priorMap[`${row.company_id}:${row.code}`] != null
+      ? row.balance - priorMap[`${row.company_id}:${row.code}`]
+      : null,
+    group: getGroup(row.company_id),
+  }));
 
-    const accounts = rows.map((r: any) => {
-      const key = r.company_name + '|' + r.code;
-      const prior = priorMap[key] || 0;
-      const change = r.current_balance - prior;
-      const changePct = prior !== 0 ? ((change / Math.abs(prior)) * 100) : 0;
-      return {
-        entity_group: companyToGroup[r.company_name] || 'Other',
-        company_name: r.company_name,
-        code: r.code,
-        name: r.name,
-        current_balance: r.current_balance,
-        prior_balance: prior,
-        change,
-        change_pct: changePct,
-      };
-    });
-
-    // Group by entity group
-    const byGroup: Record<string, any[]> = {};
-    for (const a of accounts) {
-      if (!byGroup[a.entity_group]) byGroup[a.entity_group] = [];
-      byGroup[a.entity_group].push(a);
-    }
-
-    const groups = Object.entries(byGroup).map(([name, accs]) => ({
-      name,
-      accounts: accs,
-      total_current: accs.reduce((s: number, a: any) => s + a.current_balance, 0),
-      total_prior: accs.reduce((s: number, a: any) => s + a.prior_balance, 0),
-    }));
-
-    groups.sort((a, b) => Math.abs(b.total_current) - Math.abs(a.total_current));
-
-    res.json({ prior_date: priorDate, groups });
+  res.json({
+    as_of_date: asOfDate,
+    prior_date: priorDate,
+    accounts: [...accounts, ...foundationAccounts],
   });
-
-  // Xterio Foundation manual data
+});
   router.get('/xterio-foundation', (_req, res) => {
     const rows = db.prepare(`
       SELECT entity, account_code, account_name, period, amount_local, currency, exchange_rate, amount_usd, category
@@ -1681,575 +1379,536 @@ export function dashboardRoutes(db: Database.Database): Router {
   });
 
   // List available balance snapshots
-  router.get('/snapshots', (_req, res) => {
-    const snaps = db.prepare(`
-      SELECT DISTINCT snapshot_date, COUNT(*) as account_count
-      FROM account_balances
-      GROUP BY snapshot_date
-      ORDER BY snapshot_date DESC
-    `).all();
-    res.json(snaps);
-  });
+// ─── /snapshots ───────────────────────────────────────────────────────────────
+// List available balance snapshots (derived from journal entry dates)
+router.get('/snapshots', (_req, res) => {
+  // Return the last day of each month for which we have journal entries
+  const rows = db.prepare(`
+    SELECT
+      strftime('%Y-%m', date) as month,
+      MAX(date) as last_date,
+      COUNT(*) as entry_count
+    FROM journal_entries
+    WHERE status = 'posted'
+    GROUP BY strftime('%Y-%m', date)
+    ORDER BY month DESC
+  `).all() as any[];
 
-  // Executive summary for CEO dashboard
-  router.get('/executive-summary', (req, res) => {
-    const requestedDate = (req.query.as_of_date as string) || '';
+  const snapshots = rows.map(r => ({
+    snapshot_date: r.last_date,
+    month: r.month,
+    entry_count: r.entry_count,
+  }));
 
-    // Find matching snapshot
-    const snapQuery = requestedDate
-      ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate) as any
-      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get() as any;
-    const currentSnap = snapQuery?.snapshot_date;
-    if (!currentSnap) return res.json({});
+  res.json({ snapshots });
+});
+// ─── /executive-summary ──────────────────────────────────────────────────────
+router.get('/executive-summary', (req, res) => {
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
+  const currentYear = new Date().getFullYear().toString();
 
-    // Find prior snapshot (the one before current)
-    const priorQuery = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date < ? AND snapshot_date < '9000-01-01' ORDER BY snapshot_date DESC LIMIT 1`).get(currentSnap) as any;
-    const priorSnap = priorQuery?.snapshot_date;
+  // Entity group definitions for this summary
+  const XTERIO_IDS = ENTITY_GROUPS
+    .filter((g: any) => !g.is_subtotal && !g.is_manual &&
+      ['LTECH', 'LTECH W3', 'AOD', 'XLABS', 'XLAB W3', 'PRIVILEGE HK'].includes(g.name))
+    .flatMap((g: any) => g.company_ids as number[]);
+  const OW_IDS = ENTITY_GROUPS
+    .filter((g: any) => !g.is_subtotal && !g.is_manual &&
+      ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name))
+    .flatMap((g: any) => g.company_ids as number[]);
+  const HOLDINGS_IDS = ENTITY_GROUPS
+    .filter((g: any) => !g.is_subtotal && !g.is_manual &&
+      ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'].includes(g.name))
+    .flatMap((g: any) => g.company_ids as number[]);
+  const ALL_IDS = ENTITY_GROUPS
+    .filter((g: any) => !g.is_subtotal && !g.is_manual)
+    .flatMap((g: any) => g.company_ids as number[]);
 
-    // Company to group mapping
-    const companyToGroup: Record<number, string> = {};
-    for (const g of ENTITY_GROUPS) {
-      if (g.is_subtotal || g.is_manual) continue;
-      for (const cid of g.company_ids) companyToGroup[cid] = g.name;
-    }
-
-    const xterioGroups = new Set(['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK']);
-    const holdingsGroups = new Set(['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND']);
-    const nonOWGroups = new Set([...xterioGroups, ...holdingsGroups]);
-    const owGroups = new Set(['OW', 'Reach', 'Rough house', 'Keystone']);
-    // Foundation: use requestedDate (user-selected) for period, not snapshot date
-    // This ensures Foundation data changes even when Odoo snapshots haven't been updated
-    const _foundationDateExec = (requestedDate && requestedDate < '9000') ? requestedDate
-      : (currentSnap && currentSnap < '9000') ? currentSnap
-      : new Date().toISOString().slice(0, 10);
-    const foundationPeriod = _foundationDateExec.slice(0, 7);
-    const foundationRows = foundationPeriod
-      ? (db.prepare(`SELECT amount_local, exchange_rate FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ? AND account_code != 'FOUNDATION_IC'`).all(foundationPeriod) as any[])
-      : [];
-    const foundationAssets = foundationRows.length
-      ? foundationRows.reduce((s: number, r: any) => s + r.amount_local * r.exchange_rate, 0)
-      : 5942149;  // fallback to hardcoded if no data
-    const foundationICRow = foundationPeriod
-      ? (db.prepare(`SELECT amount_usd FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code = 'FOUNDATION_IC' AND period = ? LIMIT 1`).get(foundationPeriod) as any)
-      : null;
-    const foundationLiabilities = foundationICRow?.amount_usd ?? 1369636;  // IC payables to Xterio entities
-    const foundationNetAssets = foundationAssets - foundationLiabilities;
-
-    // Helper: get all company IDs for a group set
-    const getCompanyIds = (groups: Set<string>) =>
-      ENTITY_GROUPS.filter(g => groups.has(g.name) && !g.is_subtotal && !g.is_manual).flatMap(g => g.company_ids);
-
-    const nonOWCompanyIds = getCompanyIds(nonOWGroups);
-    const owCompanyIds = getCompanyIds(owGroups);
-    const xterioCompanyIds = getCompanyIds(xterioGroups);
-    const holdingsCompanyIds = getCompanyIds(holdingsGroups);
-
-    // === NET ASSETS for each group ===
-    const netAssetTypes = `'asset_cash','asset_receivable','asset_current','asset_prepayments','asset_fixed','asset_non_current','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
-    // OW excludes fixed/non-current assets (project capitalization)
-    const owNetAssetTypes = `'asset_cash','asset_receivable','asset_current','asset_prepayments','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
-
-    const netAssetsRows = db.prepare(`
-      SELECT company_id, SUM(balance) as total
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type IN (${netAssetTypes}) AND account_code != '300040'
-      GROUP BY company_id
-    `).all(currentSnap) as any[];
-
-    const owNetAssetsRows = db.prepare(`
-      SELECT company_id, SUM(balance) as total
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type IN (${owNetAssetTypes})
-      GROUP BY company_id
-    `).all(currentSnap) as any[];
-
-    let xterioNetAssets = 0;
-    let holdingsNetAssets = 0;
-    for (const r of netAssetsRows) {
-      const group = companyToGroup[r.company_id] || 'Other';
-      if (xterioGroups.has(group)) xterioNetAssets += r.total;
-      if (holdingsGroups.has(group)) holdingsNetAssets += r.total;
-    }
-
-    // 300040 accounts are excluded at the SQL level (account_code != '300040' in netAssetsRows)
-
-    let owNetAssets = 0;
-    for (const r of owNetAssetsRows) {
-      const group = companyToGroup[r.company_id] || 'Other';
-      if (owGroups.has(group)) owNetAssets += r.total;
-    }
-
-    // === PRIOR NET ASSETS ===
-    let priorXterioNetAssets = 0;
-    let priorHoldingsNetAssets = 0;
-    let priorOWNetAssets = 0;
-    if (priorSnap) {
-      const priorNARows = db.prepare(`
-        SELECT company_id, SUM(balance) as total
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type IN (${netAssetTypes}) AND account_code != '300040'
-        GROUP BY company_id
-      `).all(priorSnap) as any[];
-      for (const r of priorNARows) {
-        const group = companyToGroup[r.company_id] || 'Other';
-        if (xterioGroups.has(group)) priorXterioNetAssets += r.total;
-        if (holdingsGroups.has(group)) priorHoldingsNetAssets += r.total;
-      }
-      // Prior Holdings 300040 adjustment
-      const priorHoldingsAdj = holdingsCompanyIds.length > 0
-        ? (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${holdingsCompanyIds.map(() => '?').join(',')}) AND account_code = '300040'`).get(priorSnap, ...holdingsCompanyIds) as any)?.total || 0
-        : 0;
-      priorHoldingsNetAssets -= priorHoldingsAdj;
-      const priorOWNARows = db.prepare(`
-        SELECT company_id, SUM(balance) as total
-        FROM account_balances
-        WHERE snapshot_date = ? AND account_type IN (${owNetAssetTypes})
-        GROUP BY company_id
-      `).all(priorSnap) as any[];
-      for (const r of priorOWNARows) {
-        const group = companyToGroup[r.company_id] || 'Other';
-        if (owGroups.has(group)) priorOWNetAssets += r.total;
-      }
-    }
-
-    // === PER-FUNCTION WATERFALL: Net Assets Ã¢ÂÂ Cash breakdown ===
-    const buildWaterfall = (companyIds: number[]) => {
-      if (companyIds.length === 0) return { receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: 0, cash_crypto: 0 };
-      const ph = companyIds.map(() => '?').join(',');
-      const q = (filter: string) => (db.prepare(`SELECT SUM(balance) as total FROM account_balances WHERE snapshot_date = ? AND company_id IN (${ph}) AND ${filter}`).get(currentSnap, ...companyIds) as any)?.total || 0;
-      return {
-        receivable: q(`account_type = 'asset_receivable'`),
-        payable: q(`account_type IN ('liability_payable', 'liability_current') AND account_code NOT LIKE '303%'`),
-        intercompany: q(`account_code LIKE '303%'`),
-        deposit: q(`account_code = '202000'`),
-        cash_fiat: q(`account_type = 'asset_cash' AND currency IN ('USD', 'CNY', 'SGD')`),
-        cash_crypto: q(`account_type = 'asset_cash' AND currency IN ('BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE')`),
-      };
-    };
-
-    const wfXterio = buildWaterfall(xterioCompanyIds);
-    const wfHoldings = buildWaterfall(holdingsCompanyIds);
-    const wfOW = buildWaterfall(owCompanyIds);
-    const wfFoundation = { receivable: 0, payable: 0, intercompany: -foundationLiabilities, deposit: 0, cash_fiat: foundationAssets, cash_crypto: 0 };
-
-    const totalCashFiat = wfFoundation.cash_fiat + wfXterio.cash_fiat + wfHoldings.cash_fiat + wfOW.cash_fiat;
-    const totalCashCrypto = wfXterio.cash_crypto + wfHoldings.cash_crypto + wfOW.cash_crypto;
-    const totalCashAll = totalCashFiat + totalCashCrypto;
-    const totalGroupNetAssets = foundationNetAssets + xterioNetAssets + holdingsNetAssets + owNetAssets;
-
-    // === BACKWARD COMPAT: cash by entity group for chart ===
-    const cashRows = db.prepare(`
-      SELECT company_id, SUM(balance) as cash
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type = 'asset_cash'
-      GROUP BY company_id
-    `).all(currentSnap) as any[];
-
-    const groupCash: Record<string, number> = {};
-    let owCash = 0;
-    for (const r of cashRows) {
-      const group = companyToGroup[r.company_id] || 'Other';
-      groupCash[group] = (groupCash[group] || 0) + r.cash;
-      if (owGroups.has(group)) owCash += r.cash;
-    }
-
-    // Monthly burn
-    const burnRow = db.prepare(`
-      SELECT SUM(ABS(balance)) as burn FROM account_balances
-      WHERE snapshot_date = ? AND account_type IN ('expense', 'expense_direct_cost')
-    `).get(currentSnap) as any;
-    const entryDates = db.prepare(`SELECT MIN(date) as first, MAX(date) as last FROM journal_entries WHERE status = 'posted'`).get() as any;
-    let monthlyBurn = 0;
-    if (entryDates.first && entryDates.last) {
-      const firstDate = new Date(entryDates.first);
-      const lastDate = new Date(entryDates.last);
-      const months = Math.max(1, (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + lastDate.getMonth() - firstDate.getMonth());
-      monthlyBurn = (burnRow?.burn || 0) / months;
-    }
-
-    const nonOWTotal = totalCashFiat;
-    const runway = monthlyBurn > 0 ? Math.round(nonOWTotal / monthlyBurn) : null;
-
-    // Overdrawn accounts (alerts)
-    const overdrawn = db.prepare(`
-      SELECT company_name, account_code, account_name, balance
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type = 'asset_cash' AND balance < -1000
-      ORDER BY balance ASC LIMIT 10
-    `).all(currentSnap) as any[];
-
-    // IC imbalances
-    const icImbalances = db.prepare(`
-      SELECT account_code, account_name, SUM(balance) as net
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_code LIKE '303%'
-      GROUP BY account_code, account_name
-      HAVING ABS(net) > 10000
-      ORDER BY ABS(net) DESC LIMIT 5
-    `).all(currentSnap) as any[];
-
-    // Cash by entity group for chart Ã¢ÂÂ split into bank and crypto
-    const CRYPTO_CURRENCIES = ['BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE'];
-    const entityCash: any[] = [];
-    // Get per-entity bank vs crypto split
-    const entityDetailRows = db.prepare(`
-      SELECT company_id, currency, balance
-      FROM account_balances
-      WHERE snapshot_date = ? AND account_type = 'asset_cash' AND ABS(balance) > 0.01
-    `).all(currentSnap) as any[];
-
-    const entityBankCash: Record<string, number> = {};
-    const entityCryptoCash: Record<string, number> = {};
-    for (const r of entityDetailRows) {
-      const group = companyToGroup[r.company_id] || 'Other';
-      if (CRYPTO_CURRENCIES.includes(r.currency)) {
-        entityCryptoCash[group] = (entityCryptoCash[group] || 0) + r.balance;
-      } else {
-        entityBankCash[group] = (entityBankCash[group] || 0) + r.balance;
-      }
-    }
-
-    for (const g of ENTITY_GROUPS) {
-      if (g.is_subtotal || g.is_manual) continue;
-      const bank = entityBankCash[g.name] || 0;
-      const crypto = entityCryptoCash[g.name] || 0;
-      const total = bank + crypto;
-      if (Math.abs(total) > 100) {
-        entityCash.push({ name: g.name, cash: total, bank, crypto });
-      }
-    }
-    entityCash.sort((a, b) => b.cash - a.cash);
-
-    // Cash trend from snapshots Ã¢ÂÂ aggregated weekly (use latest snapshot per ISO week)
-    const allSnaps = db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances ORDER BY snapshot_date`).all() as any[];
-    // Group snapshots by ISO week, keep only the latest snapshot per week
-    const weeklySnaps: any[] = [];
-    const seenWeeks = new Set<string>();
-    for (let i = allSnaps.length - 1; i >= 0; i--) {
-      const d = new Date(allSnaps[i].snapshot_date + 'T00:00:00Z');
-      const year = d.getUTCFullYear();
-      const jan1 = new Date(Date.UTC(year, 0, 1));
-      const weekNum = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getUTCDay() + 1) / 7);
-      const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`;
-      if (!seenWeeks.has(weekKey)) {
-        seenWeeks.add(weekKey);
-        weeklySnaps.unshift(allSnaps[i]);
-      }
-    }
-    const cashTrend = weeklySnaps.map((s: any) => {
-      const row = db.prepare(`
-        SELECT SUM(CASE WHEN company_id IN (${Array.from(nonOWGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as non_ow,
-               SUM(CASE WHEN company_id IN (${Array.from(owGroups).flatMap(g => ENTITY_GROUPS.find(eg => eg.name === g)?.company_ids || []).join(',')}) THEN balance ELSE 0 END) as ow
-        FROM account_balances WHERE snapshot_date = ? AND account_type = 'asset_cash'
-      `).get(s.snapshot_date) as any;
-      return { date: s.snapshot_date, non_ow: (row?.non_ow || 0) + foundationAssets, ow: row?.ow || 0 };
-    });
-
-    res.json({
-      snapshot_date: currentSnap,
-      prior_date: priorSnap,
-      // Net Assets per group
-      xterio_net_assets: xterioNetAssets,
-      xterio_net_assets_prior: priorXterioNetAssets,
-      foundation_net_assets: foundationNetAssets,
-      foundation_net_assets_prior: foundationNetAssets,
-      holdings_net_assets: holdingsNetAssets,
-      holdings_net_assets_prior: priorHoldingsNetAssets,
-      ow_net_assets: owNetAssets,
-      ow_net_assets_prior: priorOWNetAssets,
-      // Total group
-      total_group_net_assets: totalGroupNetAssets,
-      // Per-function waterfall
-      waterfall: {
-        foundation: { net_assets: foundationNetAssets, ...wfFoundation },
-        xterio: { net_assets: xterioNetAssets, ...wfXterio },
-        holdings: { net_assets: holdingsNetAssets, ...wfHoldings },
-        ow: { net_assets: owNetAssets, ...wfOW },
-      },
-      // Aggregated cash totals
-      total_cash_fiat: totalCashFiat,
-      total_cash_crypto: totalCashCrypto,
-      total_cash_all: totalCashAll,
-      // Backward compat
-      non_ow_cash: nonOWTotal,
-      ow_cash: owCash,
-      // Burn & runway
-      monthly_burn: monthlyBurn,
-      runway_months: runway,
-      entity_cash: entityCash,
-      cash_trend: cashTrend,
-      alerts: {
-        overdrawn,
-        ic_imbalances: icImbalances,
-      },
-    });
-  });
-
-  // Debug: dump all OW accounts for a given snapshot
-  router.get('/ow-accounts', (req, res) => {
-    const owCompanyIds = ENTITY_GROUPS
-      .filter(g => ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name) && !g.is_subtotal)
-      .flatMap(g => g.company_ids);
-    if (owCompanyIds.length === 0) return res.json({ accounts: [] });
-
-    const placeholders = owCompanyIds.map(() => '?').join(',');
-    const requestedDate = (req.query.as_of_date as string) || '';
-    const snapQuery = requestedDate
-      ? db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE snapshot_date <= ? AND company_id IN (${placeholders}) ORDER BY snapshot_date DESC LIMIT 1`).get(requestedDate, ...owCompanyIds) as any
-      : db.prepare(`SELECT DISTINCT snapshot_date FROM account_balances WHERE company_id IN (${placeholders}) ORDER BY snapshot_date DESC LIMIT 1`).get(...owCompanyIds) as any;
-    const snapDate = snapQuery?.snapshot_date;
-    if (!snapDate) return res.json({ accounts: [], snapshot_date: null });
-
-    const rows = db.prepare(`
-      SELECT account_code as code, account_name as name, account_type, company_name, SUM(balance) as balance
-      FROM account_balances
-      WHERE snapshot_date = ? AND company_id IN (${placeholders}) AND ABS(balance) > 0.5
-      GROUP BY account_code, account_name, account_type, company_name
-      ORDER BY account_type, account_code, company_name
-    `).all(snapDate, ...owCompanyIds) as any[];
-
-    // Also show the categorization for each account
-    const categorized = rows.map((r: any) => {
-      let category = 'EXCLUDED';
-      if (r.account_type === 'asset_cash') category = 'Cash';
-      else if (r.code.startsWith('303')) category = 'OR From Xterio';
-      else if (r.code === '101000') category = 'AR';
-      else if (r.code === '101010' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') category = 'NoteReceivable';
-      else if (r.code === '300030' || r.code === '300000') category = 'Payables';
-      else if (r.code === '301000' || r.code === '302010') category = 'Accrual exp';
-      else if (r.code === '300040' || r.code === '300050') category = 'Thrackle Loan';
-      return { ...r, category };
-    });
-
-    res.json({ snapshot_date: snapDate, accounts: categorized });
-  });
-
-  // OW Closing Balance history Ã¢ÂÂ breakdown by line item across snapshots
-  router.get('/ow-closing', (req, res) => {
-    const owCompanyIds = ENTITY_GROUPS
-      .filter(g => ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name) && !g.is_subtotal)
-      .flatMap(g => g.company_ids);
-
-    if (owCompanyIds.length === 0) return res.json({ snapshots: [] });
-
-    const placeholders = owCompanyIds.map(() => '?').join(',');
-
-    // Get all available snapshot dates
-    const snapDates = db.prepare(
-      `SELECT DISTINCT snapshot_date FROM account_balances WHERE company_id IN (${placeholders}) ORDER BY snapshot_date`
-    ).all(...owCompanyIds) as any[];
-
-    const snapshots = snapDates.map((s: any) => {
-      const rows = db.prepare(`
-        SELECT account_code as code, account_name as name, account_type, SUM(balance) as balance
-        FROM account_balances
-        WHERE snapshot_date = ? AND company_id IN (${placeholders}) AND ABS(balance) > 0.01
-        GROUP BY account_code, account_name, account_type
-        ORDER BY account_code
-      `).all(s.snapshot_date, ...owCompanyIds) as any[];
-
-      // Categorize into closing balance line items matching Excel definition
-      // Only include curated line items Ã¢ÂÂ exclude equity, P&L, fixed assets, non-current assets
-      let cash = 0, orFromXterio = 0, ar = 0, noteReceivable = 0;
-      let payables = 0, accrualExp = 0, thrackle = 0;
-
-      for (const r of rows) {
-        const code = r.code;
-        const bal = r.balance;
-
-        // Cash (asset_cash Ã¢ÂÂ bank 100xxx + crypto 10Wxxx)
-        if (r.account_type === 'asset_cash') {
-          cash += bal;
-        }
-        // OR From Xterio Ã¢ÂÂ ALL intercompany accounts (303xxx)
-        else if (code.startsWith('303')) {
-          orFromXterio += bal;
-        }
-        // AR Ã¢ÂÂ Accounts Receivable (101000)
-        else if (code === '101000') {
-          ar += bal;
-        }
-        // NoteReceivable Ã¢ÂÂ Other Receivable (101010) + other current assets
-        else if (code === '101010' || r.account_type === 'asset_current' || r.account_type === 'asset_prepayments') {
-          noteReceivable += bal;
-        }
-        // Payables Ã¢ÂÂ Trade Payables (300030, 300000)
-        else if (code === '300030' || code === '300000') {
-          payables += bal;
-        }
-        // Accrued Expenses (301000, 302010)
-        else if (code === '301000' || code === '302010') {
-          accrualExp += bal;
-        }
-        // Thrackle Loan Ã¢ÂÂ Other Payables non-trade (300040, 300050)
-        else if (code === '300040' || code === '300050') {
-          thrackle += bal;
-        }
-        // All other accounts are excluded from OW closing balance
-      }
-
-      const total = cash + orFromXterio + ar + noteReceivable + payables + accrualExp + thrackle;
-
-      return {
-        date: s.snapshot_date,
-        cash,
-        or_from_xterio: orFromXterio,
-        ar,
-        note_receivable: noteReceivable,
-        payables,
-        accrual_exp: accrualExp,
-        thrackle_loan: thrackle,
-        total,
-      };
-    });
-
-    // Monthly burn from Excel: $250,000 (1 Month Bonus * 3 Years)
-    const monthlyBurn = 250000;
-    const latestTotal = snapshots.length > 0 ? snapshots[snapshots.length - 1].total : 0;
-    const availableBalance = latestTotal;
-    const runwayMonths = monthlyBurn > 0 ? Math.round(availableBalance / monthlyBurn) : null;
-
-    res.json({
-      snapshots,
-      summary: {
-        available_balance: availableBalance,
-        monthly_burn: monthlyBurn,
-        runway_months: runwayMonths,
-      },
-    });
-  });
-
-  // GET /api/dashboard/card-detail-csv - account balance CSV per dashboard card
-  router.get('/card-detail-csv', (req, res) => {
-    const card = (req.query.card as string) || '';
-    const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
-
-    // ── Foundation: manual_balances ───────────────────────────────────────────
-    if (card === 'foundation') {
-      const foundationPeriod = (() => {
-        const d = new Date(asOfDate + 'T00:00:00Z');
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      })();
-      // Try requested period; fall back to latest available period if no data
-      let foundRows = db.prepare(`
-        SELECT entity AS "Company", account_code AS "Account Code",
-               account_name AS "Account Name", period AS "Period",
-               amount_local AS "Amount (Local)", exchange_rate AS "Exchange Rate",
-               ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)"
-        FROM manual_balances
-        WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
-          AND period = ?
-        ORDER BY account_code
-      `).all(foundationPeriod) as any[];
-      // If no data for requested period, use the latest available period
-      if (!foundRows.length) {
-        const latestPeriod = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') ORDER BY period DESC LIMIT 1`).get() as any)?.period;
-        if (latestPeriod) {
-          foundRows = db.prepare(`
-            SELECT entity AS "Company", account_code AS "Account Code",
-                   account_name AS "Account Name", period AS "Period",
-                   amount_local AS "Amount (Local)", exchange_rate AS "Exchange Rate",
-                   ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)"
-            FROM manual_balances
-            WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
-              AND period = ?
-            ORDER BY account_code
-          `).all(latestPeriod) as any[];
-        }
-      }
-      const hdrs = foundRows.length ? Object.keys(foundRows[0]) : ['Company','Account Code','Account Name','Period','Amount (Local)','Exchange Rate','Balance (USD)'];
-      const csvLines = [hdrs.map(h => `"${h}"`).join(','), ...foundRows.map(r => hdrs.map(h => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="foundation-detail.csv"`);
-      return res.send('\uFEFF' + csvLines.join('\n'));
-    }
-
-    // ── All other cards: account_balances ─────────────────────────────────────────────────
-    const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
-    const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
-    const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name) && !g.is_subtotal).flatMap((g: any) => g.company_ids);
-    const allIds = ENTITY_GROUPS.filter((g: any) => !g.is_subtotal).flatMap((g: any) => g.company_ids);
-    let companyIds: number[] = [];
-    let label = '';
-    let extraFilter = '';
-    if (card === 'total_group') { companyIds = allIds; label = 'Total-Group'; }
-    else if (card === 'xterio') { companyIds = getIds(['LTECH, LTECH W3','AOD','XLABS, XLAB W3','PRIVILEGE HK']); label = 'Xterio'; }
-    else if (card === 'holdings') { companyIds = getIds(holdingsNames); label = 'Holdings'; }
-    else if (card === 'ow') { companyIds = getIds(owNames); label = 'OW'; }
-    else if (card === 'cash_fiat') { companyIds = allIds; label = 'Cash-Fiat'; extraFilter = ` AND ab.account_type = 'asset_cash' AND ab.currency IN ('USD', 'CNY', 'SGD')`; }
-    else if (card === 'cash_crypto') { companyIds = allIds; label = 'Cash-Crypto'; extraFilter = ` AND ab.account_type = 'asset_cash' AND ab.currency IN ('BNB', 'ETH', 'XTR', 'UST', 'WBN', 'USC', 'SHI', 'SPE')`; }
-    else { return res.status(400).json({ error: 'Unknown card: ' + card }); }
-    if (!companyIds.length) { return res.status(404).json({ error: 'No companies for card: ' + card }); }
-
-    const snapDate = (db.prepare(`SELECT snapshot_date FROM account_balances WHERE snapshot_date <= ? ORDER BY snapshot_date DESC LIMIT 1`).get(asOfDate) as any)?.snapshot_date;
-    if (!snapDate) { return res.send('No snapshot data'); }
-
+  function getNetAssets(companyIds: number[]) {
+    if (!companyIds.length) return { assets: 0, liabilities: 0, equity: 0, net_income: 0, net_assets: 0 };
     const ph = companyIds.map(() => '?').join(',');
-    // Non-cash cards: restrict to asset_* and liability_* only; exclude account 300040
-    // OW card excludes fixed/non-current assets (matches card calculation logic)
-    const owExtraTypeFilter = (card === 'ow') ? ` AND ab.account_type NOT IN ('asset_fixed','asset_non_current')` : '';
-    const typeFilter = extraFilter
-      ? ''
-      : ` AND (ab.account_type LIKE 'asset_%' OR ab.account_type LIKE 'liability_%') AND ab.account_code != '300040'${owExtraTypeFilter}`;
-    const rows = db.prepare(`
-      SELECT ab.company_name AS "Company",
-             ab.account_odoo_id AS "Odoo Account ID",
-             ab.account_code AS "Account Code",
-             ab.account_name AS "Account Name",
-             ab.account_type AS "Account Type",
-             COALESCE(ab.currency, 'USD') AS "Currency",
-             ab.balance AS "Balance (USD)",
-             ab.snapshot_date AS "Snapshot Date"
-      FROM account_balances ab
-      WHERE ab.snapshot_date = ? AND ab.company_id IN (${ph})${typeFilter}${extraFilter}
-      ORDER BY ab.company_name, ab.account_code
-    `).all(snapDate, ...companyIds) as any[];
-    const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company','Odoo Account ID','Account Code','Account Name','Account Type','Currency','Balance (USD)','Snapshot Date'];
-    const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) => hdrs2.map(h => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','))];
-    // For cash_fiat: also include Foundation fiat cash from manual_balances
-    if (card === 'cash_fiat') {
-      const foundationPeriod2 = (() => {
-        const d = new Date(asOfDate + 'T00:00:00Z');
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      })();
-      // Try requested period; fall back to latest available period if no data
-      let foundRows2 = db.prepare(`
-        SELECT entity AS "Company", NULL AS "Odoo Account ID",
-               account_code AS "Account Code", account_name AS "Account Name",
-               'asset_cash' AS "Account Type",
-               'USD' AS "Currency",
-               ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)",
-               ? AS "Snapshot Date"
-        FROM manual_balances
-        WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
-          AND period = ?
-        ORDER BY account_code
-      `).all(snapDate, foundationPeriod2) as any[];
-      if (!foundRows2.length) {
-        const latestPeriod2 = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') ORDER BY period DESC LIMIT 1`).get() as any)?.period;
-        if (latestPeriod2) {
-          foundRows2 = db.prepare(`
-            SELECT entity AS "Company", NULL AS "Odoo Account ID",
-                   account_code AS "Account Code", account_name AS "Account Name",
-                   'asset_cash' AS "Account Type",
-                   'USD' AS "Currency",
-                   ROUND(amount_local * exchange_rate, 2) AS "Balance (USD)",
-                   ? AS "Snapshot Date"
-            FROM manual_balances
-            WHERE entity = 'Xterio Foundation' AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')
-              AND period = ?
-            ORDER BY account_code
-          `).all(snapDate, latestPeriod2) as any[];
-        }
-      }
-      foundRows2.forEach((r: any) => {
-        csvLines2.push(hdrs2.map((h: string) => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','));
-      });
-    }
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${label}-detail.csv"`);
-    res.send('\uFEFF' + csvLines2.join('\n'));
+
+    const allTimeRows = db.prepare(`
+      SELECT a.odoo_type,
+             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.date <= ?
+        AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type != ''
+      GROUP BY a.odoo_type
+    `).all(asOfDate, ...companyIds) as any[];
+
+    const byType: Record<string, number> = {};
+    for (const r of allTimeRows) byType[r.odoo_type] = r.balance;
+
+    const cyRows = db.prepare(`
+      SELECT a.odoo_type,
+             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.date > ? AND je.date <= ?
+        AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type IN ('income', 'income_other', 'expense', 'expense_depreciation', 'expense_direct_cost')
+      GROUP BY a.odoo_type
+    `).all(currentYear + '-01-01', asOfDate, ...companyIds) as any[];
+
+    const byCY: Record<string, number> = {};
+    for (const r of cyRows) byCY[r.odoo_type] = r.balance;
+
+    const assets = (byType['asset_cash'] || 0) + (byType['asset_receivable'] || 0) +
+                   (byType['asset_current'] || 0) + (byType['asset_fixed'] || 0) +
+                   (byType['asset_non_current'] || 0);
+    const liabilities = (byType['liability_payable'] || 0) + (byType['liability_current'] || 0) +
+                        (byType['liability_non_current'] || 0);
+    const equity = byType['equity'] || 0;
+    const revenue = (byCY['income'] || 0) + (byCY['income_other'] || 0);
+    const expenses = (byCY['expense'] || 0) + (byCY['expense_depreciation'] || 0) +
+                     (byCY['expense_direct_cost'] || 0);
+    const net_income = -(revenue - expenses);
+
+    return { assets, liabilities, equity, net_income, net_assets: assets + liabilities + equity + net_income };
+  }
+
+  function getCash(companyIds: number[]) {
+    if (!companyIds.length) return 0;
+    const ph = companyIds.map(() => '?').join(',');
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as total
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted' AND je.date <= ?
+        AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id = li.account_id
+      WHERE a.odoo_type = 'asset_cash'
+    `).get(asOfDate, ...companyIds) as any;
+    return row?.total || 0;
+  }
+
+  // Foundation manual balances
+  const foundationPeriod = (() => {
+    const d = new Date(asOfDate + 'T00:00:00Z');
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  })();
+  let foundationData = db.prepare(`
+    SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET}) THEN amount_usd ELSE 0 END) as cash_usd
+    FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?
+  `).get(foundationPeriod) as any;
+  if (!foundationData?.net_assets) {
+    const latestP = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+    if (latestP) foundationData = db.prepare(`
+      SELECT SUM(amount_usd) as net_assets, SUM(CASE WHEN account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET}) THEN amount_usd ELSE 0 END) as cash_usd
+      FROM manual_balances WHERE entity = 'Xterio Foundation' AND period = ?
+    `).get(latestP) as any;
+  }
+  const foundationNetAssets = foundationData?.net_assets || 0;
+  const foundationCash = foundationData?.cash_usd || 0;
+
+  // Get net assets by group
+  const xterioNA = getNetAssets(XTERIO_IDS);
+  const owNA = getNetAssets(OW_IDS);
+  const holdingsNA = getNetAssets(HOLDINGS_IDS);
+  const allNA = getNetAssets(ALL_IDS);
+
+  // Cash totals
+  const xterioCash = getCash(XTERIO_IDS) + foundationCash;
+  const owCash = getCash(OW_IDS);
+  const holdingsCash = getCash(HOLDINGS_IDS);
+  const totalCash = xterioCash + owCash + holdingsCash;
+
+  // Waterfall: breakdown by group
+  const waterfall = [
+    { name: 'Xterio', net_assets: xterioNA.net_assets + foundationNetAssets, cash: xterioCash },
+    { name: 'OW', net_assets: owNA.net_assets, cash: owCash },
+    { name: 'Holdings', net_assets: holdingsNA.net_assets, cash: holdingsCash },
+  ];
+
+  // Per-entity cash breakdown
+  const entityCashRows = db.prepare(`
+    SELECT je.company_id, je.company_name,
+           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as cash
+    FROM line_items li
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted' AND je.date <= ?
+      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
+    INNER JOIN accounts a ON a.id = li.account_id
+    WHERE a.odoo_type = 'asset_cash'
+    GROUP BY je.company_id, je.company_name
+    HAVING ABS(cash) > 0.01
+    ORDER BY je.company_name
+  `).all(asOfDate, ...ALL_IDS) as any[];
+
+  const entity_cash = [
+    ...entityCashRows.map(r => ({ company_name: r.company_name, cash: r.cash })),
+    { company_name: 'Xterio Foundation', cash: foundationCash },
+  ];
+
+  // Burn rate: last 3 months expenses
+  const threeMonthsAgo = (() => {
+    const d = new Date(asOfDate + 'T00:00:00Z');
+    d.setMonth(d.getMonth() - 3);
+    return d.toISOString().slice(0, 10);
+  })();
+  const burnRow = db.prepare(`
+    SELECT COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as total_expense
+    FROM line_items li
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.date > ? AND je.date <= ?
+      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
+    INNER JOIN accounts a ON a.id = li.account_id
+    WHERE a.odoo_type IN ('expense', 'expense_direct_cost', 'expense_depreciation')
+  `).get(threeMonthsAgo, asOfDate, ...ALL_IDS) as any;
+  const monthlyBurn = (burnRow?.total_expense || 0) / 3;
+  const runway = monthlyBurn > 0 ? totalCash / monthlyBurn : null;
+
+  // 24-month cash trend
+  const cashTrendRows = db.prepare(`
+    SELECT strftime('%Y-%m', je.date) as month,
+           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as cumulative_cash
+    FROM line_items li
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
+    INNER JOIN accounts a ON a.id = li.account_id
+    WHERE a.odoo_type = 'asset_cash'
+    GROUP BY strftime('%Y-%m', je.date)
+    ORDER BY month DESC
+    LIMIT 24
+  `).all(...ALL_IDS) as any[];
+
+  const cash_trend = cashTrendRows.reverse().map(r => ({
+    month: r.month,
+    cash: r.cumulative_cash,
+  }));
+
+  // Overdrawn accounts
+  const overdrawnRows = db.prepare(`
+    SELECT je.company_name, a.code, a.name,
+           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    FROM line_items li
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted' AND je.date <= ?
+      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
+    INNER JOIN accounts a ON a.id = li.account_id
+    WHERE a.odoo_type = 'asset_cash'
+    GROUP BY je.company_id, a.code, a.name
+    HAVING balance < -0.01
+    ORDER BY balance
+  `).all(asOfDate, ...ALL_IDS) as any[];
+
+  const overdrawn_alerts = overdrawnRows.map(r => ({
+    company_name: r.company_name,
+    account_code: r.code,
+    account_name: r.name,
+    balance: r.balance,
+  }));
+
+  // IC imbalances: 303xxx accounts should net to zero
+  const icRows = db.prepare(`
+    SELECT je.company_name,
+           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as ic_balance
+    FROM line_items li
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted' AND je.date <= ?
+      AND je.company_id IN (${ALL_IDS.map(() => '?').join(',')})
+    INNER JOIN accounts a ON a.id = li.account_id
+    WHERE a.code LIKE '303%'
+    GROUP BY je.company_id, je.company_name
+    HAVING ABS(ic_balance) > 100
+    ORDER BY ABS(ic_balance) DESC
+  `).all(asOfDate, ...ALL_IDS) as any[];
+
+  const ic_imbalances = icRows.map(r => ({
+    company_name: r.company_name,
+    ic_balance: r.ic_balance,
+  }));
+
+  res.json({
+    as_of_date: asOfDate,
+    net_assets: {
+      xterio: xterioNA.net_assets + foundationNetAssets,
+      ow: owNA.net_assets,
+      holdings: holdingsNA.net_assets,
+      total: allNA.net_assets + foundationNetAssets,
+    },
+    cash: {
+      xterio: xterioCash,
+      ow: owCash,
+      holdings: holdingsCash,
+      total: totalCash,
+    },
+    waterfall,
+    entity_cash,
+    monthly_burn: monthlyBurn,
+    runway_months: runway,
+    cash_trend,
+    overdrawn_alerts,
+    ic_imbalances,
   });
+});
+// ─── /ow-accounts ────────────────────────────────────────────────────────────
+router.get('/ow-accounts', (req, res) => {
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
+
+  // OW group includes: OW[15,16], Reach[30], Rough house[31], Keystone/Play Algorithm[28]
+  const owCompanyIds = ENTITY_GROUPS
+    .filter((g: any) => !g.is_subtotal && !g.is_manual &&
+      ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name))
+    .flatMap((g: any) => g.company_ids as number[]);
+
+  if (!owCompanyIds.length) return res.json({ as_of_date: asOfDate, accounts: [] });
+
+  const ph = owCompanyIds.map(() => '?').join(',');
+
+  const rows = db.prepare(`
+    SELECT
+      je.company_id,
+      je.company_name,
+      a.code,
+      a.name,
+      a.odoo_type,
+      COALESCE(MAX(li.currency), 'USD') as currency,
+      COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
+    FROM accounts a
+    INNER JOIN line_items li ON li.account_id = a.id
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.date <= ?
+      AND je.company_id IN (${ph})
+    WHERE a.is_active = 1
+      AND (a.odoo_type LIKE 'asset_%' OR a.odoo_type LIKE 'liability_%')
+      AND a.odoo_type NOT IN ('asset_fixed', 'asset_non_current')
+    GROUP BY je.company_id, a.code, a.name, a.odoo_type
+    HAVING ABS(balance) > 0.01
+    ORDER BY je.company_name, a.code
+  `).all(asOfDate, ...owCompanyIds) as any[];
+
+  const accounts = rows.map(row => ({
+    company_id: row.company_id,
+    company_name: row.company_name,
+    account_code: row.code,
+    account_name: row.name,
+    account_type: row.odoo_type,
+    currency: row.currency,
+    balance: row.balance,
+  }));
+
+  res.json({ as_of_date: asOfDate, accounts });
+});
+// ─── /ow-closing ─────────────────────────────────────────────────────────────
+router.get('/ow-closing', (req, res) => {
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
+
+  // OW group company IDs
+  const owCompanyIds = ENTITY_GROUPS
+    .filter((g: any) => !g.is_subtotal && !g.is_manual &&
+      ['OW', 'Reach', 'Rough house', 'Keystone'].includes(g.name))
+    .flatMap((g: any) => g.company_ids as number[]);
+
+  if (!owCompanyIds.length) return res.json({ as_of_date: asOfDate, months: [] });
+
+  const ph = owCompanyIds.map(() => '?').join(',');
+
+  // Get end-of-month balances for the last 24 months
+  const monthsRows = db.prepare(`
+    SELECT DISTINCT strftime('%Y-%m', date) as month
+    FROM journal_entries
+    WHERE status = 'posted'
+      AND company_id IN (${ph})
+      AND date <= ?
+    ORDER BY month DESC
+    LIMIT 24
+  `).all(...owCompanyIds, asOfDate) as any[];
+
+  const months = monthsRows.map(r => r.month).reverse();
+
+  const result = months.map(month => {
+    const monthEnd = month + '-31'; // SQLite will clamp to last day
+    const lastDayRow = db.prepare(`SELECT MAX(date) as last_day FROM journal_entries WHERE status='posted' AND date LIKE ? AND company_id IN (${ph})`).get(month + '%', ...owCompanyIds) as any;
+    const lastDay = lastDayRow?.last_day || (month + '-01');
+
+    const balRow = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN a.odoo_type = 'asset_cash' THEN li.debit - li.credit ELSE 0 END), 0) as cash,
+        COALESCE(SUM(CASE WHEN a.odoo_type LIKE 'asset_%' AND a.odoo_type NOT IN ('asset_fixed','asset_non_current') THEN li.debit - li.credit ELSE 0 END), 0) as assets,
+        COALESCE(SUM(CASE WHEN a.odoo_type LIKE 'liability_%' THEN li.debit - li.credit ELSE 0 END), 0) as liabilities
+      FROM line_items li
+      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        AND je.status = 'posted'
+        AND je.date <= ?
+        AND je.company_id IN (${ph})
+      INNER JOIN accounts a ON a.id = li.account_id
+    `).get(lastDay, ...owCompanyIds) as any;
+
+    return {
+      month,
+      last_day: lastDay,
+      cash: balRow?.cash || 0,
+      assets: balRow?.assets || 0,
+      liabilities: balRow?.liabilities || 0,
+      net_assets: (balRow?.assets || 0) + (balRow?.liabilities || 0),
+    };
+  });
+
+  res.json({ as_of_date: asOfDate, months: result });
+});
+// ─── /card-detail-csv ────────────────────────────────────────────────────────
+router.get('/card-detail-csv', (req, res) => {
+  const card = (req.query.card as string) || '';
+  const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
+
+  // ── Foundation: manual_balances ──────────────────────────────────────────────
+  if (card === 'foundation') {
+    const foundationPeriod = (() => {
+      const d = new Date(asOfDate + 'T00:00:00Z');
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    })();
+
+    let foundRows = db.prepare(`
+      SELECT entity AS "Company", account_code AS "Account Code",
+             account_name AS "Account Name", period AS "Period",
+             amount_local AS "Amount Local", exchange_rate AS "Exchange Rate",
+             ROUND(amount_local * exchange_rate, 2) AS "Balance USD"
+      FROM manual_balances
+      WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+        AND period = ?
+      ORDER BY account_code
+    `).all(foundationPeriod) as any[];
+
+    if (!foundRows.length) {
+      const latestPeriod = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+      if (latestPeriod) {
+        foundRows = db.prepare(`
+          SELECT entity AS "Company", account_code AS "Account Code",
+                 account_name AS "Account Name", period AS "Period",
+                 amount_local AS "Amount Local", exchange_rate AS "Exchange Rate",
+                 ROUND(amount_local * exchange_rate, 2) AS "Balance USD"
+          FROM manual_balances
+          WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+            AND period = ?
+          ORDER BY account_code
+        `).all(latestPeriod) as any[];
+      }
+    }
+
+    const hdrs = foundRows.length ? Object.keys(foundRows[0]) : ['Company', 'Account Code', 'Account Name', 'Period', 'Amount Local', 'Exchange Rate', 'Balance USD'];
+    const csvLines = [hdrs.map(h => `"${h}"`).join(','), ...foundRows.map(r =>
+      hdrs.map((h: string) => { const v = (r as any)[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(',')
+    )];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="foundation-detail.csv"');
+    return res.send('\uFEFF' + csvLines.join('\n'));
+  }
+
+  // ── All other cards: JE-based ─────────────────────────────────────────────────
+  const holdingsNames = ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'];
+  const owNames = ['OW', 'Reach', 'Rough house', 'Keystone'];
+  const getIds = (names: string[]) => ENTITY_GROUPS.filter(g => names.includes(g.name)).flatMap((g: any) => g.company_ids as number[]);
+  const allIds = ENTITY_GROUPS.filter((g: any) => !g.is_subtotal).flatMap((g: any) => g.company_ids as number[]);
+  let companyIds: number[] = [];
+  let label = '';
+  let typeFilter = '';
+
+  if (card === 'total_group') { companyIds = allIds; label = 'Total-Group'; }
+  else if (card === 'xterio') { companyIds = getIds(['LTECH', 'LTECH W3', 'AOD', 'XLABS', 'XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation']); label = 'Xterio'; }
+  else if (card === 'holdings') { companyIds = getIds(holdingsNames); label = 'Holdings'; }
+  else if (card === 'ow') {
+    companyIds = getIds(owNames); label = 'OW';
+    typeFilter = `AND a.odoo_type NOT IN ('asset_fixed', 'asset_non_current')`;
+  }
+  else if (card === 'cash_fiat') {
+    companyIds = allIds; label = 'Cash-Fiat';
+    typeFilter = `AND a.odoo_type = 'asset_cash' AND a.currency != 'USDT' AND a.currency != 'ETH' AND a.currency != 'BTC'`;
+  }
+  else if (card === 'cash_crypto') {
+    companyIds = allIds; label = 'Cash-Crypto';
+    typeFilter = `AND a.odoo_type = 'asset_cash' AND (a.currency = 'USDT' OR a.currency = 'ETH' OR a.currency = 'BTC')`;
+  }
+  else return res.status(400).json({ error: 'Unknown card: ' + card });
+
+  if (!companyIds.length) return res.status(404).json({ error: 'No companies for card: ' + card });
+
+  const ph = companyIds.map(() => '?').join(',');
+  const dateStr = asOfDate.replace(/'/g, '');
+
+  const baseTypeFilter = typeFilter || `AND (a.odoo_type LIKE 'asset_%' OR a.odoo_type LIKE 'liability_%') AND a.code != '300040'`;
+
+  const rows = db.prepare(`
+    SELECT je.company_name AS "Company",
+           a.odoo_id AS "Odoo Account ID",
+           a.code AS "Account Code",
+           a.name AS "Account Name",
+           a.odoo_type AS "Account Type",
+           COALESCE(MAX(li.currency), 'USD') AS "Currency",
+           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) AS "Balance USD",
+           '${dateStr}' AS "Snapshot Date"
+    FROM accounts a
+    INNER JOIN line_items li ON li.account_id = a.id
+    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+      AND je.status = 'posted'
+      AND je.date <= '${dateStr}'
+      AND je.company_id IN (${ph})
+    WHERE a.is_active = 1 ${baseTypeFilter}
+    GROUP BY je.company_name, a.code, a.name, a.odoo_type
+    HAVING ABS("Balance USD") > 0.01
+    ORDER BY je.company_name, a.code
+  `).all(...companyIds) as any[];
+
+  const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company', 'Odoo Account ID', 'Account Code', 'Account Name', 'Account Type', 'Currency', 'Balance USD', 'Snapshot Date'];
+  const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) =>
+    hdrs2.map((h: string) => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(',')
+  )];
+
+  // For cash_fiat: also include Foundation fiat cash from manual_balances
+  if (card === 'cash_fiat') {
+    const foundationPeriod2 = (() => {
+      const d = new Date(asOfDate + 'T00:00:00Z');
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    })();
+
+    let foundRows2 = db.prepare(`
+      SELECT entity AS "Company", NULL AS "Odoo Account ID",
+             account_code AS "Account Code", account_name AS "Account Name",
+             'asset_cash' AS "Account Type",
+             'USD' AS "Currency",
+             ROUND(amount_local * exchange_rate, 2) AS "Balance USD",
+             ? AS "Snapshot Date"
+      FROM manual_balances
+      WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+        AND period = ?
+      ORDER BY account_code
+    `).all(dateStr, foundationPeriod2) as any[];
+
+    if (!foundRows2.length) {
+      const latestPeriod2 = (db.prepare(`SELECT period FROM manual_balances WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET}) ORDER BY period DESC LIMIT 1`).get() as any)?.period;
+      if (latestPeriod2) {
+        foundRows2 = db.prepare(`
+          SELECT entity AS "Company", NULL AS "Odoo Account ID",
+                 account_code AS "Account Code", account_name AS "Account Name",
+                 'asset_cash' AS "Account Type",
+                 'USD' AS "Currency",
+                 ROUND(amount_local * exchange_rate, 2) AS "Balance USD",
+                 ? AS "Snapshot Date"
+          FROM manual_balances
+          WHERE entity = 'Xterio Foundation' AND account_code NOT IN (${FOUNDATION_IC}, ${FOUNDATION_NET})
+            AND period = ?
+          ORDER BY account_code
+        `).all(dateStr, latestPeriod2) as any[];
+      }
+    }
+
+    foundRows2.forEach((r: any) => {
+      csvLines2.push(hdrs2.map((h: string) => { const v = r[h]; return typeof v === 'number' ? v : `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(','));
+    });
+  }
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${label}-detail.csv"`);
+  res.send('\uFEFF' + csvLines2.join('\n'));
+});
 
   return router;
 }
