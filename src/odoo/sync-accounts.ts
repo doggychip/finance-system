@@ -45,7 +45,7 @@ export async function syncAccounts(odoo: OdooClient, db: Database.Database): Pro
   const odooAccounts = await odoo.searchRead(
     'account.account',
     [],
-    ['id', 'name', 'code', 'account_type', 'deprecated'],
+    ['id', 'name', 'code', 'account_type', 'active'],
     { order: 'code asc' }
   );
 
@@ -77,7 +77,7 @@ export async function syncAccounts(odoo: OdooClient, db: Database.Database): Pro
         if (!code || !accountType) continue;
 
         const mappedType = mapOdooType(accountType);
-        const isActive = acc.deprecated === true ? 0 : 1;
+        const isActive = acc.active === false ? 0 : 1; // Odoo 19: active=false means archived
 
         const existing = getByOdooId.get(odooId) as { id: string } | undefined;
 
