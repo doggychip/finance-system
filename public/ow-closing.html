@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OW Closing Balance — Finance Dashboard</title>
+  <title>OW Closing Balance â Finance Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: text; -webkit-user-select: text; }
     :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --yellow: #eab308; --blue: #3b82f6; --cyan: #06b6d4; }
@@ -39,12 +39,30 @@
     .neg { color: var(--red); }
 
     .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-dim); }
+  
+    .summary-card { position: relative; }
+    /* Card actions buttons */
+    .card-actions { position: absolute; top: 12px; right: 12px; display: flex; gap: 5px; z-index: 10; }
+    .card-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-dim); padding: 2px 5px; border-radius: 5px; line-height: 1; transition: color 0.15s, background 0.15s; }
+    .card-btn:hover { background: var(--surface2); }
+    .card-btn.info-btn:hover { color: var(--accent); }
+    .card-btn.dl-btn:hover { color: var(--cyan); }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:2000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px 30px; max-width:580px; width:92%; position:relative; max-height:82vh; overflow-y:auto; }
+    .modal-box h3 { font-size:15px; font-weight:700; margin-bottom:16px; }
+    .modal-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer; line-height:1; }
+    .modal-close:hover { color:var(--text); }
+    .info-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; gap:14px; }
+    .info-row:last-child { border-bottom:none; }
+    .info-row .lbl { color:var(--text-dim); white-space:nowrap; flex-shrink:0; }
+    .info-row .val { color:var(--text); text-align:right; }
   </style>
   <script src="/auth.js"></script>
 </head>
 <body>
   <div class="header">
-    <h1>OW & Reach Closing Balance <span style="font-size:12px;color:#8b8fa3;font-weight:400" title="Entities: OW(15,16), Reach(30), Rough house(31), Keystone(28). Net Assets = Assets + Liabilities. Excl. fixed assets. From Odoo snapshots.">ⓘ Net Assets, excl. fixed assets</span></h1>
+    <h1>OW & Reach Closing Balance <span style="font-size:12px;color:#8b8fa3;font-weight:400" title="Entities: OW(15,16), Reach(30), Rough house(31), Keystone(28). Net Assets = Assets + Liabilities. Excl. fixed assets. From Odoo snapshots.">â Net Assets, excl. fixed assets</span></h1>
     <div class="nav">
       <a href="/">Overview</a>
       <a href="/reports.html">Reports</a>
@@ -57,16 +75,19 @@
   <div class="container">
     <div class="summary-row">
       <div class="summary-card">
+        <div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('ow_avail')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('ow_avail')">⊕</button></div>
         <div class="label">Available Balance</div>
         <div class="value" id="availBal" style="color:var(--green)">--</div>
         <div class="sub" id="availSub"></div>
       </div>
       <div class="summary-card">
+        <div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('ow_burn')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('ow_burn')">⊕</button></div>
         <div class="label">OW Monthly Burn</div>
         <div class="value" id="monthlyBurn">--</div>
         <div class="sub">Estimated from balance changes</div>
       </div>
       <div class="summary-card">
+        <div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('ow_runway')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('ow_runway')">⊕</button></div>
         <div class="label">Runway (Months)</div>
         <div class="value" id="runway" style="color:var(--cyan)">--</div>
         <div class="sub">At current burn rate</div>
@@ -74,7 +95,7 @@
     </div>
 
     <div class="card">
-      <h2>OW & Reach Group — Closing Balance History</h2>
+      <h2>OW & Reach Group â Closing Balance History</h2>
       <div id="tableContainer"><div class="loading">Loading...</div></div>
     </div>
 
@@ -239,7 +260,38 @@
 
     load();
     loadAccountDetail();
+  
+    var CARD_INFO = {
+      ow_avail: { title: 'Available Balance — Construction', formula: '<strong>Available Balance</strong> = Cash + OR from Xterio + AR + Note Receivable - Payables', rows: [['Entities','OW + Reach + Rough House'],['Components','Cash, intercompany receivables, AR, payables'],['Excludes','Fixed assets, equity accounts'],['Data source','Odoo snapshot']] },
+      ow_burn: { title: 'OW Monthly Burn — Construction', formula: '<strong>Monthly Burn</strong> = Estimated from recent balance changes', rows: [['Calculation','Average monthly balance decrease over recent periods'],['Note','Estimate only — actual burn may vary']] },
+      ow_runway: { title: 'Runway (Months) — Construction', formula: '<strong>Runway</strong> = Available Balance / Monthly Burn', rows: [['Calculation','Available Balance divided by estimated monthly burn'],['Note','Based on current burn rate estimate'],['Warning','Varies significantly with one-time items']] }
+    };
+    // Card info modal functions
+    function showCardInfo(card) {
+      var info = CARD_INFO[card]; if (!info) return;
+      document.getElementById('cardModalTitle').textContent = info.title;
+      var body = '<div class="info-formula">' + info.formula + '</div>';
+      body += info.rows.map(function(r){return '<div class="info-row"><span class="lbl">'+r[0]+'</span><span class="val">'+r[1]+'</span></div>';}).join('');
+      document.getElementById('cardModalBody').innerHTML = body;
+      document.getElementById('cardInfoModal').classList.add('open');
+    }
+    function closeCardModal() { document.getElementById('cardInfoModal').classList.remove('open'); }
+    function downloadCardDetail(card) {
+      var asOf = (document.getElementById('asOfDate') || {}).value || (new Date(new Date().getFullYear(), new Date().getMonth(), 0)).toISOString().split('T')[0];
+      var a = document.createElement('a');
+      a.href = '/api/dashboard/card-detail-csv?card=' + encodeURIComponent(card) + '&as_of_date=' + encodeURIComponent(asOf);
+      a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
   </script>
-<script src="/chat-widget.js"></script>
+
+  <!-- Card Info Modal -->
+  <div class="modal-overlay" id="cardInfoModal" onclick="if(event.target===this)closeCardModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeCardModal()">&#x2715;</button>
+      <h3 id="cardModalTitle"></h3>
+      <div id="cardModalBody"></div>
+    </div>
+  </div>
+  <script src="/chat-widget.js"></script>
 </body>
 </html>
