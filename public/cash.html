@@ -547,7 +547,7 @@
           });
         });
 
-        var html = '<div style="font-size:11px;color:var(--text-dim);padding:8px 0">As at <strong>' + (document.getElementById('asOfDate').value || data.snapshot_date) + '</strong> | Prior: ' + data.prior_date + '</div>';
+        var html = '<div style="font-size:11px;color:var(--text-dim);padding:8px 0">As at <strong>' + data.snapshot_date + '</strong> | Prior: ' + data.prior_date + '</div>';
         html += '<table><thead><tr><th>Entity / Company</th><th class="val">Balance (USD)</th><th class="val">Prior</th><th class="val">Change</th><th class="val">%</th></tr></thead><tbody>';
         var grandCur = 0, grandPrior = 0;
 
