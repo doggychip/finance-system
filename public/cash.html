@@ -334,7 +334,7 @@
         ' | Holdings: ' + fmtShort((wf.holdings?.cash_fiat||0)+(wf.holdings?.cash_crypto||0)) +
         ' | OW: ' + fmtShort((wf.ow?.cash_fiat||0)+(wf.ow?.cash_crypto||0)) +
         ' | Foundation: ' + fmtShort(foundationTotal);
-      breakdownParts += ' | ' + (document.getElementById('cashAsOfDate').value || data.snapshot_date || '');
+      breakdownParts += ' | ' + (data.snapshot_date || '');
       document.getElementById('heroSub').textContent = breakdownParts;
 
       var totalAccountCount = allAccs.length;
