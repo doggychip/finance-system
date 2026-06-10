@@ -1453,7 +1453,7 @@ router.get('/executive-summary', (req, res) => {
       const assetTypes = excludeFixedAssets
         ? `'asset_cash','asset_receivable','asset_current','asset_prepayments','liability_current','liability_payable','liability_non_current','liability_credit_card'`
         : `'asset_cash','asset_receivable','asset_current','asset_prepayments','asset_fixed','asset_non_current','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
-              const rows = db.prepare(`SELECT ab.account_type as odoo_type, SUM(ab.balance) as bal FROM account_balances ab INNER JOIN (SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date FROM account_balances WHERE snapshot_date <= ? AND company_id IN (${ph}) GROUP BY company_id, account_odoo_id) latest ON ab.company_id = latest.company_id AND ab.account_odoo_id = latest.account_odoo_id AND ab.snapshot_date = latest.max_date WHERE ab.account_type IN (${assetTypes}) AND ab.account_code != '300040' GROUP BY ab.account_type`).all(asOf, ...ids) as any[];
+              const rows = db.prepare(`SELECT ab.account_type as odoo_type, SUM(ab.balance) as bal FROM account_balances ab INNER JOIN (SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date FROM account_balances WHERE snapshot_date BETWEEN ? AND ? AND company_id IN (${ph}) GROUP BY company_id, account_odoo_id) latest ON ab.company_id = latest.company_id AND ab.account_odoo_id = latest.account_odoo_id AND ab.snapshot_date = latest.max_date WHERE ab.account_type IN (${assetTypes}) AND ab.account_code != '300040' GROUP BY ab.account_type`).all(asOf.substring(0,7)+'-01', asOf, ...ids) as any[];
       const bt: Record<string, number> = {};
       for (const r of rows) bt[r.odoo_type] = r.bal;
       const assets = (bt['asset_cash']||0)+(bt['asset_receivable']||0)+(bt['asset_current']||0)+(bt['asset_prepayments']||0)+(excludeFixedAssets?0:((bt['asset_fixed']||0)+(bt['asset_non_current']||0)));
@@ -1628,7 +1628,7 @@ router.get('/ow-closing', (req, res) => {
       if (r.odoo_type === 'asset_cash') { cash += bal; }
       else if (code.startsWith('303')) { orFromXterio += bal; }
       else if (code === '101000') { ar += bal; }
-      else if (code === '101010' || r.odoo_type === 'asset_current' || r.odoo_type === 'asset_prepayments') { noteReceivable += bal; }
+      else if (code === '101010' || r.odoo_type === 'asset_hcurrent' || r.odoo_type === 'asset_prepayments') { noteReceivable += bal; }
       else if (code === '300030' || code === '300000') { payables += bal; }
       else if (code === '301000' || code === '302010') { accrualExp += bal; }
       else if (code === '300040' || code === '300050') { thrackle += bal; }
@@ -1737,12 +1737,12 @@ router.get('/card-detail-csv', (req, res) => {
                                                                                                                                                                INNER JOIN (
                                                                                                                                                                            SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date
                                                                                                                                                                                        FROM account_balances
-                                                                                                                                                                                                   WHERE snapshot_date <= '${dateStr}' AND company_id IN (${ph})
+                                                                                                                                                                                                   WHERE snapshot_date BETWEEN '${dateStr.substring(0,7)}-01' AND '${dateStr}' AND company_id IN (${ph})
                                                                                                                                                                                                                GROUP BY company_id, account_odoo_id
                                                                                                                                                                                                                          ) latest ON ab.company_id = latest.company_id
                                                                                                                                                                                                                                      AND ab.account_odoo_id = latest.account_odoo_id
                                                                                                                                                                                                                                                  AND ab.snapshot_date = latest.max_date
-                                                                                                                                                                                                                                                           WHERE ${baseTypeFilter}
+                                                                                                                                                                                                                                                           WHERE 1=1 ${baseTypeFilter}
                                                                                                                                                                                                                                                                      HAVING ABS(ab.balance) > 0.01
                                                                                                                                                                                                                                                                                ORDER BY ab.company_name, ab.account_code
                                                                                                                                                                                                                                                                                        `).all(...companyIds) as any[];
