@@ -10,7 +10,7 @@
     :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 
-    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .header { background: var(--surface); borhder-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
     .header h1 { font-size: 20px; font-weight: 700; }
     .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
     .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
@@ -141,28 +141,28 @@
     <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('foundation')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('foundation')">⊕</button></div>
-        <div class="label" title="Xterio Foundation (22) — manual entry">Foundation <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="label" title="Xterio Foundation (22) — manual entry">Xterio Foundation <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
         <div class="value" id="heroFoundation" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroFoundationChange"></div>
         <div class="sub" id="heroFoundationSub"></div>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('xterio')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('xterio')">⊕</button></div>
-        <div class="label" title="LTECH+LTECH W3+AOD+XLABS+XLAB W3+PRIVILEGE HK+Xterio Foundation">Xterio <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="label" title="LTECH+LTECH W3+AOD+XLABS+XLAB W3+PRIVILEGE HK+Xterio Foundation">Xterio ExclFoundation <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
         <div class="value" id="heroXterio" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroXterioChange"></div>
         <div class="sub" id="heroXterioSub"></div>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('holdings')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('holdings')">⊕</button></div>
-        <div class="label" title="CS+Palios+LHOLDINGS+QUANTUMMIND">Holdings <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="label" title="CS+Palios+LHOLDINGS+QUANTUMMIND">Lholding Total <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
         <div class="value" id="heroHoldings" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroHoldingsChange"></div>
         <div class="sub" id="heroHoldingsSub"></div>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('ow')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('ow')">⊕</button></div>
-        <div class="label" title="OW+Reach+Rough house+Keystone, excl fixed assets">Overworld <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
+        <div class="label" title="OW+Reach+Rough house+Keystone, excl fixed assets">OW & Reach <span style="cursor:help;color:var(--text-dim)">ⓘ</span></div>
         <div class="value" id="heroOWClosing" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroOWClosingChange"></div>
         <div class="sub" id="heroOWClosingSub"></div>
@@ -290,7 +290,7 @@
         var totalGroupNA = data.total_group_net_assets || 0;
         document.getElementById('heroTotalNA').textContent = fmt(totalGroupNA);
         var _displayDate = data.snapshot_date;
-        document.getElementById('heroTotalNASub').textContent = 'As of ' + _displayDate + ' | Foundation + Xterio + Holdings + OW';
+        document.getElementById('heroTotalNASub').textContent = 'As of ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
 
         // Level 2: 4 Function Net Assets
         fillWidget('heroFoundation', data.foundation_net_assets, data.foundation_net_assets_prior, 'Manual entry');
@@ -301,7 +301,7 @@
         // Level 3: Per-function waterfall table
         var wf = data.waterfall || {};
         var funcs = ['foundation', 'xterio', 'holdings', 'ow'];
-        var funcLabels = ['Foundation', 'Xterio', 'Holdings', 'OW'];
+        var funcLabels = ['Xterio Foundation', 'Xterio ExclFoundation', 'Lholding Total', 'OW & Reach'];
         var rowDefs = [
           { key: 'net_assets', label: 'Net Assets (after adj)', bold: true },
           { key: 'adj_300040', label: '  incl. Adj: 300040 investment', bold: false },
