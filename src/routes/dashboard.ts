@@ -1701,7 +1701,7 @@ router.get('/card-detail-csv', (req, res) => {
   let typeFilter = '';
 
   if (card === 'total_group') { companyIds = allIds; label = 'Total-Group'; }
-  else if (card === 'xterio') { companyIds = getIds(['LTECH', 'LTECH W3', 'AOD', 'XLABS', 'XLAB W3', 'PRIVILEGE HK', 'Xterio Foundation']); label = 'Xterio'; }
+  else if (card === 'xterio') { companyIds = getIds(['LTECH, LTECH W3', 'AOD', 'XLABS, XLAB W3', 'PRIVILEGE HK']); label = 'Xterio-ExclFoundation'; }
   else if (card === 'holdings') { companyIds = getIds(holdingsNames); label = 'Holdings'; }
   else if (card === 'ow') {
     companyIds = getIds(owNames); label = 'OW';
