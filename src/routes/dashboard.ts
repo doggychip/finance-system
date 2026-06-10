@@ -1453,7 +1453,7 @@ router.get('/executive-summary', (req, res) => {
       const assetTypes = excludeFixedAssets
         ? `'asset_cash','asset_receivable','asset_current','asset_prepayments','liability_current','liability_payable','liability_non_current','liability_credit_card'`
         : `'asset_cash','asset_receivable','asset_current','asset_prepayments','asset_fixed','asset_non_current','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
-      const rows = db.prepare(`SELECT a.odoo_type, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type IN (${assetTypes}) AND a.code != '300040' GROUP BY a.odoo_type`).all(asOf, ...ids) as any[];
+              const rows = db.prepare(`SELECT ab.account_type as odoo_type, SUM(ab.balance) as bal FROM account_balances ab INNER JOIN (SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date FROM account_balances WHERE snapshot_date <= ? AND company_id IN (${ph}) GROUP BY company_id, account_odoo_id) latest ON ab.company_id = latest.company_id AND ab.account_odoo_id = latest.account_odoo_id AND ab.snapshot_date = latest.max_date WHERE ab.account_type IN (${assetTypes}) AND ab.account_code != '300040' GROUP BY ab.account_type`).all(asOf, ...ids) as any[];
       const bt: Record<string, number> = {};
       for (const r of rows) bt[r.odoo_type] = r.bal;
       const assets = (bt['asset_cash']||0)+(bt['asset_receivable']||0)+(bt['asset_current']||0)+(bt['asset_prepayments']||0)+(excludeFixedAssets?0:((bt['asset_fixed']||0)+(bt['asset_non_current']||0)));
@@ -1705,15 +1705,15 @@ router.get('/card-detail-csv', (req, res) => {
   else if (card === 'holdings') { companyIds = getIds(holdingsNames); label = 'Holdings'; }
   else if (card === 'ow') {
     companyIds = getIds(owNames); label = 'OW';
-    typeFilter = `AND a.odoo_type NOT IN ('asset_fixed', 'asset_non_current')`;
+          typeFilter = `AND ab.account_type NOT IN ('asset_fixed', 'asset_non_current')`;
   }
   else if (card === 'cash_fiat') {
     companyIds = allIds; label = 'Cash-Fiat';
-    typeFilter = `AND a.odoo_type = 'asset_cash' AND li.currency != 'USDT' AND li.currency != 'ETH' AND li.currency != 'BTC'`;
+          typeFilter = `AND ab.account_type = 'asset_cash' AND ab.currency NOT IN ('USDT','ETH','BTC','BNB','XTR','WBN','SPE','MNT','USC','WET','XTE')`;
   }
   else if (card === 'cash_crypto') {
     companyIds = allIds; label = 'Cash-Crypto';
-    typeFilter = `AND a.odoo_type = 'asset_cash' AND (li.currency = 'USDT' OR li.currency = 'ETH' OR li.currency = 'BTC')`;
+          typeFilter = `AND ab.account_type = 'asset_cash' AND ab.currency IN ('USDT','ETH','BTC','BNB','XTR','WBN','SPE','MNT','USC','WET','XTE')`;
   }
   else return res.status(400).json({ error: 'Unknown card: ' + card });
 
@@ -1722,28 +1722,30 @@ router.get('/card-detail-csv', (req, res) => {
   const ph = companyIds.map(() => '?').join(',');
   const dateStr = asOfDate.replace(/'/g, '');
 
-  const baseTypeFilter = typeFilter || `AND (a.odoo_type LIKE 'asset_%' OR a.odoo_type LIKE 'liability_%') AND a.code != '300040'`;
+          const baseTypeFilter = typeFilter || `AND (ab.account_type LIKE 'asset_%' OR ab.account_type LIKE 'liability_%') AND ab.account_code != '300040'`;
 
-  const rows = db.prepare(`
-    SELECT je.company_name AS "Company",
-           a.odoo_id AS "Odoo Account ID",
-           a.code AS "Account Code",
-           a.name AS "Account Name",
-           a.odoo_type AS "Account Type",
-           COALESCE(MAX(li.currency), 'USD') AS "Currency",
-           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) AS "Balance USD",
-           '${dateStr}' AS "Snapshot Date"
-    FROM accounts a
-    INNER JOIN line_items li ON li.account_id = a.id
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted'
-      AND je.date <= '${dateStr}'
-      AND je.company_id IN (${ph})
-    WHERE a.is_active = 1 ${baseTypeFilter}
-    GROUP BY je.company_name, a.code, a.name, a.odoo_type
-    HAVING ABS("Balance USD") > 0.01
-    ORDER BY je.company_name, a.code
-  `).all(...companyIds) as any[];
+          const rows = db.prepare(`
+                    SELECT ab.company_name AS "Company",
+                                     ab.account_odoo_id AS "Odoo Account ID",
+                                                      ab.account_code AS "Account Code",
+                                                                       ab.account_name AS "Account Name",
+                                                                                        ab.account_type AS "Account Type",
+                                                                                                         ab.currency AS "Currency",
+                                                                                                                          ab.balance AS "Balance USD",
+                                                                                                                                           ab.snapshot_date AS "Snapshot Date"
+                                                                                                                                                     FROM account_balances ab
+                                                                                                                                                               INNER JOIN (
+                                                                                                                                                                           SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date
+                                                                                                                                                                                       FROM account_balances
+                                                                                                                                                                                                   WHERE snapshot_date <= '${dateStr}' AND company_id IN (${ph})
+                                                                                                                                                                                                               GROUP BY company_id, account_odoo_id
+                                                                                                                                                                                                                         ) latest ON ab.company_id = latest.company_id
+                                                                                                                                                                                                                                     AND ab.account_odoo_id = latest.account_odoo_id
+                                                                                                                                                                                                                                                 AND ab.snapshot_date = latest.max_date
+                                                                                                                                                                                                                                                           WHERE ${baseTypeFilter}
+                                                                                                                                                                                                                                                                     HAVING ABS(ab.balance) > 0.01
+                                                                                                                                                                                                                                                                               ORDER BY ab.company_name, ab.account_code
+                                                                                                                                                                                                                                                                                       `).all(...companyIds) as any[];
 
   const hdrs2 = rows.length ? Object.keys(rows[0]) : ['Company', 'Odoo Account ID', 'Account Code', 'Account Name', 'Account Type', 'Currency', 'Balance USD', 'Snapshot Date'];
   const csvLines2 = [hdrs2.map(h => `"${h}"`).join(','), ...rows.map((r: any) =>
