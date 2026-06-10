@@ -200,16 +200,17 @@ router.get('/companies', async (_req, res) => {
                   if (!Array.isArray(rows)) {
                             return res.status(400).json({ error: 'Body must be an array of TB rows' });
                   }
-                  const stmt = db.prepare(`
-                          INSERT OR REPLACE INTO account_balances
-                                    (company_id, company_name, account_code, account_name, account_type, currency, balance, snapshot_date)
-                                            VALUES
-                                                      (@company_id, @company_name, @account_code, @account_name, @account_type, @currency, @balance, @snapshot_date)
+        const stmt = db.prepare(`
+                  INSERT OR REPLACE INTO account_balances
+                              (company_id, company_name, account_code, account_name, account_type, currency, balance, snapshot_date, account_odoo_id)
+                                        VALUES
+                                                    (@company_id, @company_name, @account_code, @account_name, @account_type, @currency, @balance, @snapshot_date, @account_odoo_id)
                                                             `);
-                  const insertMany = db.transaction((items: typeof rows) => {
+                    const insertMany = db.transaction((items: Array<typeof rows[0] & { account_odoo_id: number }>) => {
                             for (const row of items) stmt.run(row);
                   });
-                  insertMany(rows);
+      const rowsWithId = rows.map(r => ({ ...r, account_odoo_id: r.account_odoo_id ?? 0 }));
+                        insertMany(rowsWithId);
                   res.json({ inserted: rows.length });
           } catch (err: unknown) {
                   const message = err instanceof Error ? err.message : 'Unknown error';
