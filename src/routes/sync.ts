@@ -184,39 +184,34 @@ router.get('/companies', async (_req, res) => {
           }
     });
 
-    // Import TB rows from external source (bulk insert/replace)
-    router.post('/import-tb', (req, res) => {
-          try {
-                  const rows: Array<{
-                            company_id: number;
-                            company_name: string;
-                            account_code: string;
-                            account_name: string;
-                            account_type: string;
-                            currency: string;
-                            balance: number;
-                            snapshot_date: string;
-                  }> = req.body;
-                  if (!Array.isArray(rows)) {
-                            return res.status(400).json({ error: 'Body must be an array of TB rows' });
-                  }
-        const stmt = db.prepare(`
-                  INSERT OR REPLACE INTO account_balances
-                              (company_id, company_name, account_code, account_name, account_type, currency, balance, snapshot_date, account_odoo_id)
-                                        VALUES
-                                                    (@company_id, @company_name, @account_code, @account_name, @account_type, @currency, @balance, @snapshot_date, @account_odoo_id)
-                                                            `);
-                    const insertMany = db.transaction((items: Array<typeof rows[0] & { account_odoo_id: number }>) => {
-                            for (const row of items) stmt.run(row);
-                  });
-      const rowsWithId = rows.map(r => ({ ...r, account_odoo_id: r.account_odoo_id ?? 0 }));
-                        insertMany(rowsWithId);
-                  res.json({ inserted: rows.length });
-          } catch (err: unknown) {
-                  const message = err instanceof Error ? err.message : 'Unknown error';
-                  res.status(500).json({ error: message });
-          }
-    });
-
-return router;
-}
+      // Import TB rows from external source (bulk insert/replace)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  router.post('/import-tb', (req: any, res: any) => {
+        try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rows: any[] = req.body;
+                if (!Array.isArray(rows)) {
+                          return res.status(400).json({ error: 'Body must be an array of TB rows' });
+                }
+                const stmt = db.prepare(
+                          'INSERT OR REPLACE INTO account_balances ' +
+                          '(company_id, company_name, account_code, account_name, account_type, currency, balance, snapshot_date, account_odoo_id) ' +
+                          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                        );
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const insertMany = db.transaction((items: any[]) => {
+                    for (const row of items) {
+                                stmt.run(
+                                              row.company_id, row.company_name, row.account_code, row.account_name,
+                                              row.account_type, row.currency, row.balance, row.snapshot_date,
+                                              row.account_odoo_id ?? 0
+                                            );
+                    }
+          });
+                insertMany(rows);
+                res.json({ inserted: rows.length });
+        } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                res.status(500).json({ error: message });
+        }
+  });
