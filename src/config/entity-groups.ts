@@ -16,17 +16,17 @@ export const ENTITY_GROUPS: EntityGroup[] = [
 
   { name: 'CS', company_ids: [2, 3, 4, 12, 13, 14] },
   { name: 'Palios', company_ids: [11, 9] },
-  { name: 'LHOLDINGS', company_ids: [19, 20] },
+  { name: 'LHOLDINGS', company_ids: [19, 20] },  { name: 'PLAY ALGORITHM', company_ids: [28] },
   { name: 'QUANTUMMIND', company_ids: [8] },
 
-  { name: 'Lholding Total', company_ids: [], is_subtotal: true, subtotal_groups: ['CS', 'Palios', 'LHOLDINGS', 'QUANTUMMIND'] },
+  { name: 'Lholding Total', company_ids: [], is_subtotal: true, subtotal_groups: ['CS', 'Palios', 'LHOLDINGS', 'PLAY ALGORITHM', 'QUANTUMMIND'] },
 
   { name: 'Non OW Total', company_ids: [], is_subtotal: true, subtotal_groups: ['Xterio Total', 'Lholding Total'] },
 
   { name: 'OW', company_ids: [15, 16] },
   { name: 'Reach', company_ids: [30] },
   { name: 'Rough house', company_ids: [31] },
-  { name: 'Keystone', company_ids: [28] },
+  { name: 'Keystone', company_ids: [], is_manual: true },
 
   { name: 'OW & Reach Total', company_ids: [], is_subtotal: true, subtotal_groups: ['OW', 'Reach', 'Rough house', 'Keystone'] },
 
