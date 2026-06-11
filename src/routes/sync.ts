@@ -216,4 +216,5 @@ router.get('/companies', async (_req, res) => {
         }
   });
 
+  return router;
 }
