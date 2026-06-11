@@ -215,3 +215,5 @@ router.get('/companies', async (_req, res) => {
                 res.status(500).json({ error: message });
         }
   });
+
+}
