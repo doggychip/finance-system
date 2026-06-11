@@ -1450,15 +1450,25 @@ router.get('/executive-summary', (req, res) => {
     function getNetAssets(ids: number[], asOf: string, excludeFixedAssets = false): number {
       if (!ids.length) return 0;
       const ph = ids.map(() => '?').join(',');
-      const assetTypes = excludeFixedAssets
-        ? `'asset_cash','asset_receivable','asset_current','asset_prepayments','liability_current','liability_payable','liability_non_current','liability_credit_card'`
-        : `'asset_cash','asset_receivable','asset_current','asset_prepayments','asset_fixed','asset_non_current','liability_current','liability_payable','liability_non_current','liability_credit_card'`;
-              const rows = db.prepare(`SELECT ab.account_type as odoo_type, SUM(ab.balance) as bal FROM account_balances ab INNER JOIN (SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date FROM account_balances WHERE snapshot_date BETWEEN ? AND ? AND company_id IN (${ph}) GROUP BY company_id, account_odoo_id) latest ON ab.company_id = latest.company_id AND ab.account_odoo_id = latest.account_odoo_id AND ab.snapshot_date = latest.max_date WHERE ab.account_type IN (${assetTypes}) AND ab.account_code != '300040' GROUP BY ab.account_type`).all(asOf.substring(0,7)+'-01', asOf, ...ids) as any[];
-      const bt: Record<string, number> = {};
-      for (const r of rows) bt[r.odoo_type] = r.bal;
-      const assets = (bt['asset_cash']||0)+(bt['asset_receivable']||0)+(bt['asset_current']||0)+(bt['asset_prepayments']||0)+(excludeFixedAssets?0:((bt['asset_fixed']||0)+(bt['asset_non_current']||0)));
-      const liabs = (bt['liability_payable']||0)+(bt['liability_current']||0)+(bt['liability_non_current']||0)+(bt['liability_credit_card']||0);
-      return assets + liabs;
+      const excludeFixed = excludeFixedAssets
+        ? `AND a.odoo_type NOT IN ('asset_fixed', 'asset_non_current')`
+        : '';
+      const row = db.prepare(`
+        SELECT COALESCE(SUM(COALESCE(li.debit,0) - COALESCE(li.credit,0)), 0) as net_assets
+        FROM line_items li
+        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
+        INNER JOIN accounts a ON a.id = li.account_id
+        WHERE je.date <= ?
+          AND je.company_id IN (${ph})
+          AND a.odoo_type IN (
+            'asset_cash','asset_receivable','asset_current','asset_prepayments',
+            'asset_fixed','asset_non_current',
+            'liability_payable','liability_current','liability_non_current','liability_credit_card'
+          )
+          AND a.code != '300040'
+          ${excludeFixed}
+      `).get(asOf, ...ids) as any;
+      return row?.net_assets ?? 0;
     }
     function getCash(ids: number[], asOf: string): { fiat: number; crypto: number } {
       if (!ids.length) return { fiat: 0, crypto: 0 };
