@@ -775,60 +775,54 @@
 
   
 <!-- Odoo Sync & TB -->
-  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
-    <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin-bottom:20px;">Odoo Sync & TB</h2>
+  <div class="card">
+    <h2>Odoo Sync &amp; TB</h2>
 
     <!-- Sync Accounts -->
-    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
+    <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="color:#8b9ab5;font-size:0.85rem;min-width:140px;">Sync Accounts</span>
+        <span style="color:var(--text-dim);font-size:13px;min-width:130px;">Sync Accounts</span>
         <button id="syncAccountsBtn" onclick="doSyncAccounts()"
           style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.85rem;">
           Sync Accounts
         </button>
-        <span id="syncAccountsStatus" style="color:#8b9ab5;font-size:0.82rem;"></span>
+        <span id="syncAccountsStatus" style="color:var(--text-dim);font-size:0.82rem;"></span>
       </div>
     </div>
 
     <!-- Sync Journal -->
-    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
+    <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="color:#8b9ab5;font-size:0.85rem;min-width:140px;">Sync Journal</span>
-        <input type="month" id="journalFrom" style="background:#0f1923;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
-        <span style="color:#8b9ab5;font-size:0.82rem;">to</span>
-        <input type="month" id="journalTo" style="background:#0f1923;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
+        <span style="color:var(--text-dim);font-size:13px;min-width:130px;">Sync Journal</span>
+        <input type="month" id="journalFrom" style="background:#0f1923;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
+        <span style="color:var(--text-dim);font-size:0.82rem;">to</span>
+        <input type="month" id="journalTo" style="background:#0f1923;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
         <button id="syncJournalBtn" onclick="doSyncJournal()"
           style="background:#0ca678;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.85rem;">
           Sync Journal
         </button>
-        <span id="syncJournalStatus" style="color:#8b9ab5;font-size:0.82rem;"></span>
+        <span id="syncJournalStatus" style="color:var(--text-dim);font-size:0.82rem;"></span>
       </div>
     </div>
 
     <!-- Import TB -->
-    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="min-width:120px;color:var(--text-dim);font-size:13px;">Import TB</span>
-        <input type="month" id="tbFrom" style="background:#0f1923;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;" />
-        <span style="color:var(--text-dim)">to</span>
-        <input type="month" id="tbTo" style="background:#0f1923;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;" />
+        <span style="color:var(--text-dim);font-size:13px;min-width:130px;">Import TB</span>
+        <input type="month" id="tbFrom" style="background:#0f1923;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;" />
+        <span style="color:var(--text-dim);">to</span>
+        <input type="month" id="tbTo" style="background:#0f1923;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;" />
         <button class="btn primary" onclick="importTbFromOdoo()">⬇ 从 Odoo 导入（草稿）</button>
-        <button class="btn" onclick="loadTbData()" style="background:var(--surface2)">↻ 刷新</button>
-        <button class="btn primary" id="tbConfirmBtn" onclick="confirmTbData()" style="background:#16a34a;border-color:#16a34a;display:none">✓ 确认发布</button>
-        <button class="btn danger" id="tbUnconfirmBtn" onclick="unconfirmTbData()" style="display:none">⟲ 撤回为草稿</button>
+        <button class="btn" onclick="loadTbSummary()" style="background:var(--surface2);">↻ 刷新</button>
       </div>
+      <div id="tbImportStatus" style="margin-top:10px;font-size:13px;color:var(--text-dim);min-height:18px;"></div>
     </div>
 
-    <div id="tbStatus" style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:13px;background:var(--surface2)">
-      选择月份后点击"刷新"查看数据
-    </div>
-    <div id="tbTableContainer" style="overflow-x:auto;max-height:600px;overflow-y:auto">
-      <div style="color:var(--text-dim);text-align:center;padding:40px">暂无数据</div>
-      </div>
-    </div>
+    <!-- TB Monthly Summary Table -->
+    <div id="tbSummaryContainer">
+      <div style="color:var(--text-dim);text-align:center;padding:30px;">加载中...</div>
     </div>
   </div>
-
 <!-- Export Data -->
   <div style="margin: 2rem auto 2rem; max-width: 900px; background: #1a1f35; border-radius: 12px; padding: 1.5rem; border: 1px solid #2d3348;">
     <h2 style="color:#e2e8f0; margin:0 0 1.2rem 0; font-size:1.15rem; font-weight:600; letter-spacing:0.03em;">Export Data</h2>
@@ -1748,85 +1742,75 @@
 <script>
 // ──────────── TB 数据标签页逻辑 ────────────
 (function() {
+  // ──────────── TB 数据标签页逻辑 ────────────
+
   // Init period to current month
   const now = new Date();
   const curPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
   document.addEventListener('DOMContentLoaded', function() {
     const tbFromEl = document.getElementById('tbFrom');
-    const tbToEl = document.getElementById('tbTo');
+    const tbToEl   = document.getElementById('tbTo');
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    const prevPeriod = sixMonthsAgo.getFullYear() + '-' + String(sixMonthsAgo.getMonth() + 1).padStart(2,'0');
+    const prevPeriod = sixMonthsAgo.getFullYear() + '-' + String(sixMonthsAgo.getMonth() + 1).padStart(2, '0');
     if (tbFromEl && !tbFromEl.value) tbFromEl.value = prevPeriod;
-    if (tbToEl && !tbToEl.value) tbToEl.value = curPeriod;
+    if (tbToEl   && !tbToEl.value)   tbToEl.value   = curPeriod;
+    loadTbSummary();
   });
 
-  window.loadTbData = async function() {
-    const _tbToEl = document.getElementById('tbTo');
-    const period = (_tbToEl && _tbToEl.value) ? _tbToEl.value : curPeriod;
-    const statusEl = document.getElementById('tbStatus');
-    const tableEl = document.getElementById('tbTableContainer');
-    const confirmBtn = document.getElementById('tbConfirmBtn');
-    const unconfirmBtn = document.getElementById('tbUnconfirmBtn');
-    statusEl.textContent = '加载中…';
+  // ── 月度汇总表 ──────────────────────────────
+  window.loadTbSummary = async function() {
+    const container = document.getElementById('tbSummaryContainer');
+    if (!container) return;
+    container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:20px;">加载中...</div>';
     try {
-      const r = await fetch('/api/admin/tb?period=' + period);
+      const r = await fetch('/api/admin/tb/summary');
       const d = await r.json();
-      if (d.error) { statusEl.textContent = '错误: ' + d.error; return; }
-
-      // Status bar
-      const isConfirmed = !!d.confirmed_at;
-      statusEl.innerHTML = (isConfirmed
-        ? '<span style="color:#22c55e">● 已确认发布</span> — ' + d.confirmed_at + ' by ' + (d.rows[0]?.confirmed_by || 'admin')
-        : '<span style="color:#facc15">● 草稿（未发布）</span>') +
-        ' &nbsp;|&nbsp; ' + d.row_count + ' 行 &nbsp;|&nbsp; Period: ' + period;
-      statusEl.style.background = isConfirmed ? 'rgba(34,197,94,0.1)' : 'rgba(250,204,21,0.1)';
-
-      confirmBtn.style.display = isConfirmed ? 'none' : (d.row_count > 0 ? '' : 'none');
-      unconfirmBtn.style.display = isConfirmed ? '' : 'none';
-
-      if (d.row_count === 0) {
-        tableEl.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:40px">该月份无数据。请点击"从 Odoo 导入"</div>';
+      if (d.error) { container.innerHTML = '<div style="color:var(--red);padding:12px;">错误: ' + d.error + '</div>'; return; }
+      if (!d.periods || d.periods.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:30px;">暂无数据，请先从 Odoo 导入</div>';
         return;
       }
-
-      // Build table grouped by company
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
-      html += '<thead><tr style="position:sticky;top:0;background:var(--surface2)">';
-      ['公司', '科目代码', '科目名称', '类型', '货币', '余额 (USD)', '来源', '操作'].forEach(h => {
-        html += '<th style="padding:6px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)">' + h + '</th>';
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+      html += '<thead><tr style="background:var(--surface2);">';
+      ['月份','行数','发布状态','最近同步时间','操作'].forEach(h => {
+        html += '<th style="padding:8px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);">' + h + '</th>';
       });
       html += '</tr></thead><tbody>';
-
-      let lastCo = null;
-      d.rows.forEach(function(row) {
-        if (row.company_name !== lastCo) {
-          html += '<tr><td colspan="8" style="padding:6px 10px;font-weight:700;background:var(--surface);color:var(--accent);font-size:13px">' + row.company_name + '</td></tr>';
-          lastCo = row.company_name;
-        }
-        const bal = Number(row.balance).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-        const balColor = row.balance < 0 ? '#ef4444' : '';
-        html += '<tr><td style="padding:4px 10px"></td>';
-        html += '<td style="padding:4px 10px;font-family:monospace">' + row.account_code + '</td>';
-        html += '<td style="padding:4px 10px">' + row.account_name + '</td>';
-        html += '<td style="padding:4px 10px;color:var(--text-dim)">' + row.account_type + '</td>';
-        html += '<td style="padding:4px 10px">' + row.currency + '</td>';
-        html += '<td style="padding:4px 10px;text-align:right;font-family:monospace;color:' + balColor + '">' + bal + '</td>';
-        html += '<td style="padding:4px 10px"><span style="font-size:11px;padding:1px 6px;border-radius:4px;background:' + (row.source === 'manual' ? 'rgba(250,204,21,0.2)' : 'rgba(99,102,241,0.2)') + '">' + row.source + '</span></td>';
-        html += '<td style="padding:4px 10px"><button onclick="editTbRow(' + row.id + ',' + row.balance + ')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;color:var(--text)">编辑</button></td>';
+      d.periods.forEach(row => {
+        const isConfirmed = row.status === 'confirmed';
+        const statusBadge = isConfirmed
+          ? '<span style="color:#22c55e;font-weight:600;">✓ 已发布</span>'
+          : '<span style="color:#facc15;">● 草稿</span>';
+        const syncTime = row.last_sync_at
+          ? row.last_sync_at.replace('T', ' ').slice(0, 16)
+          : '<span style="color:var(--text-dim);">—</span>';
+        const confirmBtn = !isConfirmed && row.row_count > 0
+          ? '<button onclick="confirmTbPeriod(' + "'" + row.period + "'" + ')" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;">确认发布</button>'
+          : '';
+        const unconfirmBtn = isConfirmed
+          ? '<button onclick="unconfirmTbPeriod(' + "'" + row.period + "'" + ')" style="background:transparent;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;">撤回</button>'
+          : '';
+        html += '<tr style="border-bottom:1px solid var(--border);">';
+        html += '<td style="padding:8px 12px;font-weight:600;">' + row.period + '</td>';
+        html += '<td style="padding:8px 12px;">' + (row.row_count || 0) + ' 行</td>';
+        html += '<td style="padding:8px 12px;">' + statusBadge + '</td>';
+        html += '<td style="padding:8px 12px;color:var(--text-dim);">' + syncTime + '</td>';
+        html += '<td style="padding:8px 12px;display:flex;gap:6px;">' + confirmBtn + unconfirmBtn + '</td>';
         html += '</tr>';
       });
       html += '</tbody></table>';
-      tableEl.innerHTML = html;
+      container.innerHTML = html;
     } catch(e) {
-      statusEl.textContent = '请求失败: ' + e.message;
+      container.innerHTML = '<div style="color:var(--red);padding:12px;">请求失败: ' + e.message + '</div>';
     }
   };
 
+  // ── 导入 ────────────────────────────────────
   window.importTbFromOdoo = async function() {
     const tbFrom = document.getElementById('tbFrom')?.value;
-    const tbTo = document.getElementById('tbTo')?.value;
-    const statusEl = document.getElementById('tbStatus');
+    const tbTo   = document.getElementById('tbTo')?.value;
+    const statusEl = document.getElementById('tbImportStatus');
     if (!tbFrom || !tbTo) { alert('请选择起止月份'); return; }
     if (tbFrom > tbTo) { alert('起始月份不能晚于结束月份'); return; }
     const months = [];
@@ -1836,10 +1820,10 @@
       const [y, m] = cur.split('-').map(Number);
       cur = m === 12 ? (y+1) + '-01' : y + '-' + String(m+1).padStart(2,'0');
     }
-    statusEl.textContent = '正在导入 ' + months.length + ' 个月份...';
+    if (statusEl) statusEl.textContent = '正在导入 ' + months.length + ' 个月份...';
     try {
       for (const month of months) {
-        statusEl.textContent = '正在导入 ' + month + '...';
+        if (statusEl) statusEl.textContent = '正在导入 ' + month + '...';
         const r = await fetch('/api/admin/tb/import', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -1848,56 +1832,47 @@
         const d = await r.json();
         if (d.error) throw new Error(month + ': ' + d.error);
       }
-      statusEl.textContent = '已导入 ' + months.length + ' 个月份（草稿）。';
-      await loadTbData();
+      if (statusEl) statusEl.textContent = '已导入 ' + months.length + ' 个月份（草稿）。';
+      await loadTbSummary();
     } catch(e) {
-      statusEl.textContent = '导入失败: ' + e.message;
+      if (statusEl) statusEl.textContent = '导入失败: ' + e.message;
     }
   };
 
-  window.confirmTbData = async function() {
-    const period = (document.getElementById('tbTo')?.value || curPeriod);
+  // ── 确认发布单个月 ────────────────────────────
+  window.confirmTbPeriod = async function(period) {
     if (!confirm('确认发布 ' + period + ' 的 TB 数据？发布后其他看板将读取此数据。')) return;
-    const r = await fetch('/api/admin/tb/confirm', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({period, confirmed_by: 'admin'})
-    });
-    const d = await r.json();
-    if (d.error) { alert('错误: ' + d.error); return; }
-    alert('已发布 ' + d.rows_confirmed + ' 行！其他看板现在读取此 TB 数据。');
-    await loadTbData();
+    try {
+      const r = await fetch('/api/admin/tb/confirm', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({period, confirmed_by: 'admin'})
+      });
+      const d = await r.json();
+      if (d.error) { alert('错误: ' + d.error); return; }
+      await loadTbSummary();
+    } catch(e) { alert('请求失败: ' + e.message); }
   };
 
-  window.unconfirmTbData = async function() {
-    const period = (document.getElementById('tbTo')?.value || curPeriod);
+  // ── 撤回单个月 ─────────────────────────────────
+  window.unconfirmTbPeriod = async function(period) {
     if (!confirm('撤回 ' + period + ' 的发布状态？其他看板将回退到 journal entry 计算模式。')) return;
-    await fetch('/api/admin/tb/unconfirm', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({period})
-    });
-    await loadTbData();
+    try {
+      await fetch('/api/admin/tb/unconfirm', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({period})
+      });
+      await loadTbSummary();
+    } catch(e) { alert('请求失败: ' + e.message); }
   };
 
-  window.editTbRow = async function(id, currentBalance) {
-    const newBal = prompt('修改余额（当前：' + currentBalance + '）：', currentBalance);
-    if (newBal === null) return;
-    const r = await fetch('/api/admin/tb/' + id, {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({balance: Number(newBal)})
-    });
-    const d = await r.json();
-    if (d.error) { alert('错误: ' + d.error); return; }
-    await loadTbData();
-  };
-
-  // Hook into switchAdminTab to auto-load when TB tab is activated
+  // ── Hook into switchAdminTab to auto-load when TB tab is activated ──
   const origSwitch = window.switchAdminTab;
   window.switchAdminTab = function(tab) {
     if (origSwitch) origSwitch(tab);
   };
+
 })();
 </script>
 <script src="/chat-widget.js"></script></body>
