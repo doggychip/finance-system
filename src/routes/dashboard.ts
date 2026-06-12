@@ -8,7 +8,7 @@ export function dashboardRoutes(db: Database.Database): Router {
   // Overview stats
   router.get('/stats', (_req, res) => {
     const accountCount = (db.prepare('SELECT COUNT(*) as count FROM accounts WHERE is_active = 1').get() as any).count;
-    const journalCount = (db.prepare('SELECThh COUNT(*) as count FROM journal_entries').get() as any).count;
+    const journalCount = (db.prepare('SELECT COUNT(*) as count FROM journal_entries').get() as any).count;
     const postedCount = (db.prepare("SELECT COUNT(*) as count FROM journal_entries WHERE status = 'posted'").get() as any).count;
     const invoiceCount = (db.prepare('SELECT COUNT(*) as count FROM invoices').get() as any).count;
     const paymentCount = (db.prepare('SELECT COUNT(*) as count FROM payments').get() as any).count;
