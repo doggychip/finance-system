@@ -774,9 +774,9 @@
   </div>
 
   
-<!-- Odoo Sync -->
+<!-- Odoo Sync & TB -->
   <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
-    <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin-bottom:20px;">Odoo Sync</h2>
+    <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin-bottom:20px;">Odoo Sync & TB</h2>
 
     <!-- Sync Accounts -->
     <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
@@ -805,30 +805,34 @@
       </div>
     </div>
 
+    <!-- Import TB -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="min-width:120px;color:var(--text-dim);font-size:13px;">Import TB</span>
+        <input type="month" id="tbFrom" style="background:#0f1923;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;" />
+        <span style="color:var(--text-dim)">to</span>
+        <input type="month" id="tbTo" style="background:#0f1923;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;" />
+        <button class="btn primary" onclick="importTbFromOdoo()">⬇ 从 Odoo 导入（草稿）</button>
+        <button class="btn" onclick="loadTbData()" style="background:var(--surface2)">↻ 刷新</button>
+        <button class="btn primary" id="tbConfirmBtn" onclick="confirmTbData()" style="background:#16a34a;border-color:#16a34a;display:none">✓ 确认发布</button>
+        <button class="btn danger" id="tbUnconfirmBtn" onclick="unconfirmTbData()" style="display:none">⟲ 撤回为草稿</button>
+      </div>
+    </div>
 
     </div>
   </div>
 
-<!-- TB 数据 -->
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 style="margin:0">TB 数据（Odoo TB 中间层）</h2>
-      <div style="display:flex;gap:8px;align-items:center">
-        <label style="font-size:13px;color:var(--text-dim)">Period:</label>
-        <input type="month" id="tbPeriod" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px" />
-        <button class="btn primary" onclick="importTbFromOdoo()">⬇ 从 Odoo 导入（草稿）</button>
-        <button class="btn" onclick="loadTbData()" style="background:var(--surface2)">↻ 刷新</button>
-        <button class="btn" id="tbConfirmBtn" onclick="confirmTbData()" style="background:#22c55e;color:#000;font-weight:600;display:none">✓ 确认发布</button>
-        <button class="btn danger" id="tbUnconfirmBtn" onclick="unconfirmTbData()" style="display:none">⟲ 撤回为草稿</button>
-      </div>
-    </div>
+<!-- TB Data View -->
+  <div class="card" style="padding:0;overflow:hidden;">
     <div id="tbStatus" style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:13px;background:var(--surface2)">
       选择月份后点击"刷新"查看数据
     </div>
     <div id="tbTableContainer" style="overflow-x:auto;max-height:600px;overflow-y:auto">
       <div style="color:var(--text-dim);text-align:center;padding:40px">暂无数据</div>
+      </div>
     </div>
   </div>
+
 
 
 <!-- Export Data -->
@@ -1755,12 +1759,17 @@
   const curPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
   document.addEventListener('DOMContentLoaded', function() {
-    const inp = document.getElementById('tbPeriod');
-    if (inp) inp.value = curPeriod;
+    const tbFromEl = document.getElementById('tbFrom');
+    const tbToEl = document.getElementById('tbTo');
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const prevPeriod = sixMonthsAgo.getFullYear() + '-' + String(sixMonthsAgo.getMonth() + 1).padStart(2,'0');
+    if (tbFromEl && !tbFromEl.value) tbFromEl.value = prevPeriod;
+    if (tbToEl && !tbToEl.value) tbToEl.value = curPeriod;
   });
 
   window.loadTbData = async function() {
-    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    const _tbToEl = document.getElementById('tbTo');
+    const period = (_tbToEl && _tbToEl.value) ? _tbToEl.value : curPeriod;
     const statusEl = document.getElementById('tbStatus');
     const tableEl = document.getElementById('tbTableContainer');
     const confirmBtn = document.getElementById('tbConfirmBtn');
@@ -1821,19 +1830,31 @@
   };
 
   window.importTbFromOdoo = async function() {
-    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    const tbFrom = document.getElementById('tbFrom')?.value;
+    const tbTo = document.getElementById('tbTo')?.value;
     const statusEl = document.getElementById('tbStatus');
-    statusEl.textContent = '正在从 Odoo 导入 ' + period + '…（约需 30 秒）';
-    statusEl.style.background = 'rgba(99,102,241,0.1)';
+    if (!tbFrom || !tbTo) { alert('请选择起止月份'); return; }
+    if (tbFrom > tbTo) { alert('起始月份不能晚于结束月份'); return; }
+    const months = [];
+    let cur = tbFrom;
+    while (cur <= tbTo) {
+      months.push(cur);
+      const [y, m] = cur.split('-').map(Number);
+      cur = m === 12 ? (y+1) + '-01' : y + '-' + String(m+1).padStart(2,'0');
+    }
+    statusEl.textContent = '正在导入 ' + months.length + ' 个月份...';
     try {
-      const r = await fetch('/api/admin/tb/import', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({period})
-      });
-      const d = await r.json();
-      if (d.error) { statusEl.textContent = '错误: ' + d.error; return; }
-      statusEl.textContent = '导入完成：' + d.imported + ' 行，状态=草稿。请检查数据后点击"确认发布"。';
+      for (const month of months) {
+        statusEl.textContent = '正在导入 ' + month + '...';
+        const r = await fetch('/api/admin/tb/import', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({period: month})
+        });
+        const d = await r.json();
+        if (d.error) throw new Error(month + ': ' + d.error);
+      }
+      statusEl.textContent = '已导入 ' + months.length + ' 个月份（草稿）。';
       await loadTbData();
     } catch(e) {
       statusEl.textContent = '导入失败: ' + e.message;
@@ -1841,7 +1862,7 @@
   };
 
   window.confirmTbData = async function() {
-    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    const period = (document.getElementById('tbTo')?.value || curPeriod);
     if (!confirm('确认发布 ' + period + ' 的 TB 数据？发布后其他看板将读取此数据。')) return;
     const r = await fetch('/api/admin/tb/confirm', {
       method: 'PATCH',
@@ -1855,7 +1876,7 @@
   };
 
   window.unconfirmTbData = async function() {
-    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    const period = (document.getElementById('tbTo')?.value || curPeriod);
     if (!confirm('撤回 ' + period + ' 的发布状态？其他看板将回退到 journal entry 计算模式。')) return;
     await fetch('/api/admin/tb/unconfirm', {
       method: 'PATCH',
