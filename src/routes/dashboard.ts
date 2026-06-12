@@ -1449,6 +1449,33 @@ router.get('/executive-summary', (req, res) => {
     }
     function getNetAssets(ids: number[], asOf: string, excludeFixedAssets = false): number {
       if (!ids.length) return 0;
+              // ── TB-Snapshot layer: prefer confirmed tb_snapshots over journal lines ──
+        const period = asOf.slice(0, 7); // e.g. '2026-06'
+        const tbCheck = db.prepare(`
+          SELECT COUNT(*) as cnt FROM tb_snapshots
+          WHERE period = ? AND confirmed_at IS NOT NULL
+        `).get(period) as any;
+        if (tbCheck && tbCheck.cnt > 0) {
+          const ph = ids.map(() => '?').join(',');
+          const typeFilter = excludeFixedAssets
+            ? "AND account_type NOT IN ('asset_fixed','asset_non_current')"
+            : '';
+          const tbRow = db.prepare(`
+            SELECT COALESCE(SUM(balance), 0) as net_assets
+            FROM tb_snapshots
+            WHERE period = ?
+              AND company_id IN (${ph})
+              AND account_type IN (
+                'asset_cash','asset_receivable','asset_current','asset_prepayments',
+                'asset_fixed','asset_non_current',
+                'liability_payable','liability_current','liability_non_current','liability_credit_card'
+              )
+              AND account_code != '300040'
+              AND confirmed_at IS NOT NULL
+              ${typeFilter}
+          `).get(period, ...ids) as any;
+          return tbRow?.net_assets ?? 0;
+        }
       const ph = ids.map(() => '?').join(',');
       const excludeFixed = excludeFixedAssets
         ? `AND a.odoo_type NOT IN ('asset_fixed', 'asset_non_current')`
