@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Finance Dashboard — Executive View</htitle>
+  <title>Finance Dashboard — Executive View</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: text; -webkit-user-select: text; }
     :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; --cyan: #06b6d4; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 
-    .header { background: var(--surface); borhhder-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
     .header h1 { font-size: 20px; font-weight: 700; }
     .nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
     .nav a { padding: 6px 14px; border-radius: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: all 0.15s; }
@@ -314,7 +314,7 @@
           { key: 'cash_crypto', label: '  → Crypto', bold: false },
         ];
 
-        var wfHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px">';hh
+        var wfHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
         wfHtml += '<thead><tr><th style="text-align:left;padding:8px 10px;color:var(--text-dim);border-bottom:2px solid var(--border)">Item</th>';
         funcLabels.forEach(function(l) { wfHtml += '<th style="text-align:right;padding:8px 10px;color:var(--text-dim);border-bottom:2px solid var(--border)">' + l + '</th>'; });
         wfHtml += '<th style="text-align:right;padding:8px 10px;color:var(--text-dim);border-bottom:2px solid var(--border);font-weight:700">Total</th></tr></thead><tbody>';
