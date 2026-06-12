@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin â Finance Dashboard</title>
+  <title>Admin Ã¢ÂÂ Finance Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #232734; --border: #2e3344; --text: #e4e6ef; --text-dim: #8b8fa3; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
@@ -83,7 +83,6 @@
   <div class="admin-tabs">
     <button class="admin-tab-btn active" onclick="switchAdminTab('user-mgmt')">User &amp; Settings</button>
     <button class="admin-tab-btn" onclick="switchAdminTab('odoo-mgt')">Odoo Sync MGT</button>
-    <button class="admin-tab-btn" onclick="switchAdminTab('tb-data')">TB 数据</button>
   </div>
 
 <div id="tab-user-mgmt" class="admin-tab-pane active">
@@ -124,7 +123,7 @@
     </div>
     <!-- Foundation Manual Balances -->
     <div class="card">
-      <h2>Xterio Foundation â Manual Balances</h2>
+      <h2>Xterio Foundation Ã¢ÂÂ Manual Balances</h2>
       <div id="foundationMsg" class="msg"></div>
       <div class="period-selector">
         <label style="font-size:12px;color:var(--text-dim)">Period:</label>
@@ -151,7 +150,7 @@
 
     <!-- Keystone Foundation Manual Balances -->
     <div class="card">
-      <h2>Keystone Foundation â Manual Balances</h2>
+      <h2>Keystone Foundation Ã¢ÂÂ Manual Balances</h2>
       <div id="keystoneMsg" class="msg"></div>
       <div class="period-selector">
         <label style="font-size:12px;color:var(--text-dim)">Period:</label>
@@ -172,980 +171,6 @@
 
 
   <script>
-    var currentUser = window.getUser();
-
-    function init() {
-      if (!currentUser) {
-        window.location.href = '/login.html';
-        return;
-      }
-      // Show admin content for any logged-in user (server-side security via auth.js)
-      document.getElementById('adminContent').style.display = 'block';
-      loadUsers();
-      loadFoundationPeriods();
-      loadFoundationICPeriods();
-      loadKeystonePeriods();
-    }
-
-    async function loadUsers() {
-      var users = await (await fetch('/api/tasks/users')).json();
-      var el = document.getElementById('userTable');
-      if (!users.length) {
-        el.innerHTML = '<p style="color:var(--text-dim)">No users found</p>';
-        return;
-      }
-      el.innerHTML =
-        '<table><thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Role</th><th>Actions</th></tr></thead><tbody>' +
-        users.map(function(u) {
-          return '<tr>' +
-            '<td style="color:var(--text-dim)">' + u.id + '</td>' +
-            '<td>' + esc(u.username) + '</td>' +
-            '<td>' + esc(u.display_name) + '</td>' +
-            '<td><span class="badge ' + u.role + '">' + u.role + '</span></td>' +
-            '<td style="display:flex;gap:4px">' +
-              '<button class="btn" style="padding:4px 10px;font-size:11px" onclick="promptResetPassword(' + u.id + ', \'' + esc(u.display_name) + '\')">Reset Password</button>' +
-              (u.id !== currentUser.id ? '<button class="btn danger" style="padding:4px 10px;font-size:11px" onclick="deleteUser(' + u.id + ', \'' + esc(u.username) + '\')">Delete</button>' : '') +
-            '</td></tr>';
-        }).join('') +
-        '</tbody></table>';
-    }
-
-    function esc(s) {
-      var d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
-    }
-
-    function showMsg(elId, text, type) {
-      var el = document.getElementById(elId);
-      el.className = 'msg ' + type;
-      el.textContent = text;
-      el.style.display = 'block';
-      setTimeout(function() { el.style.display = 'none'; }, 4000);
-    }
-
-    async function createUser() {
-      var username = document.getElementById('newUsername').value.trim();
-      var displayName = document.getElementById('newDisplayName').value.trim();
-      var password = document.getElementById('newPassword').value;
-      var role = document.getElementById('newRole').value;
-
-      if (!username || !displayName || !password) {
-        showMsg('createMsg', 'All fields are required', 'error');
-        return;
-      }
-
-      try {
-        var res = await fetch('/api/tasks/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username, password: password, display_name: displayName, role: role })
-        });
-        var data = await res.json();
-        if (!res.ok) {
-          showMsg('createMsg', data.error || 'Failed to create user', 'error');
-          return;
-        }
-        showMsg('createMsg', 'User "' + data.display_name + '" created successfully', 'success');
-        document.getElementById('newUsername').value = '';
-        document.getElementById('newDisplayName').value = '';
-        document.getElementById('newPassword').value = '';
-        loadUsers();
-      } catch (e) {
-        showMsg('createMsg', 'Network error', 'error');
-      }
-    }
-
-    function promptResetPassword(userId, displayName) {
-      var newPw = prompt('Enter new password for ' + displayName + ':');
-      if (!newPw) return;
-      if (newPw.length < 4) {
-        showMsg('resetMsg', 'Password must be at least 4 characters', 'error');
-        return;
-      }
-      resetPassword(userId, newPw, displayName);
-    }
-
-    async function resetPassword(userId, newPassword, displayName) {
-      try {
-        var res = await fetch('/api/tasks/users/' + userId + '/password', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ new_password: newPassword, requester_id: currentUser.id })
-        });
-        var data = await res.json();
-        if (!res.ok) {
-          showMsg('resetMsg', data.error || 'Failed to reset password', 'error');
-          return;
-        }
-        showMsg('resetMsg', 'Password reset for ' + displayName, 'success');
-      } catch (e) {
-        showMsg('resetMsg', 'Network error', 'error');
-      }
-    }
-
-    async function deleteUser(userId, username) {
-      if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
-      try {
-        var res = await fetch('/api/tasks/users/' + userId + '?requester_id=' + currentUser.id, { method: 'DELETE' });
-        var data = await res.json().catch(function() { return {}; });
-        if (!res.ok) {
-          showMsg('resetMsg', data.error || ('Failed to delete user (HTTP ' + res.status + ')'), 'error');
-          return;
-        }
-        showMsg('resetMsg', 'User "' + username + '" deleted', 'success');
-        loadUsers();
-      } catch (e) {
-        showMsg('resetMsg', 'Network error', 'error');
-      }
-    }
-
-    init();
-
-    // ââ Foundation Manual Balances ââ
-    var foundationRows = [];
-
-    async function loadFoundationPeriods() {
-      try {
-        var data = await (await fetch('/api/dashboard/foundation-balances')).json();
-        var existingPeriods = (data.periods || []);
-        // Generate all months from earliest existing to current month
-        var now = new Date();
-        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        var allPeriods = [];
-        // Find earliest: existingPeriods is desc, so last element is earliest
-        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
-        var parts = earliest.split('-');
-        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
-        var np = now.getFullYear() * 12 + now.getMonth() + 1;
-        var ep = cy * 12 + cm;
-        for (var i = np; i >= ep; i--) {
-          var y = Math.floor((i - 1) / 12);
-          var m = ((i - 1) % 12) + 1;
-          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
-        }
-        var sel = document.getElementById('foundationPeriod');
-        sel.innerHTML = allPeriods.map(function(p) {
-          var hasData = existingPeriods.indexOf(p) >= 0;
-          return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
-        }).join('');
-        // Default to current month
-        sel.value = currentPeriod;
-        loadFoundation();
-      } catch(e) {
-        console.error(e);
-        showMsg('foundationMsg', 'Failed to load periods: ' + e.message, 'error');
-      }
-    }
-
-    async function loadFoundation() {
-      var period = document.getElementById('foundationPeriod').value;
-      if (!period) return;
-      try {
-        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + period)).json();
-        foundationRows = data.rows;
-        if (!foundationRows.length) {
-          document.getElementById('foundationTable').innerHTML =
-            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
-            'No data for ' + period + '. ' +
-            '<button class="btn" onclick="copyFromPrevMonth(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
-            '</div>';
-          document.getElementById('foundationTotal').textContent = '';
-        } else {
-          renderFoundationTable(foundationRows);
-        }
-      } catch(e) {
-        showMsg('foundationMsg', 'Failed to load data', 'error');
-      }
-    }
-
-    function renderFoundationTable(rows) {
-      if (!rows.length) {
-        document.getElementById('foundationTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
-        return;
-      }
-      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
-      var totalUSD = 0;
-      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>CHF Amount</th><th>FX Rate (CHF/USD)</th><th>USD Amount</th></tr></thead><tbody>';
-      cats.forEach(function(cat) {
-        html += '<tr class="cat-header"><td colspan="5">' + cat + '</td></tr>';
-        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
-          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
-          totalUSD += r.amount_local * r.exchange_rate;
-          html += '<tr data-id="' + r.id + '">' +
-            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
-            '<td>' + r.account_name + '</td>' +
-            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcRow(this,' + r.id + ')" style="width:140px"></td>' +
-            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcRow(this,' + r.id + ')" style="width:90px"></td>' +
-            '<td id="usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
-            '</tr>';
-        });
-      });
-      html += '<tr class="total-row"><td colspan="4">Total USD</td><td id="foundationTotalCell">' + fmt(totalUSD) + '</td></tr>';
-      html += '</tbody></table>';
-      document.getElementById('foundationTable').innerHTML = html;
-      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(totalUSD);
-    }
-
-    function fmt(n) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
-    }
-
-    function recalcRow(input, id) {
-      var row = foundationRows.find(function(r) { return r.id === id; });
-      if (!row) return;
-      var tr = input.closest('tr');
-      var chf = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
-      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
-      var usd = chf * fx;
-      document.getElementById('usd_' + id).textContent = fmt(usd);
-      // update total
-      var total = 0;
-      foundationRows.forEach(function(r) {
-        var t = document.querySelector('tr[data-id="' + r.id + '"]');
-        if (!t) return;
-        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
-        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
-        total += c * f;
-      });
-      var tc = document.getElementById('foundationTotalCell');
-      if (tc) tc.textContent = fmt(total);
-      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(total);
-    }
-
-    async function saveFoundation() {
-      var saved = 0, failed = 0;
-      for (var r of foundationRows) {
-        var tr = document.querySelector('tr[data-id="' + r.id + '"]');
-        if (!tr) continue;
-        var chf = parseFloat(tr.querySelectorAll('input')[0].value);
-        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
-        try {
-          var res = await fetch('/api/dashboard/foundation-balances/' + r.id, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount_local: chf, exchange_rate: fx })
-          });
-          if (res.ok) saved++; else failed++;
-        } catch(e) { failed++; }
-      }
-      if (failed === 0) {
-        showMsg('foundationMsg', saved + ' rows saved successfully', 'success');
-      } else {
-        showMsg('foundationMsg', saved + ' saved, ' + failed + ' failed', 'error');
-      }
-      loadFoundation();
-    }
-
-    function addNewPeriod() {
-      var sel = document.getElementById('foundationPeriod');
-      var now = new Date();
-      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-      sel.value = currentPeriod;
-      loadFoundation();
-    }
-
-    async function copyFromPrevMonth(period) {
-      // Calculate previous month
-      var parts = period.split('-');
-      var y = parseInt(parts[0]), m = parseInt(parts[1]);
-      m--; if (m < 1) { m = 12; y--; }
-      var prevPeriod = y + '-' + String(m).padStart(2, '0');
-
-      try {
-        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + prevPeriod)).json();
-        if (!data.rows.length) {
-          showMsg('foundationMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
-          return;
-        }
-        // Post new rows for current period based on prev month
-        var newRows = data.rows.map(function(r) {
-          return {
-            account_code: r.account_code,
-            account_name: r.account_name,
-            category: r.category,
-            amount_local: r.amount_local,
-            currency: r.currency || 'CHF',
-            exchange_rate: r.exchange_rate
-          };
-        });
-        var res = await fetch('/api/dashboard/foundation-balances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ period: period, rows: newRows })
-        });
-        if (res.ok) {
-          showMsg('foundationMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
-          await loadFoundationPeriods();
-          document.getElementById('foundationPeriod').value = period;
-          loadFoundation();
-        } else {
-          showMsg('foundationMsg', 'Failed to copy data', 'error');
-        }
-      } catch(e) {
-        showMsg('foundationMsg', 'Error: ' + e.message, 'error');
-      }
-    }
-
-    // ââ Foundation IC Payable ââ
-    var FOUNDATION_IC_ENTITY = 'Xterio Foundation';
-    var FOUNDATION_IC_CODE = 'FOUNDATION_IC';
-    var foundationICRow = null;
-
-    async function loadFoundationICPeriods() {
-      try {
-        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY))).json();
-        var existingPeriods = (data.periods || []);
-
-        var now = new Date();
-        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        var allPeriods = [];
-        var startYear = 2025, startMonth = 5;
-        var np = now.getFullYear() * 12 + now.getMonth() + 1;
-        var ep = startYear * 12 + startMonth;
-        for (var i = np; i >= ep; i--) {
-          var y = Math.floor((i - 1) / 12);
-          var m = ((i - 1) % 12) + 1;
-          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
-        }
-
-        var sel = document.getElementById('foundationICPeriod');
-        sel.innerHTML = allPeriods.map(function(p) {
-          var hasData = existingPeriods.indexOf(p) >= 0;
-          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
-        }).join('');
-        sel.value = currentPeriod;
-        loadFoundationIC();
-      } catch(e) {
-        showMsg('foundationICMsg', 'Failed to load periods: ' + e.message, 'error');
-      }
-    }
-
-    async function loadFoundationIC() {
-      var period = document.getElementById('foundationICPeriod').value;
-      if (!period) return;
-      try {
-        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY) + '&period=' + period)).json();
-        foundationICRow = (data.rows || []).find(function(r) { return r.account_code === FOUNDATION_IC_CODE; }) || null;
-        document.getElementById('foundationICAmount').value = foundationICRow ? foundationICRow.amount_usd : 0;
-      } catch(e) {
-        showMsg('foundationICMsg', 'Failed to load IC data', 'error');
-      }
-    }
-
-    async function saveFoundationIC() {
-      var period = document.getElementById('foundationICPeriod').value;
-      var amount = parseFloat(document.getElementById('foundationICAmount').value) || 0;
-      try {
-        if (foundationICRow && foundationICRow.id) {
-          var res = await fetch('/api/dashboard/manual-balances/' + foundationICRow.id, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entity: FOUNDATION_IC_ENTITY, amount_local: amount, exchange_rate: 1 })
-          });
-          if (!res.ok) throw new Error('save failed');
-        } else {
-          var res = await fetch('/api/dashboard/manual-balances', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              entity: FOUNDATION_IC_ENTITY,
-              period: period,
-              rows: [{ account_code: FOUNDATION_IC_CODE, account_name: 'IC Payable (USD)', category: 'IC', amount_local: amount, currency: 'USD', exchange_rate: 1 }]
-            })
-          });
-          if (!res.ok) throw new Error('save failed');
-        }
-        showMsg('foundationICMsg', 'IC Payable saved for ' + period, 'success');
-        loadFoundationIC();
-      } catch(e) {
-        showMsg('foundationICMsg', 'Failed to save: ' + e.message, 'error');
-      }
-    }
-
-    // ââ Keystone Foundation Manual Balances ââ
-    var keystoneRows = [];
-    var KEYSTONE_ENTITY = 'Keystone Foundation';
-
-    async function loadKeystonePeriods() {
-      try {
-        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY))).json();
-        var existingPeriods = (data.periods || []);
-
-        var now = new Date();
-        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        var allPeriods = [];
-        var startYear = 2025, startMonth = 5;
-        var np = now.getFullYear() * 12 + now.getMonth() + 1;
-        var ep = startYear * 12 + startMonth;
-        for (var i = np; i >= ep; i--) {
-          var y = Math.floor((i - 1) / 12);
-          var m = ((i - 1) % 12) + 1;
-          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
-        }
-
-        var sel = document.getElementById('keystonePeriod');
-        sel.innerHTML = allPeriods.map(function(p) {
-          var hasData = existingPeriods.indexOf(p) >= 0;
-          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
-        }).join('');
-        sel.value = currentPeriod;
-        loadKeystone();
-      } catch(e) {
-        console.error(e);
-        showMsg('keystoneMsg', 'Failed to load periods: ' + e.message, 'error');
-      }
-    }
-
-    async function loadKeystone() {
-      var period = document.getElementById('keystonePeriod').value;
-      if (!period) return;
-      try {
-        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + period)).json();
-        keystoneRows = data.rows || [];
-        if (!keystoneRows.length) {
-          document.getElementById('keystoneTable').innerHTML =
-            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
-            'No data for ' + period + '. ' +
-            '<button class="btn" onclick="copyFromPrevKeystone(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
-            '</div>';
-          document.getElementById('keystoneTotal').textContent = '';
-        } else {
-          renderKeystoneTable(keystoneRows);
-        }
-      } catch(e) {
-        showMsg('keystoneMsg', 'Failed to load data', 'error');
-      }
-    }
-
-    function renderKeystoneTable(rows) {
-      if (!rows.length) {
-        document.getElementById('keystoneTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
-        return;
-      }
-      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
-      var totalUSD = 0;
-      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>Amount (Local)</th><th>Currency</th><th>FX Rate</th><th>USD Amount</th></tr></thead><tbody>';
-      cats.forEach(function(cat) {
-        html += '<tr class="cat-header"><td colspan="6">' + cat + '</td></tr>';
-        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
-          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
-          totalUSD += r.amount_local * r.exchange_rate;
-          html += '<tr data-id="' + r.id + '">' +
-            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
-            '<td>' + r.account_name + '</td>' +
-            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:140px"></td>' +
-            '<td>' + (r.currency || 'USD') + '</td>' +
-            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:90px"></td>' +
-            '<td id="keystone_usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
-            '</tr>';
-        });
-      });
-      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="keystoneTotalCell">' + fmt(totalUSD) + '</td></tr>';
-      html += '</tbody></table>';
-      document.getElementById('keystoneTable').innerHTML = html;
-      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(totalUSD);
-    }
-
-    function recalcKeystoneRow(input, id) {
-      var row = keystoneRows.find(function(r) { return r.id === id; });
-      if (!row) return;
-      var tr = input.closest('tr');
-      var amt = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
-      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
-      var usd = amt * fx;
-      document.getElementById('keystone_usd_' + id).textContent = fmt(usd);
-      // update total
-      var total = 0;
-      keystoneRows.forEach(function(r) {
-        var t = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
-        if (!t) return;
-        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
-        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
-        total += c * f;
-      });
-      var tc = document.getElementById('keystoneTotalCell');
-      if (tc) tc.textContent = fmt(total);
-      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(total);
-    }
-
-    async function saveKeystone() {
-      if (!keystoneRows || !keystoneRows.length) {
-        showMsg('keystoneMsg', 'No rows to save. Copy from previous month or add a row first.', 'error');
-        return;
-      }
-      var saved = 0, failed = 0;
-      for (var r of keystoneRows) {
-        var tr = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
-        if (!tr) continue;
-        var amt = parseFloat(tr.querySelectorAll('input')[0].value);
-        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
-        if (isNaN(amt) || isNaN(fx)) { failed++; continue; }
-        try {
-          var res = await fetch('/api/dashboard/manual-balances/' + r.id, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entity: KEYSTONE_ENTITY, amount_local: amt, exchange_rate: fx })
-          });
-          if (res.ok) saved++; else failed++;
-        } catch(e) { failed++; }
-      }
-      if (failed === 0) {
-        showMsg('keystoneMsg', saved + ' rows saved successfully', 'success');
-      } else {
-        showMsg('keystoneMsg', saved + ' saved, ' + failed + ' failed', 'error');
-      }
-      loadKeystone();
-    }
-
-    function addNewKeystonePeriod() {
-      var sel = document.getElementById('keystonePeriod');
-      var now = new Date();
-      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-      sel.value = currentPeriod;
-      loadKeystone();
-    }
-
-    async function copyFromPrevKeystone(period) {
-      // Calculate previous month
-      var parts = period.split('-');
-      var y = parseInt(parts[0]), m = parseInt(parts[1]);
-      m--; if (m < 1) { m = 12; y--; }
-      var prevPeriod = y + '-' + String(m).padStart(2, '0');
-
-      try {
-        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + prevPeriod)).json();
-        if (!data.rows.length) {
-          showMsg('keystoneMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
-          return;
-        }
-        // Post new rows for current period based on prev month
-        var newRows = data.rows.map(function(r) {
-          return {
-            account_code: r.account_code,
-            account_name: r.account_name,
-            category: r.category,
-            amount_local: r.amount_local,
-            currency: r.currency || 'USD',
-            exchange_rate: r.exchange_rate
-          };
-        });
-        var res = await fetch('/api/dashboard/manual-balances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ entity: KEYSTONE_ENTITY, period: period, rows: newRows })
-        });
-        if (res.ok) {
-          showMsg('keystoneMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
-          await loadKeystonePeriods();
-          document.getElementById('keystonePeriod').value = period;
-          loadKeystone();
-        } else {
-          showMsg('keystoneMsg', 'Failed to copy data', 'error');
-        }
-      } catch(e) {
-        showMsg('keystoneMsg', 'Error: ' + e.message, 'error');
-      }
-    }
-
-  </script>
-<script src="/chat-widget.js"></script>
-</div>
-<div id="tab-odoo-mgt" class="admin-tab-pane">
-  <div class="container">
-  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin:0;">Companies (from Odoo)</h2>
-      <button onclick="loadOdooCompanies()" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:0.83rem;">&#x21bb; Refresh</button>
-    </div>
-    <div id="companiesStatus" style="color:#8b9ab5;font-size:0.82rem;margin-bottom:10px;"></div>
-    <div id="companiesList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-  </div>
-  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin:0;">Entity Groups</h2>
-      <div style="display:flex;gap:8px;">
-        <button onclick="addEntityGroup()" style="background:#0ca678;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">+ Add Group</button>
-        <button onclick="saveEntityGroups()" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">&#x2713; Save</button>
-        <button onclick="resetEntityGroups()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">Reset Default</button>
-      </div>
-    </div>
-    <div id="entityGroupsStatus" style="color:#8b9ab5;font-size:0.82rem;margin-bottom:12px;"></div>
-    <div id="entityGroupsList"></div>
-  </div>
-
-  
-<!-- Odoo Sync -->
-  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
-    <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin-bottom:20px;">Odoo Sync</h2>
-
-    <!-- Sync Accounts -->
-    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="color:#8b9ab5;font-size:0.85rem;min-width:140px;">Sync Accounts</span>
-        <button id="syncAccountsBtn" onclick="doSyncAccounts()"
-          style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.85rem;">
-          Sync Accounts
-        </button>
-        <span id="syncAccountsStatus" style="color:#8b9ab5;font-size:0.82rem;"></span>
-      </div>
-    </div>
-
-    <!-- Sync Journal -->
-    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="color:#8b9ab5;font-size:0.85rem;min-width:140px;">Sync Journal</span>
-        <input type="month" id="journalFrom" style="background:#0f1923;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
-        <span style="color:#8b9ab5;font-size:0.82rem;">to</span>
-        <input type="month" id="journalTo" style="background:#0f1923;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
-        <button id="syncJournalBtn" onclick="doSyncJournal()"
-          style="background:#0ca678;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.85rem;">
-          Sync Journal
-        </button>
-        <span id="syncJournalStatus" style="color:#8b9ab5;font-size:0.82rem;"></span>
-      </div>
-    </div>
-
-
-    </div>
-  </div>
-
-<!-- Export Data -->
-  <div style="margin: 2rem auto 2rem; max-width: 900px; background: #1a1f35; border-radius: 12px; padding: 1.5rem; border: 1px solid #2d3348;">
-    <h2 style="color:#e2e8f0; margin:0 0 1.2rem 0; font-size:1.15rem; font-weight:600; letter-spacing:0.03em;">Export Data</h2>
-
-    <div style="display:flex; gap:2rem; flex-wrap:wrap; align-items:flex-start;">
-
-      <div>
-        <div style="color:#94a3b8; font-size:0.75rem; font-weight:600; letter-spacing:0.08em; margin-bottom:0.4rem;">MONTH</div>
-        <input type="month" id="exportMonth" style="background:#252b40; color:#e2e8f0; border:1px solid #3d4460; border-radius:6px; padding:0.45rem 0.8rem; font-size:0.9rem; outline:none;" />
-      </div>
-
-      <div style="flex:1; min-width:280px;">
-        <div style="display:flex; gap:0.6rem; align-items:center; margin-bottom:0.5rem;">
-          <span style="color:#94a3b8; font-size:0.75rem; font-weight:600; letter-spacing:0.08em;">COMPANIES</span>
-          <button onclick="exportSelectAll(true)" style="background:none; border:1px solid #3d4460; color:#94a3b8; border-radius:4px; padding:1px 7px; font-size:0.72rem; cursor:pointer;">All</button>
-          <button onclick="exportSelectAll(false)" style="background:none; border:1px solid #3d4460; color:#94a3b8; border-radius:4px; padding:1px 7px; font-size:0.72rem; cursor:pointer;">None</button>
-        </div>
-        <div id="exportCompanies" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:0.25rem 0.8rem; max-height:180px; overflow-y:auto; padding:0.6rem 0.8rem; background:#111827; border-radius:8px; border:1px solid #2d3348;"></div>
-      </div>
-
-    </div>
-
-    <div style="margin-top:1.2rem; display:flex; gap:0.8rem; flex-wrap:wrap; align-items:center;">
-      <button onclick="doExportTB()" style="background:#1d4ed8; color:#fff; border:none; border-radius:6px; padding:0.45rem 1.1rem; font-size:0.83rem; cursor:pointer; font-weight:600;">&#11015; Export TB</button>
-      <button onclick="doExportJournal()" style="background:#065f46; color:#fff; border:none; border-radius:6px; padding:0.45rem 1.1rem; font-size:0.83rem; cursor:pointer; font-weight:600;">&#11015; Export Journal</button>
-      <span id="exportMsg" style="color:#94a3b8; font-size:0.8rem;"></span>
-    </div>
-  </div>
-
-  <script>
-  (function() {
-        // Companies populated dynamically from Odoo (see populateExportCompanies)
-    if (window._odooCompanies && window._odooCompanies.length) {
-      populateExportCompanies(window._odooCompanies);
-    }
-        const d = new Date(); d.setMonth(d.getMonth() - 1);
-    document.getElementById('exportMonth').value = d.toISOString().slice(0,7);
-  })();
-
-  function exportSelectAll(v) { document.querySelectorAll('.exp-cb').forEach(c => c.checked = v); }
-
-  function populateExportCompanies(companies) {
-    var box = document.getElementById('exportCompanies');
-    if (!box) return;
-    box.innerHTML = '';
-    companies.forEach(function(c) {
-      var lbl = document.createElement('label');
-      lbl.style.cssText = 'display:flex;align-items:center;gap:0.35rem;color:#cbd5e1;font-size:0.8rem;cursor:pointer;';
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.className = 'exp-cb';
-      cb.value = c.id;
-      cb.checked = true;
-      cb.style.accentColor = '#3b82f6';
-      var span = document.createElement('span');
-      span.textContent = c.name;
-      lbl.appendChild(cb);
-      lbl.appendChild(span);
-      box.appendChild(lbl);
-    });
-  }
-
-  function getExportParams() {
-    const month = document.getElementById('exportMonth').value;
-    if (!month) { alert('Select a month'); return null; }
-    const ids = [...document.querySelectorAll('.exp-cb:checked')].map(c => c.value).join(',');
-    if (!ids) { alert('Select at least one company'); return null; }
-    return { month, companies: ids };
-  }
-
-  function triggerDownload(url, filename) {
-    const msg = document.getElementById('exportMsg');
-    msg.textContent = 'Preparing...';
-    fetch(url).then(r => {
-      if (!r.ok) return r.json().then(e => { throw new Error(e.error || 'Failed'); });
-      return r.blob();
-    }).then(b => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b); a.download = filename; a.click();
-      msg.textContent = filename + ' downloaded.';
-      setTimeout(() => msg.textContent = '', 4000);
-    }).catch(e => { msg.textContent = 'Error: ' + e.message; });
-  }
-
-  function doExportTB() {
-    const p = getExportParams(); if (!p) return;
-    triggerDownload('/api/export/tb?month=' + p.month + '&companies=' + p.companies, 'TB_' + p.month + '.csv');
-  }
-
-  function doExportJournal() {
-    const p = getExportParams(); if (!p) return;
-    triggerDownload('/api/export/journal?month=' + p.month + '&companies=' + p.companies, 'Journal_' + p.month + '.csv');
-  }
-  
-  // --- Odoo Sync functions ---
-  function setDefaultSyncDates() {
-    var now = new Date();
-    var yyyy = now.getFullYear();
-    var mm = String(now.getMonth() + 1).padStart(2, '0');
-    var dd = String(now.getDate()).padStart(2, '0');
-    var monthStr = yyyy + '-' + mm;
-    var dateStr = yyyy + '-' + mm + '-' + dd;
-    var jFrom = document.getElementById('journalFrom');
-    var jTo = document.getElementById('journalTo');
-    var bDate = document.getElementById('balancesDate');
-    if (jFrom && !jFrom.value) jFrom.value = monthStr;
-    if (jTo && !jTo.value) jTo.value = monthStr;
-    if (bDate && !bDate.value) bDate.value = dateStr;
-  }
-
-  async function doSyncAccounts() {
-    var btn = document.getElementById('syncAccountsBtn');
-    var status = document.getElementById('syncAccountsStatus');
-    btn.disabled = true; btn.textContent = 'Syncing...';
-    status.style.color = '#8b9ab5'; status.textContent = 'Running...';
-    try {
-      var r = await fetch('/api/sync/accounts', { method: 'POST' });
-      var data = await r.json();
-      if (data.error) throw new Error(data.error);
-      status.style.color = '#40c057';
-      status.textContent = 'Done. Upserted: ' + (data.upserted || data.accounts_upserted || JSON.stringify(data)).toString().slice(0, 80);
-    } catch(e) {
-      status.style.color = '#fa5252'; status.textContent = 'Error: ' + e.message;
-    }
-    btn.disabled = false; btn.textContent = 'Sync Accounts';
-  }
-
-  async function doSyncJournal() {
-    var btn = document.getElementById('syncJournalBtn');
-    var status = document.getElementById('syncJournalStatus');
-    var fromMonth = document.getElementById('journalFrom').value;
-    var toMonth = document.getElementById('journalTo').value;
-    if (!fromMonth || !toMonth) { status.style.color='#fa5252'; status.textContent='Select from/to months.'; return; }
-    var dateFrom = fromMonth + '-01';
-    // Get last day of toMonth
-    var toDate = new Date(toMonth.slice(0,4), parseInt(toMonth.slice(5,7)), 0);
-    var dateTo = toMonth + '-' + String(toDate.getDate()).padStart(2,'0');
-    btn.disabled = true; btn.textContent = 'Syncing...';
-    status.style.color = '#8b9ab5'; status.textContent = 'Running (' + dateFrom + ' to ' + dateTo + ')...';
-    try {
-      var r = await fetch('/api/sync/journal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-      });
-      var data = await r.json();
-      if (data.error) throw new Error(data.error);
-      status.style.color = '#40c057';
-      var msg = 'Done.';
-      if (data.synced !== undefined) msg += ' Synced: ' + data.synced;
-      else if (data.journal_entries_synced !== undefined) msg += ' Synced: ' + data.journal_entries_synced;
-      else msg += ' ' + JSON.stringify(data).slice(0, 100);
-      status.textContent = msg;
-    } catch(e) {
-      status.style.color = '#fa5252'; status.textContent = 'Error: ' + e.message;
-    }
-    btn.disabled = false; btn.textContent = 'Sync Journal';
-  }
-
-
-  document.addEventListener('DOMContentLoaded', function() {
-    setDefaultSyncDates();
-  });
-  // --- end Odoo Sync functions ---
-
-  // ââ Admin Tab Switching ââââââââââââââââââââââââââââââââââââââââââââââ
-  function switchAdminTab(tabId) {
-    document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + tabId).classList.add('active');
-    var btns = document.querySelectorAll('.admin-tab-btn');
-    var tabMap = { 'user-mgmt': 0, 'odoo-mgt': 1 };
-    btns[tabMap[tabId]].classList.add('active');
-    if (tabId === 'odoo-mgt') {
-      if (!window._companiesLoaded) loadOdooCompanies();
-      if (!window._entityGroupsLoaded) loadEntityGroups();
-      setDefaultSyncDates();
-    }
-  }
-
-  // ââ Companies from Odoo ââââââââââââââââââââââââââââââââââââââââââââââ
-  window._odooCompanies = [];
-  window._companiesLoaded = false;
-
-  async function loadOdooCompanies() {
-    var statusEl = document.getElementById('companiesStatus');
-    var listEl = document.getElementById('companiesList');
-    statusEl.textContent = 'Loading from Odoo...';
-    statusEl.style.color = '#8b9ab5';
-    listEl.innerHTML = '';
-    try {
-      var r = await fetch('/api/sync/companies');
-      var data = await r.json();
-      if (data.error) throw new Error(data.error);
-      window._odooCompanies = data;
-      populateExportCompanies(data);
-      window._companiesLoaded = true;
-      statusEl.style.color = '#40c057';
-      statusEl.textContent = data.length + ' companies loaded from Odoo.';
-      listEl.innerHTML = data.map(function(c) {
-        return '<span style="background:#0f1923;border:1px solid #2e3a4e;border-radius:6px;padding:4px 10px;color:#c5d0e0;font-size:0.8rem;"><b style=\'color:#6495ed\'>' + c.id + '</b> ' + c.name + '</span>';
-      }).join('');
-    } catch(e) {
-      statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error: ' + e.message;
-    }
-  }
-
-  // ââ Entity Groups ââââââââââââââââââââââââââââââââââââââââââââââââââââ
-  window._entityGroups = [];
-  window._entityGroupsLoaded = false;
-
-  async function loadEntityGroups() {
-    var statusEl = document.getElementById('entityGroupsStatus');
-    statusEl.textContent = 'Loading...'; statusEl.style.color = '#8b9ab5';
-    try {
-      var r = await fetch('/api/config/entity-groups');
-      var data = await r.json();
-      if (data.error) throw new Error(data.error);
-      window._entityGroups = data;
-      window._entityGroupsLoaded = true;
-      statusEl.textContent = '';
-      renderEntityGroups();
-    } catch(e) {
-      statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error loading: ' + e.message;
-    }
-  }
-
-  function renderEntityGroups() {
-    var listEl = document.getElementById('entityGroupsList');
-    listEl.innerHTML = '';
-    window._entityGroups.forEach(function(grp, idx) {
-      var isSubtotal = grp.is_subtotal || false;
-      var isManual = grp.is_manual || false;
-      var subtotalGroups = (grp.subtotal_groups || []).join(', ');
-      var companyIds = (grp.company_ids || []).join(', ');
-      var row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:8px;background:#0f1923;border-radius:8px;border:1px solid #2e3a4e;flex-wrap:wrap;';
-      row.innerHTML = '<div style="flex:0 0 180px;">'
-        + '<label style="color:#8b9ab5;font-size:0.75rem;display:block;margin-bottom:3px;">Group Name</label>'
-        + '<input type="text" value="' + escHtml(grp.name) + '" onchange="updateGroupField(' + idx + ',\'name\',this.value)" style="width:100%;background:#1a2332;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:5px;padding:5px 8px;font-size:0.83rem;" />'
-        + '</div>'
-        + '<div style="flex:1;min-width:140px;">'
-        + '<label style="color:#8b9ab5;font-size:0.75rem;display:block;margin-bottom:3px;">' + (isSubtotal ? 'Sub-groups (comma sep.)' : 'Company IDs (comma sep.)') + '</label>'
-        + (isSubtotal
-          ? '<input type="text" value="' + escHtml(subtotalGroups) + '" onchange="updateGroupSubtotals(' + idx + ',this.value)" style="width:100%;background:#1a2332;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:5px;padding:5px 8px;font-size:0.83rem;" />'
-          : '<input type="text" value="' + escHtml(companyIds) + '" onchange="updateGroupCompanyIds(' + idx + ',this.value)" style="width:100%;background:#1a2332;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:5px;padding:5px 8px;font-size:0.83rem;" />'
-          )
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;gap:4px;padding-top:16px;">'
-        + '<label style="color:#8b9ab5;font-size:0.75rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox"' + (isSubtotal?' checked':'') + ' onchange="updateGroupFlag(' + idx + ',\'is_subtotal\',this.checked)" /> Subtotal</label>'
-        + '<label style="color:#8b9ab5;font-size:0.75rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox"' + (isManual?' checked':'') + ' onchange="updateGroupFlag(' + idx + ',\'is_manual\',this.checked)" /> Manual</label>'
-        + '</div>'
-        + '<div style="padding-top:16px;">'
-        + '<button onclick="removeEntityGroup(' + idx + ')" style="background:rgba(239,68,68,0.15);color:#fa5252;border:1px solid rgba(239,68,68,0.3);border-radius:5px;padding:5px 12px;cursor:pointer;font-size:0.8rem;">Remove</button>'
-        + '</div>';
-      listEl.appendChild(row);
-    });
-  }
-
-  function escHtml(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function updateGroupField(idx, field, val) { window._entityGroups[idx][field] = val; }
-
-  function updateGroupCompanyIds(idx, val) {
-    window._entityGroups[idx].company_ids = val.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
-  }
-
-  function updateGroupSubtotals(idx, val) {
-    window._entityGroups[idx].subtotal_groups = val.split(',').map(s=>s.trim()).filter(Boolean);
-  }
-
-  function updateGroupFlag(idx, flag, checked) {
-    window._entityGroups[idx][flag] = checked;
-    renderEntityGroups();
-  }
-
-  function addEntityGroup() {
-    window._entityGroups.push({ name: 'NEW GROUP', company_ids: [], is_subtotal: false });
-    renderEntityGroups();
-    document.getElementById('entityGroupsList').lastElementChild.scrollIntoView({behavior:'smooth'});
-  }
-
-  function removeEntityGroup(idx) {
-    if (!confirm('Remove group "' + window._entityGroups[idx].name + '"?')) return;
-    window._entityGroups.splice(idx, 1);
-    renderEntityGroups();
-  }
-
-  async function saveEntityGroups() {
-    var statusEl = document.getElementById('entityGroupsStatus');
-    statusEl.textContent = 'Saving...'; statusEl.style.color = '#8b9ab5';
-    try {
-      var r = await fetch('/api/config/entity-groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(window._entityGroups)
-      });
-      var data = await r.json();
-      if (data.error) throw new Error(data.error);
-      statusEl.style.color = '#40c057';
-      statusEl.textContent = 'Saved ' + data.saved + ' groups. Changes take effect on next dashboard load.';
-    } catch(e) {
-      statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error: ' + e.message;
-    }
-  }
-
-  async function resetEntityGroups() {
-    if (!confirm('Reset entity groups to code default? This will discard any saved changes.')) return;
-    var statusEl = document.getElementById('entityGroupsStatus');
-    try {
-      var r = await fetch('/api/config/entity-groups/reset', { method: 'DELETE' });
-      var data = await r.json();
-      if (data.error) throw new Error(data.error);
-      window._entityGroupsLoaded = false;
-      await loadEntityGroups();
-      statusEl.style.color = '#40c057';
-      statusEl.textContent = 'Reset to default.';
-    } catch(e) {
-      statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error: ' + e.message;
-    }
-  }
-
-
-</script>
-</div>
-</div>
-
-<script>
-
-
     var currentUser = window.getUser();
 
     function init() {
@@ -1723,34 +748,1007 @@
     }
 
   </script>
-  
-<!-- ═══════════════════ TB 数据 tab ═══════════════════ -->
-<div id="tab-tb-data" class="admin-tab-pane">
+<script src="/chat-widget.js"></script>
+</div>
+<div id="tab-odoo-mgt" class="admin-tab-pane">
   <div class="container">
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <h2 style="margin:0">TB 数据（Odoo TB 中间层）</h2>
-        <div style="display:flex;gap:8px;align-items:center">
-          <label style="font-size:13px;color:var(--text-dim)">Period:</label>
-          <input type="month" id="tbPeriod" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px" />
-          <button class="btn primary" onclick="importTbFromOdoo()">⬇ 从 Odoo 导入（草稿）</button>
-          <button class="btn" onclick="loadTbData()" style="background:var(--surface2)">↻ 刷新</button>
-          <button class="btn" id="tbConfirmBtn" onclick="confirmTbData()" style="background:#22c55e;color:#000;font-weight:600;display:none">✓ 确认发布</button>
-          <button class="btn danger" id="tbUnconfirmBtn" onclick="unconfirmTbData()" style="display:none">⟲ 撤回为草稿</button>
-        </div>
-      </div>
-      <div id="tbStatus" style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:13px;background:var(--surface2)">
-        选择月份后点击"刷新"查看数据
-      </div>
-      <div id="tbTableContainer" style="overflow-x:auto;max-height:600px;overflow-y:auto">
-        <div style="color:var(--text-dim);text-align:center;padding:40px">暂无数据</div>
+  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin:0;">Companies (from Odoo)</h2>
+      <button onclick="loadOdooCompanies()" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:0.83rem;">&#x21bb; Refresh</button>
+    </div>
+    <div id="companiesStatus" style="color:#8b9ab5;font-size:0.82rem;margin-bottom:10px;"></div>
+    <div id="companiesList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+  </div>
+  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin:0;">Entity Groups</h2>
+      <div style="display:flex;gap:8px;">
+        <button onclick="addEntityGroup()" style="background:#0ca678;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">+ Add Group</button>
+        <button onclick="saveEntityGroups()" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">&#x2713; Save</button>
+        <button onclick="resetEntityGroups()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:0.83rem;">Reset Default</button>
       </div>
     </div>
+    <div id="entityGroupsStatus" style="color:#8b9ab5;font-size:0.82rem;margin-bottom:12px;"></div>
+    <div id="entityGroupsList"></div>
   </div>
+
+  
+<!-- Odoo Sync -->
+  <div style="background:#1a2332;border-radius:12px;padding:24px;margin-bottom:24px;">
+    <h2 style="color:#f0f4ff;font-size:1.1rem;font-weight:700;letter-spacing:0.08em;margin-bottom:20px;">Odoo Sync</h2>
+
+    <!-- Sync Accounts -->
+    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="color:#8b9ab5;font-size:0.85rem;min-width:140px;">Sync Accounts</span>
+        <button id="syncAccountsBtn" onclick="doSyncAccounts()"
+          style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.85rem;">
+          Sync Accounts
+        </button>
+        <span id="syncAccountsStatus" style="color:#8b9ab5;font-size:0.82rem;"></span>
+      </div>
+    </div>
+
+    <!-- Sync Journal -->
+    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #2e3a4e;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="color:#8b9ab5;font-size:0.85rem;min-width:140px;">Sync Journal</span>
+        <input type="month" id="journalFrom" style="background:#0f1923;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
+        <span style="color:#8b9ab5;font-size:0.82rem;">to</span>
+        <input type="month" id="journalTo" style="background:#0f1923;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:6px;padding:6px 10px;font-size:0.85rem;" />
+        <button id="syncJournalBtn" onclick="doSyncJournal()"
+          style="background:#0ca678;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.85rem;">
+          Sync Journal
+        </button>
+        <span id="syncJournalStatus" style="color:#8b9ab5;font-size:0.82rem;"></span>
+      </div>
+    </div>
+
+
+    </div>
+  </div>
+
+<!-- TB 数据 -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin:0">TB æ°æ®ï¼Odoo TB ä¸­é´å±ï¼</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:13px;color:var(--text-dim)">Period:</label>
+        <input type="month" id="tbPeriod" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px" />
+        <button class="btn primary" onclick="importTbFromOdoo()">â¬ ä» Odoo å¯¼å¥ï¼èç¨¿ï¼</button>
+        <button class="btn" onclick="loadTbData()" style="background:var(--surface2)">â» å·æ°</button>
+        <button class="btn" id="tbConfirmBtn" onclick="confirmTbData()" style="background:#22c55e;color:#000;font-weight:600;display:none">â ç¡®è®¤åå¸</button>
+        <button class="btn danger" id="tbUnconfirmBtn" onclick="unconfirmTbData()" style="display:none">â² æ¤åä¸ºèç¨¿</button>
+      </div>
+    </div>
+    <div id="tbStatus" style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:13px;background:var(--surface2)">
+      éæ©æä»½åç¹å»"å·æ°"æ¥çæ°æ®
+    </div>
+    <div id="tbTableContainer" style="overflow-x:auto;max-height:600px;overflow-y:auto">
+      <div style="color:var(--text-dim);text-align:center;padding:40px">ææ æ°æ®</div>
+    </div>
+  </div>
+
+
+<!-- Export Data -->
+  <div style="margin: 2rem auto 2rem; max-width: 900px; background: #1a1f35; border-radius: 12px; padding: 1.5rem; border: 1px solid #2d3348;">
+    <h2 style="color:#e2e8f0; margin:0 0 1.2rem 0; font-size:1.15rem; font-weight:600; letter-spacing:0.03em;">Export Data</h2>
+
+    <div style="display:flex; gap:2rem; flex-wrap:wrap; align-items:flex-start;">
+
+      <div>
+        <div style="color:#94a3b8; font-size:0.75rem; font-weight:600; letter-spacing:0.08em; margin-bottom:0.4rem;">MONTH</div>
+        <input type="month" id="exportMonth" style="background:#252b40; color:#e2e8f0; border:1px solid #3d4460; border-radius:6px; padding:0.45rem 0.8rem; font-size:0.9rem; outline:none;" />
+      </div>
+
+      <div style="flex:1; min-width:280px;">
+        <div style="display:flex; gap:0.6rem; align-items:center; margin-bottom:0.5rem;">
+          <span style="color:#94a3b8; font-size:0.75rem; font-weight:600; letter-spacing:0.08em;">COMPANIES</span>
+          <button onclick="exportSelectAll(true)" style="background:none; border:1px solid #3d4460; color:#94a3b8; border-radius:4px; padding:1px 7px; font-size:0.72rem; cursor:pointer;">All</button>
+          <button onclick="exportSelectAll(false)" style="background:none; border:1px solid #3d4460; color:#94a3b8; border-radius:4px; padding:1px 7px; font-size:0.72rem; cursor:pointer;">None</button>
+        </div>
+        <div id="exportCompanies" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:0.25rem 0.8rem; max-height:180px; overflow-y:auto; padding:0.6rem 0.8rem; background:#111827; border-radius:8px; border:1px solid #2d3348;"></div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:1.2rem; display:flex; gap:0.8rem; flex-wrap:wrap; align-items:center;">
+      <button onclick="doExportTB()" style="background:#1d4ed8; color:#fff; border:none; border-radius:6px; padding:0.45rem 1.1rem; font-size:0.83rem; cursor:pointer; font-weight:600;">&#11015; Export TB</button>
+      <button onclick="doExportJournal()" style="background:#065f46; color:#fff; border:none; border-radius:6px; padding:0.45rem 1.1rem; font-size:0.83rem; cursor:pointer; font-weight:600;">&#11015; Export Journal</button>
+      <span id="exportMsg" style="color:#94a3b8; font-size:0.8rem;"></span>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+        // Companies populated dynamically from Odoo (see populateExportCompanies)
+    if (window._odooCompanies && window._odooCompanies.length) {
+      populateExportCompanies(window._odooCompanies);
+    }
+        const d = new Date(); d.setMonth(d.getMonth() - 1);
+    document.getElementById('exportMonth').value = d.toISOString().slice(0,7);
+  })();
+
+  function exportSelectAll(v) { document.querySelectorAll('.exp-cb').forEach(c => c.checked = v); }
+
+  function populateExportCompanies(companies) {
+    var box = document.getElementById('exportCompanies');
+    if (!box) return;
+    box.innerHTML = '';
+    companies.forEach(function(c) {
+      var lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:0.35rem;color:#cbd5e1;font-size:0.8rem;cursor:pointer;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'exp-cb';
+      cb.value = c.id;
+      cb.checked = true;
+      cb.style.accentColor = '#3b82f6';
+      var span = document.createElement('span');
+      span.textContent = c.name;
+      lbl.appendChild(cb);
+      lbl.appendChild(span);
+      box.appendChild(lbl);
+    });
+  }
+
+  function getExportParams() {
+    const month = document.getElementById('exportMonth').value;
+    if (!month) { alert('Select a month'); return null; }
+    const ids = [...document.querySelectorAll('.exp-cb:checked')].map(c => c.value).join(',');
+    if (!ids) { alert('Select at least one company'); return null; }
+    return { month, companies: ids };
+  }
+
+  function triggerDownload(url, filename) {
+    const msg = document.getElementById('exportMsg');
+    msg.textContent = 'Preparing...';
+    fetch(url).then(r => {
+      if (!r.ok) return r.json().then(e => { throw new Error(e.error || 'Failed'); });
+      return r.blob();
+    }).then(b => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b); a.download = filename; a.click();
+      msg.textContent = filename + ' downloaded.';
+      setTimeout(() => msg.textContent = '', 4000);
+    }).catch(e => { msg.textContent = 'Error: ' + e.message; });
+  }
+
+  function doExportTB() {
+    const p = getExportParams(); if (!p) return;
+    triggerDownload('/api/export/tb?month=' + p.month + '&companies=' + p.companies, 'TB_' + p.month + '.csv');
+  }
+
+  function doExportJournal() {
+    const p = getExportParams(); if (!p) return;
+    triggerDownload('/api/export/journal?month=' + p.month + '&companies=' + p.companies, 'Journal_' + p.month + '.csv');
+  }
+  
+  // --- Odoo Sync functions ---
+  function setDefaultSyncDates() {
+    var now = new Date();
+    var yyyy = now.getFullYear();
+    var mm = String(now.getMonth() + 1).padStart(2, '0');
+    var dd = String(now.getDate()).padStart(2, '0');
+    var monthStr = yyyy + '-' + mm;
+    var dateStr = yyyy + '-' + mm + '-' + dd;
+    var jFrom = document.getElementById('journalFrom');
+    var jTo = document.getElementById('journalTo');
+    var bDate = document.getElementById('balancesDate');
+    if (jFrom && !jFrom.value) jFrom.value = monthStr;
+    if (jTo && !jTo.value) jTo.value = monthStr;
+    if (bDate && !bDate.value) bDate.value = dateStr;
+  }
+
+  async function doSyncAccounts() {
+    var btn = document.getElementById('syncAccountsBtn');
+    var status = document.getElementById('syncAccountsStatus');
+    btn.disabled = true; btn.textContent = 'Syncing...';
+    status.style.color = '#8b9ab5'; status.textContent = 'Running...';
+    try {
+      var r = await fetch('/api/sync/accounts', { method: 'POST' });
+      var data = await r.json();
+      if (data.error) throw new Error(data.error);
+      status.style.color = '#40c057';
+      status.textContent = 'Done. Upserted: ' + (data.upserted || data.accounts_upserted || JSON.stringify(data)).toString().slice(0, 80);
+    } catch(e) {
+      status.style.color = '#fa5252'; status.textContent = 'Error: ' + e.message;
+    }
+    btn.disabled = false; btn.textContent = 'Sync Accounts';
+  }
+
+  async function doSyncJournal() {
+    var btn = document.getElementById('syncJournalBtn');
+    var status = document.getElementById('syncJournalStatus');
+    var fromMonth = document.getElementById('journalFrom').value;
+    var toMonth = document.getElementById('journalTo').value;
+    if (!fromMonth || !toMonth) { status.style.color='#fa5252'; status.textContent='Select from/to months.'; return; }
+    var dateFrom = fromMonth + '-01';
+    // Get last day of toMonth
+    var toDate = new Date(toMonth.slice(0,4), parseInt(toMonth.slice(5,7)), 0);
+    var dateTo = toMonth + '-' + String(toDate.getDate()).padStart(2,'0');
+    btn.disabled = true; btn.textContent = 'Syncing...';
+    status.style.color = '#8b9ab5'; status.textContent = 'Running (' + dateFrom + ' to ' + dateTo + ')...';
+    try {
+      var r = await fetch('/api/sync/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
+      });
+      var data = await r.json();
+      if (data.error) throw new Error(data.error);
+      status.style.color = '#40c057';
+      var msg = 'Done.';
+      if (data.synced !== undefined) msg += ' Synced: ' + data.synced;
+      else if (data.journal_entries_synced !== undefined) msg += ' Synced: ' + data.journal_entries_synced;
+      else msg += ' ' + JSON.stringify(data).slice(0, 100);
+      status.textContent = msg;
+    } catch(e) {
+      status.style.color = '#fa5252'; status.textContent = 'Error: ' + e.message;
+    }
+    btn.disabled = false; btn.textContent = 'Sync Journal';
+  }
+
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setDefaultSyncDates();
+  });
+  // --- end Odoo Sync functions ---
+
+  // Ã¢ÂÂÃ¢ÂÂ Admin Tab Switching Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  function switchAdminTab(tabId) {
+    document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    var btns = document.querySelectorAll('.admin-tab-btn');
+    var tabMap = { 'user-mgmt': 0, 'odoo-mgt': 1 };
+    btns[tabMap[tabId]].classList.add('active');
+    if (tabId === 'odoo-mgt') {
+      if (!window._companiesLoaded) loadOdooCompanies();
+      if (!window._entityGroupsLoaded) loadEntityGroups();
+      setDefaultSyncDates();
+    }
+  }
+
+  // Ã¢ÂÂÃ¢ÂÂ Companies from Odoo Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  window._odooCompanies = [];
+  window._companiesLoaded = false;
+
+  async function loadOdooCompanies() {
+    var statusEl = document.getElementById('companiesStatus');
+    var listEl = document.getElementById('companiesList');
+    statusEl.textContent = 'Loading from Odoo...';
+    statusEl.style.color = '#8b9ab5';
+    listEl.innerHTML = '';
+    try {
+      var r = await fetch('/api/sync/companies');
+      var data = await r.json();
+      if (data.error) throw new Error(data.error);
+      window._odooCompanies = data;
+      populateExportCompanies(data);
+      window._companiesLoaded = true;
+      statusEl.style.color = '#40c057';
+      statusEl.textContent = data.length + ' companies loaded from Odoo.';
+      listEl.innerHTML = data.map(function(c) {
+        return '<span style="background:#0f1923;border:1px solid #2e3a4e;border-radius:6px;padding:4px 10px;color:#c5d0e0;font-size:0.8rem;"><b style=\'color:#6495ed\'>' + c.id + '</b> ' + c.name + '</span>';
+      }).join('');
+    } catch(e) {
+      statusEl.style.color = '#fa5252';
+      statusEl.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  // Ã¢ÂÂÃ¢ÂÂ Entity Groups Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  window._entityGroups = [];
+  window._entityGroupsLoaded = false;
+
+  async function loadEntityGroups() {
+    var statusEl = document.getElementById('entityGroupsStatus');
+    statusEl.textContent = 'Loading...'; statusEl.style.color = '#8b9ab5';
+    try {
+      var r = await fetch('/api/config/entity-groups');
+      var data = await r.json();
+      if (data.error) throw new Error(data.error);
+      window._entityGroups = data;
+      window._entityGroupsLoaded = true;
+      statusEl.textContent = '';
+      renderEntityGroups();
+    } catch(e) {
+      statusEl.style.color = '#fa5252';
+      statusEl.textContent = 'Error loading: ' + e.message;
+    }
+  }
+
+  function renderEntityGroups() {
+    var listEl = document.getElementById('entityGroupsList');
+    listEl.innerHTML = '';
+    window._entityGroups.forEach(function(grp, idx) {
+      var isSubtotal = grp.is_subtotal || false;
+      var isManual = grp.is_manual || false;
+      var subtotalGroups = (grp.subtotal_groups || []).join(', ');
+      var companyIds = (grp.company_ids || []).join(', ');
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:8px;background:#0f1923;border-radius:8px;border:1px solid #2e3a4e;flex-wrap:wrap;';
+      row.innerHTML = '<div style="flex:0 0 180px;">'
+        + '<label style="color:#8b9ab5;font-size:0.75rem;display:block;margin-bottom:3px;">Group Name</label>'
+        + '<input type="text" value="' + escHtml(grp.name) + '" onchange="updateGroupField(' + idx + ',\'name\',this.value)" style="width:100%;background:#1a2332;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:5px;padding:5px 8px;font-size:0.83rem;" />'
+        + '</div>'
+        + '<div style="flex:1;min-width:140px;">'
+        + '<label style="color:#8b9ab5;font-size:0.75rem;display:block;margin-bottom:3px;">' + (isSubtotal ? 'Sub-groups (comma sep.)' : 'Company IDs (comma sep.)') + '</label>'
+        + (isSubtotal
+          ? '<input type="text" value="' + escHtml(subtotalGroups) + '" onchange="updateGroupSubtotals(' + idx + ',this.value)" style="width:100%;background:#1a2332;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:5px;padding:5px 8px;font-size:0.83rem;" />'
+          : '<input type="text" value="' + escHtml(companyIds) + '" onchange="updateGroupCompanyIds(' + idx + ',this.value)" style="width:100%;background:#1a2332;color:#f0f4ff;border:1px solid #2e3a4e;border-radius:5px;padding:5px 8px;font-size:0.83rem;" />'
+          )
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:4px;padding-top:16px;">'
+        + '<label style="color:#8b9ab5;font-size:0.75rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox"' + (isSubtotal?' checked':'') + ' onchange="updateGroupFlag(' + idx + ',\'is_subtotal\',this.checked)" /> Subtotal</label>'
+        + '<label style="color:#8b9ab5;font-size:0.75rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox"' + (isManual?' checked':'') + ' onchange="updateGroupFlag(' + idx + ',\'is_manual\',this.checked)" /> Manual</label>'
+        + '</div>'
+        + '<div style="padding-top:16px;">'
+        + '<button onclick="removeEntityGroup(' + idx + ')" style="background:rgba(239,68,68,0.15);color:#fa5252;border:1px solid rgba(239,68,68,0.3);border-radius:5px;padding:5px 12px;cursor:pointer;font-size:0.8rem;">Remove</button>'
+        + '</div>';
+      listEl.appendChild(row);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function updateGroupField(idx, field, val) { window._entityGroups[idx][field] = val; }
+
+  function updateGroupCompanyIds(idx, val) {
+    window._entityGroups[idx].company_ids = val.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
+  }
+
+  function updateGroupSubtotals(idx, val) {
+    window._entityGroups[idx].subtotal_groups = val.split(',').map(s=>s.trim()).filter(Boolean);
+  }
+
+  function updateGroupFlag(idx, flag, checked) {
+    window._entityGroups[idx][flag] = checked;
+    renderEntityGroups();
+  }
+
+  function addEntityGroup() {
+    window._entityGroups.push({ name: 'NEW GROUP', company_ids: [], is_subtotal: false });
+    renderEntityGroups();
+    document.getElementById('entityGroupsList').lastElementChild.scrollIntoView({behavior:'smooth'});
+  }
+
+  function removeEntityGroup(idx) {
+    if (!confirm('Remove group "' + window._entityGroups[idx].name + '"?')) return;
+    window._entityGroups.splice(idx, 1);
+    renderEntityGroups();
+  }
+
+  async function saveEntityGroups() {
+    var statusEl = document.getElementById('entityGroupsStatus');
+    statusEl.textContent = 'Saving...'; statusEl.style.color = '#8b9ab5';
+    try {
+      var r = await fetch('/api/config/entity-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(window._entityGroups)
+      });
+      var data = await r.json();
+      if (data.error) throw new Error(data.error);
+      statusEl.style.color = '#40c057';
+      statusEl.textContent = 'Saved ' + data.saved + ' groups. Changes take effect on next dashboard load.';
+    } catch(e) {
+      statusEl.style.color = '#fa5252';
+      statusEl.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  async function resetEntityGroups() {
+    if (!confirm('Reset entity groups to code default? This will discard any saved changes.')) return;
+    var statusEl = document.getElementById('entityGroupsStatus');
+    try {
+      var r = await fetch('/api/config/entity-groups/reset', { method: 'DELETE' });
+      var data = await r.json();
+      if (data.error) throw new Error(data.error);
+      window._entityGroupsLoaded = false;
+      await loadEntityGroups();
+      statusEl.style.color = '#40c057';
+      statusEl.textContent = 'Reset to default.';
+    } catch(e) {
+      statusEl.style.color = '#fa5252';
+      statusEl.textContent = 'Error: ' + e.message;
+    }
+  }
+
+
+</script>
+</div>
 </div>
 
 <script>
-// ──────────── TB 数据标签页逻辑 ────────────
+
+
+    var currentUser = window.getUser();
+
+    function init() {
+      if (!currentUser) {
+        window.location.href = '/login.html';
+        return;
+      }
+      // Show admin content for any logged-in user (server-side security via auth.js)
+      document.getElementById('adminContent').style.display = 'block';
+      loadUsers();
+      loadFoundationPeriods();
+      loadFoundationICPeriods();
+      loadKeystonePeriods();
+    }
+
+    async function loadUsers() {
+      var users = await (await fetch('/api/tasks/users')).json();
+      var el = document.getElementById('userTable');
+      if (!users.length) {
+        el.innerHTML = '<p style="color:var(--text-dim)">No users found</p>';
+        return;
+      }
+      el.innerHTML =
+        '<table><thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Role</th><th>Actions</th></tr></thead><tbody>' +
+        users.map(function(u) {
+          return '<tr>' +
+            '<td style="color:var(--text-dim)">' + u.id + '</td>' +
+            '<td>' + esc(u.username) + '</td>' +
+            '<td>' + esc(u.display_name) + '</td>' +
+            '<td><span class="badge ' + u.role + '">' + u.role + '</span></td>' +
+            '<td style="display:flex;gap:4px">' +
+              '<button class="btn" style="padding:4px 10px;font-size:11px" onclick="promptResetPassword(' + u.id + ', \'' + esc(u.display_name) + '\')">Reset Password</button>' +
+              (u.id !== currentUser.id ? '<button class="btn danger" style="padding:4px 10px;font-size:11px" onclick="deleteUser(' + u.id + ', \'' + esc(u.username) + '\')">Delete</button>' : '') +
+            '</td></tr>';
+        }).join('') +
+        '</tbody></table>';
+    }
+
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function showMsg(elId, text, type) {
+      var el = document.getElementById(elId);
+      el.className = 'msg ' + type;
+      el.textContent = text;
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 4000);
+    }
+
+    async function createUser() {
+      var username = document.getElementById('newUsername').value.trim();
+      var displayName = document.getElementById('newDisplayName').value.trim();
+      var password = document.getElementById('newPassword').value;
+      var role = document.getElementById('newRole').value;
+
+      if (!username || !displayName || !password) {
+        showMsg('createMsg', 'All fields are required', 'error');
+        return;
+      }
+
+      try {
+        var res = await fetch('/api/tasks/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, password: password, display_name: displayName, role: role })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          showMsg('createMsg', data.error || 'Failed to create user', 'error');
+          return;
+        }
+        showMsg('createMsg', 'User "' + data.display_name + '" created successfully', 'success');
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newDisplayName').value = '';
+        document.getElementById('newPassword').value = '';
+        loadUsers();
+      } catch (e) {
+        showMsg('createMsg', 'Network error', 'error');
+      }
+    }
+
+    function promptResetPassword(userId, displayName) {
+      var newPw = prompt('Enter new password for ' + displayName + ':');
+      if (!newPw) return;
+      if (newPw.length < 4) {
+        showMsg('resetMsg', 'Password must be at least 4 characters', 'error');
+        return;
+      }
+      resetPassword(userId, newPw, displayName);
+    }
+
+    async function resetPassword(userId, newPassword, displayName) {
+      try {
+        var res = await fetch('/api/tasks/users/' + userId + '/password', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_password: newPassword, requester_id: currentUser.id })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          showMsg('resetMsg', data.error || 'Failed to reset password', 'error');
+          return;
+        }
+        showMsg('resetMsg', 'Password reset for ' + displayName, 'success');
+      } catch (e) {
+        showMsg('resetMsg', 'Network error', 'error');
+      }
+    }
+
+    async function deleteUser(userId, username) {
+      if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+      try {
+        var res = await fetch('/api/tasks/users/' + userId + '?requester_id=' + currentUser.id, { method: 'DELETE' });
+        var data = await res.json().catch(function() { return {}; });
+        if (!res.ok) {
+          showMsg('resetMsg', data.error || ('Failed to delete user (HTTP ' + res.status + ')'), 'error');
+          return;
+        }
+        showMsg('resetMsg', 'User "' + username + '" deleted', 'success');
+        loadUsers();
+      } catch (e) {
+        showMsg('resetMsg', 'Network error', 'error');
+      }
+    }
+
+    init();
+
+    // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation Manual Balances ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+    var foundationRows = [];
+
+    async function loadFoundationPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances')).json();
+        var existingPeriods = (data.periods || []);
+        // Generate all months from earliest existing to current month
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        // Find earliest: existingPeriods is desc, so last element is earliest
+        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
+        var parts = earliest.split('-');
+        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = cy * 12 + cm;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+        var sel = document.getElementById('foundationPeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        // Default to current month
+        sel.value = currentPeriod;
+        loadFoundation();
+      } catch(e) {
+        console.error(e);
+        showMsg('foundationMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadFoundation() {
+      var period = document.getElementById('foundationPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + period)).json();
+        foundationRows = data.rows;
+        if (!foundationRows.length) {
+          document.getElementById('foundationTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
+            'No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevMonth(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('foundationTotal').textContent = '';
+        } else {
+          renderFoundationTable(foundationRows);
+        }
+      } catch(e) {
+        showMsg('foundationMsg', 'Failed to load data', 'error');
+      }
+    }
+
+    function renderFoundationTable(rows) {
+      if (!rows.length) {
+        document.getElementById('foundationTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+        return;
+      }
+      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
+      var totalUSD = 0;
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>CHF Amount</th><th>FX Rate (CHF/USD)</th><th>USD Amount</th></tr></thead><tbody>';
+      cats.forEach(function(cat) {
+        html += '<tr class="cat-header"><td colspan="5">' + cat + '</td></tr>';
+        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
+          totalUSD += r.amount_local * r.exchange_rate;
+          html += '<tr data-id="' + r.id + '">' +
+            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
+            '<td>' + r.account_name + '</td>' +
+            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcRow(this,' + r.id + ')" style="width:140px"></td>' +
+            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcRow(this,' + r.id + ')" style="width:90px"></td>' +
+            '<td id="usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '</tr>';
+        });
+      });
+      html += '<tr class="total-row"><td colspan="4">Total USD</td><td id="foundationTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('foundationTable').innerHTML = html;
+      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(totalUSD);
+    }
+
+    function fmt(n) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    }
+
+    function recalcRow(input, id) {
+      var row = foundationRows.find(function(r) { return r.id === id; });
+      if (!row) return;
+      var tr = input.closest('tr');
+      var chf = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
+      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
+      var usd = chf * fx;
+      document.getElementById('usd_' + id).textContent = fmt(usd);
+      // update total
+      var total = 0;
+      foundationRows.forEach(function(r) {
+        var t = document.querySelector('tr[data-id="' + r.id + '"]');
+        if (!t) return;
+        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
+        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
+        total += c * f;
+      });
+      var tc = document.getElementById('foundationTotalCell');
+      if (tc) tc.textContent = fmt(total);
+      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(total);
+    }
+
+    async function saveFoundation() {
+      var saved = 0, failed = 0;
+      for (var r of foundationRows) {
+        var tr = document.querySelector('tr[data-id="' + r.id + '"]');
+        if (!tr) continue;
+        var chf = parseFloat(tr.querySelectorAll('input')[0].value);
+        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        try {
+          var res = await fetch('/api/dashboard/foundation-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount_local: chf, exchange_rate: fx })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) {
+        showMsg('foundationMsg', saved + ' rows saved successfully', 'success');
+      } else {
+        showMsg('foundationMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      }
+      loadFoundation();
+    }
+
+    function addNewPeriod() {
+      var sel = document.getElementById('foundationPeriod');
+      var now = new Date();
+      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      sel.value = currentPeriod;
+      loadFoundation();
+    }
+
+    async function copyFromPrevMonth(period) {
+      // Calculate previous month
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+
+      try {
+        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + prevPeriod)).json();
+        if (!data.rows.length) {
+          showMsg('foundationMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
+          return;
+        }
+        // Post new rows for current period based on prev month
+        var newRows = data.rows.map(function(r) {
+          return {
+            account_code: r.account_code,
+            account_name: r.account_name,
+            category: r.category,
+            amount_local: r.amount_local,
+            currency: r.currency || 'CHF',
+            exchange_rate: r.exchange_rate
+          };
+        });
+        var res = await fetch('/api/dashboard/foundation-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('foundationMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
+          await loadFoundationPeriods();
+          document.getElementById('foundationPeriod').value = period;
+          loadFoundation();
+        } else {
+          showMsg('foundationMsg', 'Failed to copy data', 'error');
+        }
+      } catch(e) {
+        showMsg('foundationMsg', 'Error: ' + e.message, 'error');
+      }
+    }
+
+    // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Foundation IC Payable ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+    var FOUNDATION_IC_ENTITY = 'Xterio Foundation';
+    var FOUNDATION_IC_CODE = 'FOUNDATION_IC';
+    var foundationICRow = null;
+
+    async function loadFoundationICPeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY))).json();
+        var existingPeriods = (data.periods || []);
+
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        var startYear = 2025, startMonth = 5;
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = startYear * 12 + startMonth;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+
+        var sel = document.getElementById('foundationICPeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        sel.value = currentPeriod;
+        loadFoundationIC();
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadFoundationIC() {
+      var period = document.getElementById('foundationICPeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(FOUNDATION_IC_ENTITY) + '&period=' + period)).json();
+        foundationICRow = (data.rows || []).find(function(r) { return r.account_code === FOUNDATION_IC_CODE; }) || null;
+        document.getElementById('foundationICAmount').value = foundationICRow ? foundationICRow.amount_usd : 0;
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to load IC data', 'error');
+      }
+    }
+
+    async function saveFoundationIC() {
+      var period = document.getElementById('foundationICPeriod').value;
+      var amount = parseFloat(document.getElementById('foundationICAmount').value) || 0;
+      try {
+        if (foundationICRow && foundationICRow.id) {
+          var res = await fetch('/api/dashboard/manual-balances/' + foundationICRow.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: FOUNDATION_IC_ENTITY, amount_local: amount, exchange_rate: 1 })
+          });
+          if (!res.ok) throw new Error('save failed');
+        } else {
+          var res = await fetch('/api/dashboard/manual-balances', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entity: FOUNDATION_IC_ENTITY,
+              period: period,
+              rows: [{ account_code: FOUNDATION_IC_CODE, account_name: 'IC Payable (USD)', category: 'IC', amount_local: amount, currency: 'USD', exchange_rate: 1 }]
+            })
+          });
+          if (!res.ok) throw new Error('save failed');
+        }
+        showMsg('foundationICMsg', 'IC Payable saved for ' + period, 'success');
+        loadFoundationIC();
+      } catch(e) {
+        showMsg('foundationICMsg', 'Failed to save: ' + e.message, 'error');
+      }
+    }
+
+    // ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Keystone Foundation Manual Balances ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+    var keystoneRows = [];
+    var KEYSTONE_ENTITY = 'Keystone Foundation';
+
+    async function loadKeystonePeriods() {
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY))).json();
+        var existingPeriods = (data.periods || []);
+
+        var now = new Date();
+        var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var allPeriods = [];
+        var startYear = 2025, startMonth = 5;
+        var np = now.getFullYear() * 12 + now.getMonth() + 1;
+        var ep = startYear * 12 + startMonth;
+        for (var i = np; i >= ep; i--) {
+          var y = Math.floor((i - 1) / 12);
+          var m = ((i - 1) % 12) + 1;
+          allPeriods.push(y + '-' + String(m).padStart(2, '0'));
+        }
+
+        var sel = document.getElementById('keystonePeriod');
+        sel.innerHTML = allPeriods.map(function(p) {
+          var hasData = existingPeriods.indexOf(p) >= 0;
+          return '<option value="' + p + '">' + p + (hasData ? '' : ' (no data)') + '</option>';
+        }).join('');
+        sel.value = currentPeriod;
+        loadKeystone();
+      } catch(e) {
+        console.error(e);
+        showMsg('keystoneMsg', 'Failed to load periods: ' + e.message, 'error');
+      }
+    }
+
+    async function loadKeystone() {
+      var period = document.getElementById('keystonePeriod').value;
+      if (!period) return;
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + period)).json();
+        keystoneRows = data.rows || [];
+        if (!keystoneRows.length) {
+          document.getElementById('keystoneTable').innerHTML =
+            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
+            'No data for ' + period + '. ' +
+            '<button class="btn" onclick="copyFromPrevKeystone(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
+            '</div>';
+          document.getElementById('keystoneTotal').textContent = '';
+        } else {
+          renderKeystoneTable(keystoneRows);
+        }
+      } catch(e) {
+        showMsg('keystoneMsg', 'Failed to load data', 'error');
+      }
+    }
+
+    function renderKeystoneTable(rows) {
+      if (!rows.length) {
+        document.getElementById('keystoneTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
+        return;
+      }
+      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
+      var totalUSD = 0;
+      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>Amount (Local)</th><th>Currency</th><th>FX Rate</th><th>USD Amount</th></tr></thead><tbody>';
+      cats.forEach(function(cat) {
+        html += '<tr class="cat-header"><td colspan="6">' + cat + '</td></tr>';
+        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
+          totalUSD += r.amount_local * r.exchange_rate;
+          html += '<tr data-id="' + r.id + '">' +
+            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
+            '<td>' + r.account_name + '</td>' +
+            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:140px"></td>' +
+            '<td>' + (r.currency || 'USD') + '</td>' +
+            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:90px"></td>' +
+            '<td id="keystone_usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '</tr>';
+        });
+      });
+      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="keystoneTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '</tbody></table>';
+      document.getElementById('keystoneTable').innerHTML = html;
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(totalUSD);
+    }
+
+    function recalcKeystoneRow(input, id) {
+      var row = keystoneRows.find(function(r) { return r.id === id; });
+      if (!row) return;
+      var tr = input.closest('tr');
+      var amt = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
+      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
+      var usd = amt * fx;
+      document.getElementById('keystone_usd_' + id).textContent = fmt(usd);
+      // update total
+      var total = 0;
+      keystoneRows.forEach(function(r) {
+        var t = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
+        if (!t) return;
+        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
+        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
+        total += c * f;
+      });
+      var tc = document.getElementById('keystoneTotalCell');
+      if (tc) tc.textContent = fmt(total);
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(total);
+    }
+
+    async function saveKeystone() {
+      if (!keystoneRows || !keystoneRows.length) {
+        showMsg('keystoneMsg', 'No rows to save. Copy from previous month or add a row first.', 'error');
+        return;
+      }
+      var saved = 0, failed = 0;
+      for (var r of keystoneRows) {
+        var tr = document.querySelector('#keystoneTable tr[data-id="' + r.id + '"]');
+        if (!tr) continue;
+        var amt = parseFloat(tr.querySelectorAll('input')[0].value);
+        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
+        if (isNaN(amt) || isNaN(fx)) { failed++; continue; }
+        try {
+          var res = await fetch('/api/dashboard/manual-balances/' + r.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity: KEYSTONE_ENTITY, amount_local: amt, exchange_rate: fx })
+          });
+          if (res.ok) saved++; else failed++;
+        } catch(e) { failed++; }
+      }
+      if (failed === 0) {
+        showMsg('keystoneMsg', saved + ' rows saved successfully', 'success');
+      } else {
+        showMsg('keystoneMsg', saved + ' saved, ' + failed + ' failed', 'error');
+      }
+      loadKeystone();
+    }
+
+    function addNewKeystonePeriod() {
+      var sel = document.getElementById('keystonePeriod');
+      var now = new Date();
+      var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      sel.value = currentPeriod;
+      loadKeystone();
+    }
+
+    async function copyFromPrevKeystone(period) {
+      // Calculate previous month
+      var parts = period.split('-');
+      var y = parseInt(parts[0]), m = parseInt(parts[1]);
+      m--; if (m < 1) { m = 12; y--; }
+      var prevPeriod = y + '-' + String(m).padStart(2, '0');
+
+      try {
+        var data = await (await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent(KEYSTONE_ENTITY) + '&period=' + prevPeriod)).json();
+        if (!data.rows.length) {
+          showMsg('keystoneMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
+          return;
+        }
+        // Post new rows for current period based on prev month
+        var newRows = data.rows.map(function(r) {
+          return {
+            account_code: r.account_code,
+            account_name: r.account_name,
+            category: r.category,
+            amount_local: r.amount_local,
+            currency: r.currency || 'USD',
+            exchange_rate: r.exchange_rate
+          };
+        });
+        var res = await fetch('/api/dashboard/manual-balances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity: KEYSTONE_ENTITY, period: period, rows: newRows })
+        });
+        if (res.ok) {
+          showMsg('keystoneMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
+          await loadKeystonePeriods();
+          document.getElementById('keystonePeriod').value = period;
+          loadKeystone();
+        } else {
+          showMsg('keystoneMsg', 'Failed to copy data', 'error');
+        }
+      } catch(e) {
+        showMsg('keystoneMsg', 'Error: ' + e.message, 'error');
+      }
+    }
+
+  </script>
+  
+<!-- âââââââââââââââââââ TB æ°æ® tab âââââââââââââââââââ -->
+
+<script>
+// ââââââââââââ TB æ°æ®æ ç­¾é¡µé»è¾ ââââââââââââ
 (function() {
   // Init period to current month
   const now = new Date();
@@ -1767,32 +1765,32 @@
     const tableEl = document.getElementById('tbTableContainer');
     const confirmBtn = document.getElementById('tbConfirmBtn');
     const unconfirmBtn = document.getElementById('tbUnconfirmBtn');
-    statusEl.textContent = '加载中…';
+    statusEl.textContent = 'å è½½ä¸­â¦';
     try {
       const r = await fetch('/api/admin/tb?period=' + period);
       const d = await r.json();
-      if (d.error) { statusEl.textContent = '错误: ' + d.error; return; }
+      if (d.error) { statusEl.textContent = 'éè¯¯: ' + d.error; return; }
 
       // Status bar
       const isConfirmed = !!d.confirmed_at;
       statusEl.innerHTML = (isConfirmed
-        ? '<span style="color:#22c55e">● 已确认发布</span> — ' + d.confirmed_at + ' by ' + (d.rows[0]?.confirmed_by || 'admin')
-        : '<span style="color:#facc15">● 草稿（未发布）</span>') +
-        ' &nbsp;|&nbsp; ' + d.row_count + ' 行 &nbsp;|&nbsp; Period: ' + period;
+        ? '<span style="color:#22c55e">â å·²ç¡®è®¤åå¸</span> â ' + d.confirmed_at + ' by ' + (d.rows[0]?.confirmed_by || 'admin')
+        : '<span style="color:#facc15">â èç¨¿ï¼æªåå¸ï¼</span>') +
+        ' &nbsp;|&nbsp; ' + d.row_count + ' è¡ &nbsp;|&nbsp; Period: ' + period;
       statusEl.style.background = isConfirmed ? 'rgba(34,197,94,0.1)' : 'rgba(250,204,21,0.1)';
 
       confirmBtn.style.display = isConfirmed ? 'none' : (d.row_count > 0 ? '' : 'none');
       unconfirmBtn.style.display = isConfirmed ? '' : 'none';
 
       if (d.row_count === 0) {
-        tableEl.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:40px">该月份无数据。请点击"从 Odoo 导入"</div>';
+        tableEl.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:40px">è¯¥æä»½æ æ°æ®ãè¯·ç¹å»"ä» Odoo å¯¼å¥"</div>';
         return;
       }
 
       // Build table grouped by company
       let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
       html += '<thead><tr style="position:sticky;top:0;background:var(--surface2)">';
-      ['公司', '科目代码', '科目名称', '类型', '货币', '余额 (USD)', '来源', '操作'].forEach(h => {
+      ['å¬å¸', 'ç§ç®ä»£ç ', 'ç§ç®åç§°', 'ç±»å', 'è´§å¸', 'ä½é¢ (USD)', 'æ¥æº', 'æä½'].forEach(h => {
         html += '<th style="padding:6px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)">' + h + '</th>';
       });
       html += '</tr></thead><tbody>';
@@ -1812,20 +1810,20 @@
         html += '<td style="padding:4px 10px">' + row.currency + '</td>';
         html += '<td style="padding:4px 10px;text-align:right;font-family:monospace;color:' + balColor + '">' + bal + '</td>';
         html += '<td style="padding:4px 10px"><span style="font-size:11px;padding:1px 6px;border-radius:4px;background:' + (row.source === 'manual' ? 'rgba(250,204,21,0.2)' : 'rgba(99,102,241,0.2)') + '">' + row.source + '</span></td>';
-        html += '<td style="padding:4px 10px"><button onclick="editTbRow(' + row.id + ',' + row.balance + ')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;color:var(--text)">编辑</button></td>';
+        html += '<td style="padding:4px 10px"><button onclick="editTbRow(' + row.id + ',' + row.balance + ')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;color:var(--text)">ç¼è¾</button></td>';
         html += '</tr>';
       });
       html += '</tbody></table>';
       tableEl.innerHTML = html;
     } catch(e) {
-      statusEl.textContent = '请求失败: ' + e.message;
+      statusEl.textContent = 'è¯·æ±å¤±è´¥: ' + e.message;
     }
   };
 
   window.importTbFromOdoo = async function() {
     const period = document.getElementById('tbPeriod')?.value || curPeriod;
     const statusEl = document.getElementById('tbStatus');
-    statusEl.textContent = '正在从 Odoo 导入 ' + period + '…（约需 30 秒）';
+    statusEl.textContent = 'æ­£å¨ä» Odoo å¯¼å¥ ' + period + 'â¦ï¼çº¦é 30 ç§ï¼';
     statusEl.style.background = 'rgba(99,102,241,0.1)';
     try {
       const r = await fetch('/api/admin/tb/import', {
@@ -1834,31 +1832,31 @@
         body: JSON.stringify({period})
       });
       const d = await r.json();
-      if (d.error) { statusEl.textContent = '错误: ' + d.error; return; }
-      statusEl.textContent = '导入完成：' + d.imported + ' 行，状态=草稿。请检查数据后点击"确认发布"。';
+      if (d.error) { statusEl.textContent = 'éè¯¯: ' + d.error; return; }
+      statusEl.textContent = 'å¯¼å¥å®æï¼' + d.imported + ' è¡ï¼ç¶æ=èç¨¿ãè¯·æ£æ¥æ°æ®åç¹å»"ç¡®è®¤åå¸"ã';
       await loadTbData();
     } catch(e) {
-      statusEl.textContent = '导入失败: ' + e.message;
+      statusEl.textContent = 'å¯¼å¥å¤±è´¥: ' + e.message;
     }
   };
 
   window.confirmTbData = async function() {
     const period = document.getElementById('tbPeriod')?.value || curPeriod;
-    if (!confirm('确认发布 ' + period + ' 的 TB 数据？发布后其他看板将读取此数据。')) return;
+    if (!confirm('ç¡®è®¤åå¸ ' + period + ' ç TB æ°æ®ï¼åå¸åå¶ä»çæ¿å°è¯»åæ­¤æ°æ®ã')) return;
     const r = await fetch('/api/admin/tb/confirm', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({period, confirmed_by: 'admin'})
     });
     const d = await r.json();
-    if (d.error) { alert('错误: ' + d.error); return; }
-    alert('已发布 ' + d.rows_confirmed + ' 行！其他看板现在读取此 TB 数据。');
+    if (d.error) { alert('éè¯¯: ' + d.error); return; }
+    alert('å·²åå¸ ' + d.rows_confirmed + ' è¡ï¼å¶ä»çæ¿ç°å¨è¯»åæ­¤ TB æ°æ®ã');
     await loadTbData();
   };
 
   window.unconfirmTbData = async function() {
     const period = document.getElementById('tbPeriod')?.value || curPeriod;
-    if (!confirm('撤回 ' + period + ' 的发布状态？其他看板将回退到 journal entry 计算模式。')) return;
+    if (!confirm('æ¤å ' + period + ' çåå¸ç¶æï¼å¶ä»çæ¿å°åéå° journal entry è®¡ç®æ¨¡å¼ã')) return;
     await fetch('/api/admin/tb/unconfirm', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
@@ -1868,7 +1866,7 @@
   };
 
   window.editTbRow = async function(id, currentBalance) {
-    const newBal = prompt('修改余额（当前：' + currentBalance + '）：', currentBalance);
+    const newBal = prompt('ä¿®æ¹ä½é¢ï¼å½åï¼' + currentBalance + 'ï¼ï¼', currentBalance);
     if (newBal === null) return;
     const r = await fetch('/api/admin/tb/' + id, {
       method: 'PUT',
@@ -1876,7 +1874,7 @@
       body: JSON.stringify({balance: Number(newBal)})
     });
     const d = await r.json();
-    if (d.error) { alert('错误: ' + d.error); return; }
+    if (d.error) { alert('éè¯¯: ' + d.error); return; }
     await loadTbData();
   };
 
@@ -1884,10 +1882,6 @@
   const origSwitch = window.switchAdminTab;
   window.switchAdminTab = function(tab) {
     if (origSwitch) origSwitch(tab);
-    if (tab === 'tb-data') {
-      const period = document.getElementById('tbPeriod')?.value || curPeriod;
-      if (period) setTimeout(loadTbData, 100);
-    }
   };
 })();
 </script>
