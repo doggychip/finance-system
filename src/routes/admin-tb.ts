@@ -54,6 +54,28 @@ export function adminTbRoutes(db: Database.Database): Router {
     }
   });
 
+  // GET /api/admin/tb/summary  – returns per-period metadata (no row detail)
+  router.get('/summary', (req, res) => {
+    try {
+      const rows = db.prepare(`
+        SELECT
+          period,
+          COUNT(*) AS row_count,
+          MAX(updated_at) AS last_sync_at,
+          MAX(confirmed_at) AS confirmed_at,
+          CASE WHEN MAX(confirmed_at) IS NOT NULL THEN 'confirmed' ELSE 'draft' END AS status
+        FROM tb_snapshots
+        GROUP BY period
+        ORDER BY period DESC
+      `).all() as any[];
+      res.json({ periods: rows });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+
   // POST /api/admin/tb/import  { period: '2026-06' }
   router.post('/import', async (req, res) => {
     try {
