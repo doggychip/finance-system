@@ -87,6 +87,7 @@
 
 <div id="tab-user-mgmt" class="admin-tab-pane active">
 <div class="container" id="adminContent" style="display:block">
+          <button class="admin-tab-btn" onclick="switchAdminTab('tb-data')">TB 数据</button>button>
     <!-- Create User -->
     <div class="card">
       <h2>Create New User</h2>
@@ -1722,5 +1723,173 @@
     }
 
   </script>
+  
+<!-- ═══════════════════ TB 数据 tab ═══════════════════ -->
+<div id="tab-tb-data" class="admin-tab-pane" style="display:none">
+  <div class="container">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="margin:0">TB 数据（Odoo TB 中间层）</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;color:var(--text-dim)">Period:</label>
+          <input type="month" id="tbPeriod" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px" />
+          <button class="btn primary" onclick="importTbFromOdoo()">⬇ 从 Odoo 导入（草稿）</button>
+          <button class="btn" onclick="loadTbData()" style="background:var(--surface2)">↻ 刷新</button>
+          <button class="btn" id="tbConfirmBtn" onclick="confirmTbData()" style="background:#22c55e;color:#000;font-weight:600;display:none">✓ 确认发布</button>
+          <button class="btn danger" id="tbUnconfirmBtn" onclick="unconfirmTbData()" style="display:none">⟲ 撤回为草稿</button>
+        </div>
+      </div>
+      <div id="tbStatus" style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:13px;background:var(--surface2)">
+        选择月份后点击"刷新"查看数据
+      </div>
+      <div id="tbTableContainer" style="overflow-x:auto;max-height:600px;overflow-y:auto">
+        <div style="color:var(--text-dim);text-align:center;padding:40px">暂无数据</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ──────────── TB 数据标签页逻辑 ────────────
+(function() {
+  // Init period to current month
+  const now = new Date();
+  const curPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const inp = document.getElementById('tbPeriod');
+    if (inp) inp.value = curPeriod;
+  });
+
+  window.loadTbData = async function() {
+    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    const statusEl = document.getElementById('tbStatus');
+    const tableEl = document.getElementById('tbTableContainer');
+    const confirmBtn = document.getElementById('tbConfirmBtn');
+    const unconfirmBtn = document.getElementById('tbUnconfirmBtn');
+    statusEl.textContent = '加载中…';
+    try {
+      const r = await fetch('/api/admin/tb?period=' + period);
+      const d = await r.json();
+      if (d.error) { statusEl.textContent = '错误: ' + d.error; return; }
+
+      // Status bar
+      const isConfirmed = !!d.confirmed_at;
+      statusEl.innerHTML = (isConfirmed
+        ? '<span style="color:#22c55e">● 已确认发布</span> — ' + d.confirmed_at + ' by ' + (d.rows[0]?.confirmed_by || 'admin')
+        : '<span style="color:#facc15">● 草稿（未发布）</span>') +
+        ' &nbsp;|&nbsp; ' + d.row_count + ' 行 &nbsp;|&nbsp; Period: ' + period;
+      statusEl.style.background = isConfirmed ? 'rgba(34,197,94,0.1)' : 'rgba(250,204,21,0.1)';
+
+      confirmBtn.style.display = isConfirmed ? 'none' : (d.row_count > 0 ? '' : 'none');
+      unconfirmBtn.style.display = isConfirmed ? '' : 'none';
+
+      if (d.row_count === 0) {
+        tableEl.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:40px">该月份无数据。请点击"从 Odoo 导入"</div>';
+        return;
+      }
+
+      // Build table grouped by company
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      html += '<thead><tr style="position:sticky;top:0;background:var(--surface2)">';
+      ['公司', '科目代码', '科目名称', '类型', '货币', '余额 (USD)', '来源', '操作'].forEach(h => {
+        html += '<th style="padding:6px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)">' + h + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+
+      let lastCo = null;
+      d.rows.forEach(function(row) {
+        if (row.company_name !== lastCo) {
+          html += '<tr><td colspan="8" style="padding:6px 10px;font-weight:700;background:var(--surface);color:var(--accent);font-size:13px">' + row.company_name + '</td></tr>';
+          lastCo = row.company_name;
+        }
+        const bal = Number(row.balance).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        const balColor = row.balance < 0 ? '#ef4444' : '';
+        html += '<tr><td style="padding:4px 10px"></td>';
+        html += '<td style="padding:4px 10px;font-family:monospace">' + row.account_code + '</td>';
+        html += '<td style="padding:4px 10px">' + row.account_name + '</td>';
+        html += '<td style="padding:4px 10px;color:var(--text-dim)">' + row.account_type + '</td>';
+        html += '<td style="padding:4px 10px">' + row.currency + '</td>';
+        html += '<td style="padding:4px 10px;text-align:right;font-family:monospace;color:' + balColor + '">' + bal + '</td>';
+        html += '<td style="padding:4px 10px"><span style="font-size:11px;padding:1px 6px;border-radius:4px;background:' + (row.source === 'manual' ? 'rgba(250,204,21,0.2)' : 'rgba(99,102,241,0.2)') + '">' + row.source + '</span></td>';
+        html += '<td style="padding:4px 10px"><button onclick="editTbRow(' + row.id + ',' + row.balance + ')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;color:var(--text)">编辑</button></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      tableEl.innerHTML = html;
+    } catch(e) {
+      statusEl.textContent = '请求失败: ' + e.message;
+    }
+  };
+
+  window.importTbFromOdoo = async function() {
+    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    const statusEl = document.getElementById('tbStatus');
+    statusEl.textContent = '正在从 Odoo 导入 ' + period + '…（约需 30 秒）';
+    statusEl.style.background = 'rgba(99,102,241,0.1)';
+    try {
+      const r = await fetch('/api/admin/tb/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({period})
+      });
+      const d = await r.json();
+      if (d.error) { statusEl.textContent = '错误: ' + d.error; return; }
+      statusEl.textContent = '导入完成：' + d.imported + ' 行，状态=草稿。请检查数据后点击"确认发布"。';
+      await loadTbData();
+    } catch(e) {
+      statusEl.textContent = '导入失败: ' + e.message;
+    }
+  };
+
+  window.confirmTbData = async function() {
+    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    if (!confirm('确认发布 ' + period + ' 的 TB 数据？发布后其他看板将读取此数据。')) return;
+    const r = await fetch('/api/admin/tb/confirm', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({period, confirmed_by: 'admin'})
+    });
+    const d = await r.json();
+    if (d.error) { alert('错误: ' + d.error); return; }
+    alert('已发布 ' + d.rows_confirmed + ' 行！其他看板现在读取此 TB 数据。');
+    await loadTbData();
+  };
+
+  window.unconfirmTbData = async function() {
+    const period = document.getElementById('tbPeriod')?.value || curPeriod;
+    if (!confirm('撤回 ' + period + ' 的发布状态？其他看板将回退到 journal entry 计算模式。')) return;
+    await fetch('/api/admin/tb/unconfirm', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({period})
+    });
+    await loadTbData();
+  };
+
+  window.editTbRow = async function(id, currentBalance) {
+    const newBal = prompt('修改余额（当前：' + currentBalance + '）：', currentBalance);
+    if (newBal === null) return;
+    const r = await fetch('/api/admin/tb/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({balance: Number(newBal)})
+    });
+    const d = await r.json();
+    if (d.error) { alert('错误: ' + d.error); return; }
+    await loadTbData();
+  };
+
+  // Hook into switchAdminTab to auto-load when TB tab is activated
+  const origSwitch = window.switchAdminTab;
+  window.switchAdminTab = function(tab) {
+    if (origSwitch) origSwitch(tab);
+    if (tab === 'tb-data') {
+      const period = document.getElementById('tbPeriod')?.value || curPeriod;
+      if (period) setTimeout(loadTbData, 100);
+    }
+  };
+})();
+</script>
 <script src="/chat-widget.js"></script></body>
 </html>
