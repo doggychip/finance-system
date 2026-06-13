@@ -43,6 +43,8 @@ export async function syncBalances(
   asOfDate?: string
 ): Promise<BalanceSyncResult> {
   const snapshotDate = asOfDate || new Date().toISOString().slice(0, 10);
+          // Fiscal year starts Jan 1 of snapshot year (matches Odoo TB report)
+          const fiscalYearStart = snapshotDate.substring(0, 4) + '-01-01';
 
   const result: BalanceSyncResult = {
     companies_synced: 0,
@@ -113,6 +115,36 @@ export async function syncBalances(
         }
       }
 
+        // For P&L accounts (expense/income): override balance with fiscal-year-only amount
+              // to match Odoo's Trial Balance report (which resets P&L accounts each fiscal year)
+              const plAccountIds = Object.entries(accountDetails)
+                .filter(([, d]) => d.account_type.startsWith('expense') || d.account_type.startsWith('income'))
+                .map(([id]) => Number(id));
+              if (plAccountIds.length > 0) {
+                          const groupedFY = await odoo.execute('account.move.line', 'read_group',
+                                                                           [[
+                                                                                           ['company_id', '=', company.id],
+                                                                                           ['parent_state', '=', 'posted'],
+                                                                                           ['date', '>=', fiscalYearStart],
+                                                                                           ['date', '<=', snapshotDate],
+                                                                                           ['account_id', 'in', plAccountIds],
+                                                                                         ]],
+                                                               { fields: ['account_id', 'balance'], groupby: ['account_id'], lazy: false }
+                                                                         ) as any[];
+                          const fyBalMap = new Map<number, number>();
+                          for (const g of groupedFY) {
+                                        const id = (g.account_id as [number, string])[0];
+                                        fyBalMap.set(id, g.balance);
+                          }
+                          for (const g of grouped) {
+                                        const id = (g.account_id as [number, string])[0];
+                                        if (!accountDetails[id]) continue;
+                                        const atype = accountDetails[id].account_type;
+                                        if (atype.startsWith('expense') || atype.startsWith('income')) {
+                                                        g.balance = fyBalMap.has(id) ? fyBalMap.get(id)! : 0;
+                                        }
+                          }
+              }
       const tx = db.transaction(() => {
         // Wipe prior rows for this company+snapshot to prevent stale entries
         deleteCompanySnapshot.run(company.id, snapshotDate);
