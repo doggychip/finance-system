@@ -1757,7 +1757,7 @@ router.get('/card-detail-csv', (req, res) => {
   if (!companyIds.length) return res.status(404).json({ error: 'No companies for card: ' + card });
 
   const ph = companyIds.map(() => '?').join(',');
-  const dateStr = asOfDate.replace(/'/g, '');
+  const _asOfD = new Date(asOfDate + 'T00:00:00Z'); const _endOfMonth = new Date(_asOfD.getFullYear(), _asOfD.getMonth() + 1, 0).toISOString().slice(0, 10); const dateStr = _endOfMonth.replace(/'/g, '');
 
           const baseTypeFilter = typeFilter || `AND (ab.account_type LIKE 'asset_%' OR ab.account_type LIKE 'liability_%') AND ab.account_code != '300040'`;
 
