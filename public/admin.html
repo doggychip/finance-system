@@ -854,10 +854,11 @@
 
   <script>
   (function() {
-        // Companies populated dynamically from Odoo (see populateExportCompanies)
-    if (window._odooCompanies && window._odooCompanies.length) {
-      populateExportCompanies(window._odooCompanies);
-    }
+                // Load companies from cache on page init (Odoo loads async later)
+            var _initCache = localStorage.getItem('odoo_companies_cache');
+            if (_initCache) { try { populateExportCompanies(JSON.parse(_initCache)); } catch(e){} }
+            else if (window._odooCompanies && window._odooCompanies.length) { populateExportCompanies(window._odooCompanies); }
+            else { fetch('/api/dashboard/companies').then(function(r){return r.json();}).then(function(d){if(d&&d.length){var mapped=d.map(function(c){return {id:c.company_id,name:c.company_name};});localStorage.setItem('odoo_companies_cache',JSON.stringify(mapped));populateExportCompanies(mapped);}}).catch(function(){}); }
         const d = new Date(); d.setMonth(d.getMonth() - 1);
     document.getElementById('exportMonth').value = d.toISOString().slice(0,7);
   })();
