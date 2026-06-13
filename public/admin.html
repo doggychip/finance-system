@@ -1010,16 +1010,16 @@
   async function loadOdooCompanies() {
     var statusEl = document.getElementById('companiesStatus');
     var listEl = document.getElementById('companiesList');
-    statusEl.textContent = 'Loading from Odoo...';
+    var _pc=localStorage.getItem('odoo_companies_cache');if(_pc){var _pcd=JSON.parse(_pc);window._odooCompanies=_pcd;populateExportCompanies(_pcd);listEl.innerHTML=_pcd.map(function(c){return '<span style="background:#0f1923;border:1px solid #2e3a4e;border-radius:6px;padding:4px 10px;color:#c5d0e0;font-size:0.8rem;"><b style=\'color:#6495ed\'>'+c.id+'</b> '+c.name+'</span>';}).join('');statusEl.textContent=_pcd.length+' companies (cached). Refreshing...';statusEl.style.color='#8b9ab5';}else{statusEl.textContent='Loading from Odoo...';}
     statusEl.style.color = '#8b9ab5';
-    listEl.innerHTML = '';
+        if (!_pc) listEl.innerHTML = '';
     try {
       var r = await fetch('/api/sync/companies');
       var data = await r.json();
       if (data.error) throw new Error(data.error);
       window._odooCompanies = data;
       populateExportCompanies(data);
-      window._companiesLoaded = true;
+      localStorage.setItem('odoo_companies_cache',JSON.stringify(data));window._companiesLoaded = true;
       statusEl.style.color = '#40c057';
       statusEl.textContent = data.length + ' companies loaded from Odoo.';
       listEl.innerHTML = data.map(function(c) {
@@ -1027,7 +1027,7 @@
       }).join('');
     } catch(e) {
       statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error: ' + e.message;
+      var _c=localStorage.getItem('odoo_companies_cache');if(_c){var _cd=JSON.parse(_c);window._odooCompanies=_cd;populateExportCompanies(_cd);listEl.innerHTML=_cd.map(function(c){return '<span style="background:#0f1923;border:1px solid #2e3a4e;border-radius:6px;padding:4px 10px;color:#c5d0e0;font-size:0.8rem;"><b style=\'color:#6495ed\'>'+c.id+'</b> '+c.name+'</span>';}).join('');}statusEl.textContent='Error: '+e.message+(_c?' (showing cached data)':'')
     }
   }
 
@@ -1130,7 +1130,7 @@
       statusEl.textContent = 'Saved ' + data.saved + ' groups. Changes take effect on next dashboard load.';
     } catch(e) {
       statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error: ' + e.message;
+      var _c=localStorage.getItem('odoo_companies_cache');if(_c){var _cd=JSON.parse(_c);window._odooCompanies=_cd;populateExportCompanies(_cd);listEl.innerHTML=_cd.map(function(c){return '<span style="background:#0f1923;border:1px solid #2e3a4e;border-radius:6px;padding:4px 10px;color:#c5d0e0;font-size:0.8rem;"><b style=\'color:#6495ed\'>'+c.id+'</b> '+c.name+'</span>';}).join('');}statusEl.textContent='Error: '+e.message+(_c?' (showing cached data)':'')
     }
   }
 
@@ -1147,7 +1147,7 @@
       statusEl.textContent = 'Reset to default.';
     } catch(e) {
       statusEl.style.color = '#fa5252';
-      statusEl.textContent = 'Error: ' + e.message;
+      var _c=localStorage.getItem('odoo_companies_cache');if(_c){var _cd=JSON.parse(_c);window._odooCompanies=_cd;populateExportCompanies(_cd);listEl.innerHTML=_cd.map(function(c){return '<span style="background:#0f1923;border:1px solid #2e3a4e;border-radius:6px;padding:4px 10px;color:#c5d0e0;font-size:0.8rem;"><b style=\'color:#6495ed\'>'+c.id+'</b> '+c.name+'</span>';}).join('');}statusEl.textContent='Error: '+e.message+(_c?' (showing cached data)':'')
     }
   }
 
