@@ -83,15 +83,52 @@ export function adminTbRoutes(db: Database.Database): Router {
       const [y, m] = period.split('-').map(Number);
       const lastDay = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 
-      const odoo = createOdooClient();
-      await odoo.authenticate();
-      const syncResult = await syncBalances(odoo, db, lastDay);
+        // Fiscal year starts Jan 1 of the snapshot year (matches Odoo TB report)
+              const fiscalYearStart = lastDay.substring(0, 4) + '-01-01';
 
-      const rows = db.prepare(`
-        SELECT company_id, company_name, account_odoo_id, account_code, account_name,
-               account_type, currency, balance
-        FROM account_balances WHERE snapshot_date = ?
-      `).all(lastDay) as any[];
+              // Try Odoo sync to refresh account_balances — graceful fallback if credentials unavailable
+              let syncResult: any = { companies_synced: 0, accounts_synced: 0, errors: ['Odoo sync skipped'] };
+              try {
+                          const odoo = createOdooClient();
+                          await odoo.authenticate();
+                          syncResult = await syncBalances(odoo, db, lastDay);
+              } catch (syncErr) {
+                          syncResult = { companies_synced: 0, accounts_synced: 0, errors: [(syncErr as Error).message] };
+              }
+
+              // Balance-sheet accounts (assets/liabilities/equity): cumulative all-time balance
+              const bsRows = db.prepare(`
+                        SELECT company_id, company_name, account_odoo_id, account_code, account_name,
+                                         account_type, currency, balance
+                                                   FROM account_balances
+                                                             WHERE snapshot_date = ?
+                                                                         AND account_type NOT LIKE 'expense%'
+                                                                                     AND account_type NOT LIKE 'income%'
+                                                                                             `).all(lastDay) as any[];
+
+              // P&L accounts (expense/income): fiscal-year-only balance from line_items
+              // This matches Odoo Trial Balance which resets P&L each fiscal year (Jan 1)
+              const plRows = db.prepare(`
+                        SELECT
+                                    je.company_id,
+                                                je.company_name,
+                                                            COALESCE(a.odoo_id, 0)  AS account_odoo_id,
+                                                                        a.code                  AS account_code,
+                                                                                    a.name                  AS account_name,
+                                                                                                a.odoo_type             AS account_type,
+                                                                                                            'USD'                   AS currency,
+                                                                                                                        SUM(li.debit - li.credit) AS balance
+                                                                                                                                  FROM line_items li
+                                                                                                                                            JOIN journal_entries je ON li.journal_entry_id = je.id
+                                                                                                                                                      JOIN accounts a ON li.account_id = a.id
+                                                                                                                                                                WHERE je.status = 'posted'
+                                                                                                                                                                            AND je.date >= ?
+                                                                                                                                                                                        AND je.date <= ?
+                                                                                                                                                                                                    AND (a.odoo_type LIKE 'expense%' OR a.odoo_type LIKE 'income%')
+                                                                                                                                                                                                              GROUP BY je.company_id, je.company_name, a.id, a.code, a.name, a.odoo_type
+                                                                                                                                                                                                                      `).all(fiscalYearStart, lastDay) as any[];
+
+              const rows = [...bsRows, ...plRows];
 
       const upsert = db.prepare(`
         INSERT INTO tb_snapshots
