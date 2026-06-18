@@ -20,6 +20,8 @@ export function exportRoutes(db: Database.Database): Router {
 
   // GET /api/export/tb?month=YYYY-MM&companies=1,2,3
   // Trial Balance: account balances snapshot for end-of-month
+  // GET /api/export/tb?month=YYYY-MM&companies=1,2,3
+  // Trial Balance: P&L from tb_snapshots (Odoo fiscal-year), BS from account_balances
   router.get('/tb', (req, res) => {
     const month = req.query.month as string;
     const companiesParam = req.query.companies as string;
@@ -28,21 +30,21 @@ export function exportRoutes(db: Database.Database): Router {
       return res.status(400).json({ error: 'month required (YYYY-MM)' });
     }
 
-    const endOfMonth = month + '-31';
-    const startOfMonth = month + '-01';
-    let companyFilter = '';
-    let params: any[] = [endOfMonth, startOfMonth];
+    const lastDay = new Date(parseInt(month.substring(0, 4)), parseInt(month.substring(5, 7)), 0)
+      .toISOString().substring(0, 10);
 
-    if (companiesParam) {
-      const ids = companiesParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-      if (ids.length > 0) {
-        companyFilter = `AND company_id IN (${ids.map(() => '?').join(',')})`;
-        params = [endOfMonth, startOfMonth, ...ids];
-      }
-    }
+    const companyIds: number[] = companiesParam
+      ? companiesParam.split(',').map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n))
+      : [];
+    const bsCompanyFilter = companyIds.length > 0
+      ? `AND ab.company_id IN (${companyIds.map(() => '?').join(',')})`
+      : '';
+    const plCompanyFilter = companyIds.length > 0
+      ? `AND company_id IN (${companyIds.map(() => '?').join(',')})`
+      : '';
 
-    // For each company+account, get the snapshot closest to end of month
-    const rows = db.prepare(`
+    // BS accounts: cumulative balances from account_balances
+    const bsRows = db.prepare(`
       SELECT
         ab.company_id,
         ab.company_name,
@@ -56,24 +58,51 @@ export function exportRoutes(db: Database.Database): Router {
       INNER JOIN (
         SELECT company_id, account_odoo_id, MAX(snapshot_date) as max_date
         FROM account_balances
-        WHERE snapshot_date <= ? AND snapshot_date >= ?
-        ${companyFilter}
+        WHERE snapshot_date <= ?
+          AND account_type NOT LIKE 'expense%'
+          AND account_type NOT LIKE 'income%'
         GROUP BY company_id, account_odoo_id
       ) latest ON ab.company_id = latest.company_id
         AND ab.account_odoo_id = latest.account_odoo_id
         AND ab.snapshot_date = latest.max_date
+      WHERE ab.snapshot_date <= ?
+        AND ab.account_type NOT LIKE 'expense%'
+        AND ab.account_type NOT LIKE 'income%'
+        ${bsCompanyFilter}
       ORDER BY ab.company_name, ab.account_code
-    `).all(...params) as any[];
+    `).all(lastDay, lastDay, ...companyIds) as any[];
+
+    // P&L accounts: fiscal-year balances from tb_snapshots (matches Odoo TB)
+    const plRows = db.prepare(`
+      SELECT
+        company_id,
+        company_name,
+        account_code,
+        account_name,
+        account_type,
+        currency,
+        balance,
+        ? as snapshot_date
+      FROM tb_snapshots
+      WHERE period = ?
+        AND (account_type LIKE 'expense%' OR account_type LIKE 'income%')
+        ${plCompanyFilter}
+      ORDER BY company_name, account_code
+    `).all(lastDay, month, ...companyIds) as any[];
+
+    const rows = [...bsRows, ...plRows].sort((a: any, b: any) => {
+      if (a.company_name !== b.company_name) return a.company_name.localeCompare(b.company_name);
+      return a.account_code.localeCompare(b.account_code);
+    });
 
     if (rows.length === 0) {
-      // Provide helpful info: what months have balance data for the requested companies?
       const availRows = db.prepare(`
-        SELECT DISTINCT substr(snapshot_date,1,7) as month, company_name
+        SELECT DISTINCT substr(snapshot_date,1,7) as month
         FROM account_balances
-        WHERE company_id IN (${companiesParam ? companiesParam.split(',').map(() => '?').join(',') : '?'})
+        WHERE company_id IN (${companyIds.length > 0 ? companyIds.map(() => '?').join(',') : '1'})
         ORDER BY month DESC LIMIT 12
-      `).all(...(companiesParam ? companiesParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [])) as any[];
-      const availMonths = [...new Set((availRows as any[]).map((r: any) => r.month))].slice(0,6);
+      `).all(...companyIds) as any[];
+      const availMonths = [...new Set(availRows.map((r: any) => r.month))];
       return res.status(404).json({
         error: `No TB snapshot found for ${month}. Available months: ${availMonths.join(', ') || 'none'}`
       });
@@ -82,11 +111,11 @@ export function exportRoutes(db: Database.Database): Router {
     const headers = ['Company ID', 'Company Name', 'Account Code', 'Account Name', 'Account Type', 'Currency', 'Balance', 'Snapshot Date'];
     const csvLines = [
       csvRow(headers),
-      ...rows.map(r => csvRow([r.company_id, r.company_name, r.account_code, r.account_name, r.account_type, r.currency, r.balance, r.snapshot_date]))
+      ...rows.map((r: any) => csvRow([r.company_id, r.company_name, r.account_code, r.account_name, r.account_type, r.currency, r.balance, r.snapshot_date]))
     ];
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="TB_${month}.csv"`);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="tb-${month}.csv"`);
     res.send(csvLines.join('\r\n'));
   });
 
