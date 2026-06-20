@@ -1450,27 +1450,24 @@ router.get('/executive-summary', (req, res) => {
     function getNetAssets(ids: number[], asOf: string, excludeFixedAssets = false): number {
       if (!ids.length) return 0;
       const ph = ids.map(() => '?').join(',');
-      const yr = new Date(asOf + 'T00:00:00Z').getFullYear().toString();
+      const period = asOf.slice(0, 7);
       const noFixed = excludeFixedAssets
-        ? "AND a.odoo_type NOT IN ('asset_fixed','asset_non_current')"
+        ? "AND account_type NOT IN ('asset_fixed','asset_non_current')"
         : '';
       const row = db.prepare(`
-        SELECT
-          COALESCE(SUM(CASE WHEN a.odoo_type IN ('equity','equity_unaffected')
-            THEN COALESCE(li.debit,0) - COALESCE(li.credit,0) ELSE 0 END), 0) as eq_bal,
-          COALESCE(SUM(CASE WHEN a.odoo_type IN ('income','income_other','expense','expense_direct_cost')
-            AND strftime('%Y', je.date) = ?
-            THEN COALESCE(li.debit,0) - COALESCE(li.credit,0) ELSE 0 END), 0) as pl_bal
-        FROM line_items li
-        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        INNER JOIN accounts a ON a.id = li.account_id
-        WHERE je.date <= ?
-          AND je.status = 'posted'
-          AND je.company_id IN (${ph})
-          AND a.odoo_type != ''
+        SELECT COALESCE(SUM(balance), 0) as net_assets
+        FROM tb_snapshots
+        WHERE period = ?
+          AND company_id IN (${ph})
+          AND account_type IN (
+            'asset_cash','asset_receivable','asset_current','asset_prepayments',
+            'asset_fixed','asset_non_current',
+            'liability_payable','liability_current','liability_non_current','liability_credit_card'
+          )
+          AND account_code != '300040'
           ${noFixed}
-      `).get(yr, asOf, ...ids) as any;
-      return ((row?.eq_bal as number) ?? 0) + ((row?.pl_bal as number) ?? 0);
+      `).get(period, ...ids) as any;
+      return row?.net_assets ?? 0;
     }
     function getCash(ids: number[], asOf: string): { fiat: number; crypto: number } {
       if (!ids.length) return { fiat: 0, crypto: 0 };
