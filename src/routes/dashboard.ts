@@ -1472,7 +1472,6 @@ router.get('/executive-summary', (req, res) => {
       `).get(yr, asOf, ...ids) as any;
       return ((row?.eq_bal as number) ?? 0) + ((row?.pl_bal as number) ?? 0);
     }
-    }
     function getCash(ids: number[], asOf: string): { fiat: number; crypto: number } {
       if (!ids.length) return { fiat: 0, crypto: 0 };
       const ph = ids.map(() => '?').join(',');
