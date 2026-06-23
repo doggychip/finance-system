@@ -147,6 +147,15 @@
     .xterio-table .total td { font-weight: 700; border-top: 2px solid var(--border); background: rgba(34,197,94,0.06); }
     .xterio-table .total .row-label { background: rgba(34,197,94,0.06); }
     .xterio-table .sub td { color: var(--text-dim); font-size: 10px; }
+    .bs-group-container { display: flex; flex-direction: column; gap: 24px; }
+    .bs-group-section { }
+    .bs-group-header { padding: 10px 16px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text); background: var(--surface2); border-radius: 6px 6px 0 0; margin-bottom: 0; }
+    .bs-grand-total-section { }
+    .bs-column.group-total-col { background: color-mix(in srgb, var(--surface) 85%, var(--accent) 15%); border: 1px solid var(--accent); }
+    .bs-column.group-total-col .col-header { background: var(--accent); color: white; }
+    .bs-column.super-total-col { background: var(--surface2); border: 2px solid var(--border); }
+    .bs-column.super-total-col .col-header { background: var(--surface); font-size: 14px; color: var(--text); }
+    .col-header.total-header { font-style: italic; }
   </style>
   <script src="/odoo-links.js"></script>
   <script src="/auth.js"></script>
@@ -359,47 +368,92 @@
 
     // ── Balance Sheet ──
     async function loadBalanceSheet() {
-      var el = document.getElementById('bsContent');
+      var el = document.getElementById('tabBalanceSheet');
+      var asOf = getAsOf();
       try {
-        var asOf = getAsOf();
         var _raw = await (await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''))).json();
-        var data = (_raw.companies || _raw || []).map(function(c) { return { company_name: c.company_name, assets: { total: c.total_assets||0, bank_cash: c.cash||0, receivable: c.receivable||0, current_assets: c.current_assets||0, prepayments: c.prepayments||0, fixed_assets: c.fixed_assets||0, non_current_assets: c.non_current_assets||0, total_current: (c.cash||0)+(c.receivable||0)+(c.current_assets||0) }, liabilities: { total: c.total_liabilities||0, total_current: c.current_liabilities||0, payable: c.payable||0, current_liabilities: c.current_liabilities||0, non_current_liabilities: c.non_current_liabilities||0 }, equity: { total: c.total_equity||0, equity_unaffected: c.net_income||0, equity: c.equity||0 }, liabilities_plus_equity: (c.total_liabilities||0)+(c.total_equity||0) }; });
-        if (!data.length) { el.innerHTML = '<div class="loading">No company data.</div>'; return; }
-        data.sort(function(a, b) { return Math.abs(b.assets.total) - Math.abs(a.assets.total); });
-
-        lastExportData = data.map(function(c) {
-          return { Company: c.company_name, 'Total Assets': c.assets.total, 'Bank Cash': c.assets.bank_cash, Receivables: c.assets.receivable, 'Total Liabilities': c.liabilities.total, 'Total Equity': c.equity.total, 'L+E': c.liabilities_plus_equity };
+        var companies = (_raw.companies || _raw || []);
+        if (!companies.length) { el.innerHTML = '<div class="loading">No company data.</div>'; return; }
+        var byId = {};
+        companies.forEach(function(c) { byId[c.company_id] = c; });
+        var EG = [
+          { name: 'Xterio', color: '#6366f1', subs: [
+            { name: 'LTECH, LTECH W3', ids: [1, 23] },
+            { name: 'AOD', ids: [5, 6, 7, 10] },
+            { name: 'XLABS, XLAB W3', ids: [17, 18] },
+            { name: 'PRIVILEGE HK', ids: [21] },
+            { name: 'Xterio Foundation', ids: [22] }
+          ]},
+          { name: 'Lholding', color: '#f59e0b', subs: [
+            { name: 'CS', ids: [2, 3, 4, 12, 13, 14] },
+            { name: 'Palios', ids: [11, 9] },
+            { name: 'LHOLDINGS', ids: [19, 20] },
+            { name: 'PLAY ALGORITHM', ids: [28] },
+            { name: 'QUANTUMMIND', ids: [8] }
+          ]},
+          { name: 'OW & Reach', color: '#22c55e', subs: [
+            { name: 'OW', ids: [15, 16] },
+            { name: 'Reach', ids: [30] },
+            { name: 'Rough house', ids: [31] }
+          ]}
+        ];
+        function sumIds(ids) {
+          var r={total_assets:0,cash:0,receivable:0,current_assets:0,prepayments:0,fixed_assets:0,non_current_assets:0,total_liabilities:0,payable:0,current_liabilities:0,non_current_liabilities:0,total_equity:0,equity:0,net_income:0};
+          ids.forEach(function(id){var c=byId[id];if(!c)return;Object.keys(r).forEach(function(k){r[k]+=(c[k]||0);});});
+          return r;
+        }
+        function bsCol(label, d, isTot, isGrand, color) {
+          var a=d.total_assets||0,ac=d.cash||0,ar=d.receivable||0,aca=d.current_assets||0,ap=d.prepayments||0,af=d.fixed_assets||0,an=d.non_current_assets||0,at=ac+ar+aca;
+          var l=d.total_liabilities||0,lc=d.current_liabilities||0,lp=d.payable||0,ln=d.non_current_liabilities||0;
+          var e=d.total_equity||0,er=d.equity||0,en=d.net_income||0,le=l+e;
+          var cls=isGrand?' super-total-col':isTot?' group-total-col':'';
+          var bs='border-top:3px solid '+color+';';
+          return '<div class="bs-column'+cls+'" style="'+bs+'">'+
+            '<div class="col-header'+(isTot?' total-header':'')+'">'+label+'</div>'+
+            '<div class="bs-section">'+
+              '<div class="bs-row header"><span class="label">ASSETS</span><span class="value '+valClass(a)+'">'+fmtBs(a)+'</span></div>'+
+              '<div class="bs-row sub-header"><span class="label">Current Assets</span><span class="value">'+fmtBs(at)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Bank and Cash</span><span class="value '+valClass(ac)+'">'+fmtBs(ac)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Receivables</span><span class="value '+valClass(ar)+'">'+fmtBs(ar)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Current Assets</span><span class="value '+valClass(aca)+'">'+fmtBs(aca)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Prepayments</span><span class="value '+valClass(ap)+'">'+fmtBs(ap)+'</span></div>'+
+              '<div class="bs-row sub-header"><span class="label">Fixed Assets</span><span class="value">'+fmtBs(af)+'</span></div>'+
+              '<div class="bs-row sub-header"><span class="label">Non-current Assets</span><span class="value">'+fmtBs(an)+'</span></div>'+
+            '</div>'+
+            '<div class="bs-section">'+
+              '<div class="bs-row header"><span class="label">LIABILITIES</span><span class="value '+valClass(l)+'">'+fmtBs(l)+'</span></div>'+
+              '<div class="bs-row sub-header"><span class="label">Current Liabilities</span><span class="value">'+fmtBs(lc)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Payables</span><span class="value '+valClass(lp)+'">'+fmtBs(lp)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Current Liabilities</span><span class="value '+valClass(lc)+'">'+fmtBs(lc)+'</span></div>'+
+              '<div class="bs-row sub-header"><span class="label">Non-current Liabilities</span><span class="value">'+fmtBs(ln)+'</span></div>'+
+            '</div>'+
+            '<div class="bs-section">'+
+              '<div class="bs-row header"><span class="label">EQUITY</span><span class="value '+valClass(e)+'">'+fmtBs(e)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Unallocated Earnings</span><span class="value '+valClass(en)+'">'+fmtBs(en)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Retained Earnings</span><span class="value '+valClass(er)+'">'+fmtBs(er)+'</span></div>'+
+            '</div>'+
+            '<div class="bs-section"><div class="bs-row grand-total"><span class="label">L + E</span><span class="value '+valClass(le)+'">'+fmtBs(le)+'</span></div></div>'+
+            '</div>';
+        }
+        lastExportData=companies.map(function(c){return{Company:c.company_name,'Total Assets':c.total_assets,'Bank Cash':c.cash,Receivables:c.receivable,'Total Liabilities':c.total_liabilities,'Total Equity':c.total_equity};});
+        var gTot={total_assets:0,cash:0,receivable:0,current_assets:0,prepayments:0,fixed_assets:0,non_current_assets:0,total_liabilities:0,payable:0,current_liabilities:0,non_current_liabilities:0,total_equity:0,equity:0,net_income:0};
+        companies.forEach(function(c){Object.keys(gTot).forEach(function(k){gTot[k]+=(c[k]||0);});});
+        var html='<div class="bs-group-container">';
+        EG.forEach(function(group) {
+          var gt={total_assets:0,cash:0,receivable:0,current_assets:0,prepayments:0,fixed_assets:0,non_current_assets:0,total_liabilities:0,payable:0,current_liabilities:0,non_current_liabilities:0,total_equity:0,equity:0,net_income:0};
+          var cols='';
+          group.subs.forEach(function(sg) {
+            var d=sumIds(sg.ids);
+            Object.keys(gt).forEach(function(k){gt[k]+=(d[k]||0);});
+            cols+=bsCol(sg.name, d, false, false, group.color);
+          });
+          cols+=bsCol(group.name+' Total', gt, true, false, group.color);
+          html+='<div class="bs-group-section"><div class="bs-group-header" style="border-left:4px solid '+group.color+'">'+group.name+'</div><div class="bs-grid" style="grid-template-columns:repeat('+( group.subs.length+1)+',minmax(200px,1fr))">'+cols+'</div></div>';
         });
-
-        el.innerHTML = '<div class="bs-grid" style="grid-template-columns:repeat(' + data.length + ',minmax(220px,1fr))">' + data.map(function(c) {
-          var a = c.assets, l = c.liabilities, e = c.equity;
-          return '<div class="bs-column"><div class="col-header">' + c.company_name + '</div>' +
-            '<div class="bs-section">' +
-              '<div class="bs-row header"><span class="label">ASSETS</span><span class="value ' + valClass(a.total) + '">' + fmtBs(a.total) + '</span></div>' +
-              '<div class="bs-row sub-header"><span class="label">Current Assets</span><span class="value">' + fmtBs(a.total_current) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Bank and Cash</span><span class="value ' + valClass(a.bank_cash) + '">' + fmtBs(a.bank_cash) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Receivables</span><span class="value ' + valClass(a.receivable) + '">' + fmtBs(a.receivable) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Current Assets</span><span class="value ' + valClass(a.current_assets) + '">' + fmtBs(a.current_assets) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Prepayments</span><span class="value ' + valClass(a.prepayments) + '">' + fmtBs(a.prepayments) + '</span></div>' +
-              '<div class="bs-row sub-header"><span class="label">Fixed Assets</span><span class="value">' + fmtBs(a.fixed_assets) + '</span></div>' +
-              '<div class="bs-row sub-header"><span class="label">Non-current Assets</span><span class="value">' + fmtBs(a.non_current_assets) + '</span></div>' +
-            '</div>' +
-            '<div class="bs-section">' +
-              '<div class="bs-row header"><span class="label">LIABILITIES</span><span class="value ' + valClass(l.total) + '">' + fmtBs(l.total) + '</span></div>' +
-              '<div class="bs-row sub-header"><span class="label">Current Liabilities</span><span class="value">' + fmtBs(l.total_current) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Payables</span><span class="value ' + valClass(l.payable) + '">' + fmtBs(l.payable) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Current Liabilities</span><span class="value ' + valClass(l.current_liabilities) + '">' + fmtBs(l.current_liabilities) + '</span></div>' +
-              '<div class="bs-row sub-header"><span class="label">Non-current Liabilities</span><span class="value">' + fmtBs(l.non_current_liabilities) + '</span></div>' +
-            '</div>' +
-            '<div class="bs-section">' +
-              '<div class="bs-row header"><span class="label">EQUITY</span><span class="value ' + valClass(e.total) + '">' + fmtBs(e.total) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Unallocated Earnings</span><span class="value ' + valClass(e.equity_unaffected) + '">' + fmtBs(e.equity_unaffected) + '</span></div>' +
-              '<div class="bs-row"><span class="label">Retained Earnings</span><span class="value ' + valClass(e.equity) + '">' + fmtBs(e.equity) + '</span></div>' +
-            '</div>' +
-            '<div class="bs-section"><div class="bs-row grand-total"><span class="label">L + E</span><span class="value ' + valClass(c.liabilities_plus_equity) + '">' + fmtBs(c.liabilities_plus_equity) + '</span></div></div>' +
-          '</div>';
-        }).join('') + '</div>';
-      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+        html+='<div class="bs-grand-total-section"><div class="bs-grid" style="grid-template-columns:minmax(200px,300px)">'+bsCol('Grand Total', gTot, false, true, '#8b8fa3')+'</div></div>';
+        html+='</div>';
+        el.innerHTML=html;
+      } catch(err){el.innerHTML='<div class="loading">Error: '+err.message+'</div>';}
     }
 
     // ── Consolidated BS ──
