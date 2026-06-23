@@ -89,7 +89,7 @@
     // 返回上个月最后一天，格式 YYYY-MM-DD
     function lastDayOfPrevMonth() {
       var d = new Date();
-      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+      var ld = new Date(d.getFullYear(), d.getMonth(), 0); var yyyy = ld.getFullYear(); var mm = String(ld.getMonth() + 1).padStart(2, '0'); var dd = String(ld.getDate()).padStart(2, '0'); return yyyy + '-' + mm + '-' + dd;
     }
 
     function fmt(n) {
