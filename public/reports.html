@@ -368,7 +368,7 @@
 
     // ── Balance Sheet ──
     async function loadBalanceSheet() {
-      var el = document.getElementById('tabBalanceSheet');
+      var el = document.getElementById('bsContent');
       var asOf = getAsOf();
       try {
         var _raw = await (await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''))).json();
