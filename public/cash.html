@@ -232,7 +232,7 @@
     // &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash; YYYY-MM-DD
     function lastDayOfPrevMonth() {
       var d = new Date();
-      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+      var ld = new Date(d.getFullYear(), d.getMonth(), 0); var yyyy = ld.getFullYear(); var mm = String(ld.getMonth() + 1).padStart(2, '0'); var dd = String(ld.getDate()).padStart(2, '0'); return yyyy + '-' + mm + '-' + dd;
     }
 
     var charts = {};
@@ -505,7 +505,7 @@
         asOf.value = asOfSnap.snapshot_date;
         // Prior: &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;
         var _d = new Date(_lastDay + 'T00:00:00');
-        var _prevPrevLastDay = new Date(_d.getFullYear(), _d.getMonth(), 0).toISOString().slice(0, 10);
+        var _ld = new Date(_d.getFullYear(), _d.getMonth(), 0); var _prevPrevLastDay = _ld.getFullYear() + '-' + String(_ld.getMonth() + 1).padStart(2, '0') + '-' + String(_ld.getDate()).padStart(2, '0');
         var priorSnap = snaps.find(function(s) { return s.snapshot_date <= _prevPrevLastDay; }) || snaps[1] || snaps[0];
         prior.value = priorSnap.snapshot_date;
       }
@@ -630,7 +630,7 @@
     }
     function closeCardModal() { document.getElementById('cardInfoModal').classList.remove('open'); }
     function downloadCardDetail(card) {
-      var asOf = (document.getElementById('asOfDate') || {}).value || (new Date(new Date().getFullYear(), new Date().getMonth(), 0)).toISOString().split('T')[0];
+      var asOf = (document.getElementById('asOfDate') || {}).value || (function(){ var _ld2 = new Date(new Date().getFullYear(), new Date().getMonth(), 0); return _ld2.getFullYear() + '-' + String(_ld2.getMonth()+1).padStart(2,'0') + '-' + String(_ld2.getDate()).padStart(2,'0'); })();
       var a = document.createElement('a');
       a.href = '/api/dashboard/card-detail-csv?card=' + encodeURIComponent(card) + '&as_of_date=' + encodeURIComponent(asOf);
       a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
