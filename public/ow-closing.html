@@ -277,7 +277,7 @@
     }
     function closeCardModal() { document.getElementById('cardInfoModal').classList.remove('open'); }
     function downloadCardDetail(card) {
-      var asOf = (document.getElementById('asOfDate') || {}).value || (new Date(new Date().getFullYear(), new Date().getMonth(), 0)).toISOString().split('T')[0];
+      var asOf = (document.getElementById('asOfDate') || {}).value || (function(){ var _ld2 = new Date(new Date().getFullYear(), new Date().getMonth(), 0); return _ld2.getFullYear() + '-' + String(_ld2.getMonth()+1).padStart(2,'0') + '-' + String(_ld2.getDate()).padStart(2,'0'); })();
       var a = document.createElement('a');
       a.href = '/api/dashboard/card-detail-csv?card=' + encodeURIComponent(card) + '&as_of_date=' + encodeURIComponent(asOf);
       a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
