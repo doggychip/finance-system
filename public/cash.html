@@ -291,18 +291,20 @@
         fetch('/api/dashboard/executive-summary' + getCashAsOfParam()).then(function(r) { return r.json(); })
       ]);
 
-      // Use new split fields (for account list display)
-      var cashCurrentAccs = data.cash_current?.accounts || [];
-      var cashFixedAccs = data.cash_fixed?.accounts || [];
-      var cryptoHotAccs = data.crypto_hot?.accounts || [];
-      var cryptoColdAccs = data.crypto_cold?.accounts || [];
-      var cryptoDefiAccs = data.crypto_defi?.accounts || [];
-      var cryptoOtherAccs = data.crypto_other?.accounts || [];
-      var overAccs = data.overdrawn?.accounts || [];
-      var owAccs = data.overworld?.accounts || [];
-      var reachAccs = data.reach?.accounts || [];
+      // Derive account groups from flat data.accounts
+      var FIAT_CURRENCIES = ['USD', 'CNY', 'SGD', 'US1'];
+      var allAccountsFlat = data.accounts || [];
+      var cashCurrentAccs = allAccountsFlat.filter(function(a) { return FIAT_CURRENCIES.indexOf(a.currency) >= 0 && a.balance >= 0; });
+      var cashFixedAccs = [];
+      var cryptoHotAccs = allAccountsFlat.filter(function(a) { return FIAT_CURRENCIES.indexOf(a.currency) < 0 && a.balance >= 0; });
+      var cryptoColdAccs = [];
+      var cryptoDefiAccs = [];
+      var cryptoOtherAccs = [];
+      var overAccs = allAccountsFlat.filter(function(a) { return a.balance < 0; });
+      var owAccs = allAccountsFlat.filter(function(a) { return a.group === 'OW' || a.group === 'Rough house'; });
+      var reachAccs = allAccountsFlat.filter(function(a) { return a.group === 'Reach'; });
 
-      var allAccs = [].concat(cashCurrentAccs, cashFixedAccs, cryptoHotAccs, cryptoColdAccs, cryptoDefiAccs, cryptoOtherAccs, overAccs, owAccs, reachAccs);
+      var allAccs = allAccountsFlat;
 
       // Hero total: use executive-summary (&mdash;&mdash;&mdash;&mdash;, same as Overview Cash Breakdown)
       // total_cash_fiat + total_cash_crypto already includes Foundation from manual_balances
@@ -350,15 +352,15 @@
 
       renderDistribution([].concat(cashCurrentAccs, cashFixedAccs));
 
-      renderCategoryBox('cashCurrent', cashCurrentAccs, data.cash_current?.total || 0);
-      renderCategoryBox('cashFixed', cashFixedAccs, data.cash_fixed?.total || 0);
-      renderCategoryBox('cryptoHot', cryptoHotAccs, data.crypto_hot?.total || 0);
-      renderCategoryBox('cryptoCold', cryptoColdAccs, data.crypto_cold?.total || 0);
-      renderCategoryBox('cryptoDefi', cryptoDefiAccs, data.crypto_defi?.total || 0);
-      renderCategoryBox('cryptoOther', cryptoOtherAccs, data.crypto_other?.total || 0);
-      renderCategoryBox('overworld', owAccs, data.overworld?.total || 0);
-      renderCategoryBox('reach', reachAccs, data.reach?.total || 0);
-      renderCategoryBox('overdrawn', overAccs, data.overdrawn?.total || 0);
+      renderCategoryBox('cashCurrent', cashCurrentAccs, cashCurrentAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('cashFixed', cashFixedAccs, cashFixedAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('cryptoHot', cryptoHotAccs, cryptoHotAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('cryptoCold', cryptoColdAccs, cryptoColdAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('cryptoDefi', cryptoDefiAccs, cryptoDefiAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('cryptoOther', cryptoOtherAccs, cryptoOtherAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('overworld', owAccs, owAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('reach', reachAccs, reachAccs.reduce(function(s,a){return s+a.balance;},0));
+      renderCategoryBox('overdrawn', overAccs, overAccs.reduce(function(s,a){return s+a.balance;},0));
     }
 
     function renderCategoryBox(type, accounts, total) {
