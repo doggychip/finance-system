@@ -124,7 +124,6 @@
       <input type="date" id="asOfDate" value="" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
       <button class="btn" onclick="refreshData()">Apply</button>
       <button class="btn" onclick="refreshData()">Refresh</button>
-      <button class="btn primary" onclick="triggerSync()" id="syncBtn">Sync Odoo</button>
     </div>
   </div>
 
@@ -410,16 +409,6 @@
       } catch (e) { console.error(e); }
     }
 
-    async function triggerSync() {
-      var btn = document.getElementById('syncBtn');
-      btn.disabled = true; btn.textContent = 'Syncing...';
-      try {
-        await fetch('/api/sync/accounts', { method: 'POST' });
-        await fetch('/api/sync/balances', { method: 'POST' });
-        await refreshData();
-      } catch (e) { console.error(e); }
-      btn.disabled = false; btn.textContent = 'Sync Odoo';
-    }
 
     function getAsOfParam() {
       var d = document.getElementById('asOfDate').value;
