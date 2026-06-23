@@ -146,7 +146,6 @@
       <input type="date" id="cashAsOfDate" value="" onchange="loadCashBalances();loadTimeCharts();loadPosition()" style="padding:5px 8px;border-radius:5px;border:1px solid #2e3344;background:#232734;color:#e4e6ef;font-size:12px">
       <button class="btn" onclick="loadAll()">Apply</button>
       <button class="btn btn-export" onclick="exportExcel()">Export Excel</button>
-      <button class="btn primary" onclick="triggerSync()">Sync from Odoo</button>
     </div>
   </div>
 
@@ -591,16 +590,6 @@
       await Promise.all([loadCashBalances(), loadTimeCharts(), loadPosition()]);
     }
 
-    async function triggerSync() {
-      var btn = document.querySelector('.btn.primary');
-      btn.disabled = true; btn.textContent = 'Syncing...';
-      try {
-        await fetch('/api/sync/accounts', { method: 'POST' });
-        await fetch('/api/sync/journal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 500 }) });
-        await loadAll();
-      } catch (e) { console.error(e); }
-      btn.disabled = false; btn.textContent = 'Sync from Odoo';
-    }
 
     function exportExcel() {
       if (!exportAccounts.length) {
