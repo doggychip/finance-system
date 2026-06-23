@@ -1480,6 +1480,11 @@ router.get('/executive-summary', (req, res) => {
     const fn = getFoundation(foundationPeriod), fp = getFoundation(priorFoundPeriod);
     const xNA = getNetAssets(XTERIO_IDS, asOfDate), xNAp = getNetAssets(XTERIO_IDS, priorDate);
     const oNA = getNetAssets(OW_IDS, asOfDate, true), oNAp = getNetAssets(OW_IDS, priorDate, true);
+    const ksPeriod = asOfDate.slice(0, 7), ksPriorPeriod = priorDate.slice(0, 7);
+    const keystoneRow = db.prepare("SELECT SUM(amount_usd) as total FROM manual_balances WHERE entity='Keystone Foundation' AND period=?").get(ksPeriod) as any;
+    const keystonePriorRow = db.prepare("SELECT SUM(amount_usd) as total FROM manual_balances WHERE entity='Keystone Foundation' AND period=?").get(ksPriorPeriod) as any;
+    const keystoneNA = (keystoneRow?.total ?? 0) as number;
+    const keystoneNAp = (keystonePriorRow?.total ?? 0) as number;
     const hNA = getNetAssets(HOLDINGS_IDS, asOfDate), hNAp = getNetAssets(HOLDINGS_IDS, priorDate);
     const xC = getCash(XTERIO_IDS, asOfDate), oC = getCash(OW_IDS, asOfDate);
     const hC = getCash(HOLDINGS_IDS, asOfDate), aC = getCash(ALL_IDS, asOfDate);
@@ -1557,7 +1562,7 @@ router.get('/executive-summary', (req, res) => {
       const icRows = db.prepare(`SELECT je.company_name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as ic_balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${icPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.code LIKE '303%' GROUP BY je.company_id, je.company_name HAVING ABS(ic_balance)>100 ORDER BY ABS(ic_balance) DESC`).all(asOfDate, ...ALL_IDS) as any[];
       ic_imbalances = icRows.map(r => ({ company_name: r.company_name, ic_balance: r.ic_balance }));
     }
-    res.json({ snapshot_date: asOfDate, _v: 2, prior_date: priorDate, xterio_net_assets: xNA, xterio_net_assets_prior: xNAp, foundation_net_assets: fn.net_assets, foundation_net_assets_prior: fp.net_assets, holdings_net_assets: hNA, holdings_net_assets_prior: hNAp, ow_net_assets: oNA, ow_net_assets_prior: oNAp, total_group_net_assets: xNA + fn.net_assets + hNA + oNA, waterfall, total_cash_fiat, total_cash_crypto, total_cash_all, non_ow_cash: xC.fiat + xC.crypto + hC.fiat + hC.crypto + fn.cash_usd, ow_cash: oC.fiat + oC.crypto, monthly_burn, runway_months, entity_cash, cash_trend, alerts, ic_imbalances });
+    res.json({ snapshot_date: asOfDate, _v: 2, prior_date: priorDate, xterio_net_assets: xNA, xterio_net_assets_prior: xNAp, foundation_net_assets: fn.net_assets, foundation_net_assets_prior: fp.net_assets, holdings_net_assets: hNA, holdings_net_assets_prior: hNAp, ow_net_assets: oNA + keystoneNA, ow_net_assets_prior: oNAp + keystoneNAp, total_group_net_assets: xNA + fn.net_assets + hNA + oNA + keystoneNA, waterfall, total_cash_fiat, total_cash_crypto, total_cash_all, non_ow_cash: xC.fiat + xC.crypto + hC.fiat + hC.crypto + fn.cash_usd, ow_cash: oC.fiat + oC.crypto, monthly_burn, runway_months, entity_cash, cash_trend, alerts, ic_imbalances });
   } catch (err: any) {
     console.error('executive-summary error:', err);
     res.status(500).json({ error: err?.message || 'Unknown error', stack: err?.stack });
