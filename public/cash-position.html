@@ -66,7 +66,7 @@
   <script>
     function lastDayOfPrevMonth() {
       var d = new Date();
-      return new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
+      var ld = new Date(d.getFullYear(), d.getMonth(), 0); var yyyy = ld.getFullYear(); var mm = String(ld.getMonth() + 1).padStart(2, '0'); var dd = String(ld.getDate()).padStart(2, '0'); return yyyy + '-' + mm + '-' + dd;
     }
 
     // Entity group layout with individual companies
@@ -144,7 +144,7 @@
         var asOfSnap = snaps.find(function(s) { return s.snapshot_date <= _lastDay; }) || snaps[0];
         asOfSel.value = asOfSnap.snapshot_date;
         var _d = new Date(_lastDay + 'T00:00:00');
-        var _prevPrevLastDay = new Date(_d.getFullYear(), _d.getMonth(), 0).toISOString().slice(0, 10);
+        var _ld = new Date(_d.getFullYear(), _d.getMonth(), 0); var _prevPrevLastDay = _ld.getFullYear() + '-' + String(_ld.getMonth() + 1).padStart(2, '0') + '-' + String(_ld.getDate()).padStart(2, '0');
         var priorSnap = snaps.find(function(s) { return s.snapshot_date <= _prevPrevLastDay; }) || snaps[1] || snaps[0];
         priorSel.value = priorSnap.snapshot_date;
       }
