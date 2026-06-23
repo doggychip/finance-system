@@ -318,7 +318,7 @@
       window._foundationCashTotal = foundationTotal;
 
       exportAccounts = allAccs.map(function(a) {
-        return { Code: a.code, Name: a.name, Company: a.company_name, Balance: a.balance };
+        return { Code: a.account_code, Name: a.account_name, Company: a.company_name, Balance: a.balance };
       });
 
       // Set date picker
@@ -371,8 +371,8 @@
       var sorted = accounts.slice().sort(function(a,b){ return Math.abs(b.balance) - Math.abs(a.balance); });
       listEl.innerHTML = sorted.map(function(a) {
         var balColor = a.balance >= 0 ? 'var(--green)' : 'var(--red)';
-        var cleanName = a.name.replace(/\s+/g, ' ').trim();
-        return '<div class="box-item"><div class="item-code">' + a.code + '</div><div class="item-name">' + (cleanName.length > 35 ? cleanName.slice(0,35) + '...' : cleanName) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
+        var cleanName = a.account_name.replace(/\s+/g, ' ').trim();
+        return '<div class="box-item"><div class="item-code">' + a.account_code + '</div><div class="item-name">' + (cleanName.length > 35 ? cleanName.slice(0,35) + '...' : cleanName) + '</div><div class="item-balance" style="color:' + balColor + '">' + fmt(a.balance) + '</div></div>';
       }).join('');
     }
 
@@ -382,7 +382,7 @@
       if (charts.dist) charts.dist.destroy();
       if (positive.length === 0) return;
       var top = positive.slice(0, 10);
-      var labels = top.map(function(a) { var n = a.name.replace(/\s+/g, ' ').trim(); return n.length > 25 ? n.slice(0,25) + '...' : n; });
+      var labels = top.map(function(a) { var n = a.account_name.replace(/\s+/g, ' ').trim(); return n.length > 25 ? n.slice(0,25) + '...' : n; });
       var values = top.map(function(a) { return a.balance; });
       var colors = top.map(function(_,i) { return palette[i % palette.length]; });
       // Add "Others" slice for remaining accounts
@@ -447,7 +447,7 @@
       var datasets = top.map(function(acc, i) {
         var map = {};
         acc.periods.forEach(function(p) { map[p.period] = p.balance; });
-        return { label: acc.code + ' ' + (acc.name.length > 20 ? acc.name.slice(0,20) + '...' : acc.name), data: allPeriods.map(function(p) { return map[p] || null; }), borderColor: palette[i % palette.length], backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: currentPeriod === 'monthly' ? 3 : 1 };
+        return { label: acc.account_code + ' ' + (acc.account_name.length > 20 ? acc.account_name.slice(0,20) + '...' : acc.account_name), data: allPeriods.map(function(p) { return map[p] || null; }), borderColor: palette[i % palette.length], backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointRadius: currentPeriod === 'monthly' ? 3 : 1 };
       });
       charts.accHist = new Chart(ctx, {
         type: 'line', data: { labels: allPeriods, datasets: datasets },
