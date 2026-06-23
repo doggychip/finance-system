@@ -347,7 +347,7 @@
       var posAccs = allAccs.filter(function(a) { return a.balance > 0; });
       if (posAccs.length > 0) {
         var largest = posAccs.reduce(function(a, b) { return Math.abs(a.balance) > Math.abs(b.balance) ? a : b; });
-        document.getElementById('statLargest').textContent = largest.name.slice(0, 25);
+        document.getElementById('statLargest').textContent = (largest.account_name || largest.name || "").slice(0, 25);
       }
 
       renderDistribution([].concat(cashCurrentAccs, cashFixedAccs));
