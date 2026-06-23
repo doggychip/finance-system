@@ -362,7 +362,8 @@
       var el = document.getElementById('bsContent');
       try {
         var asOf = getAsOf();
-        var data = await (await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''))).json();
+        var _raw = await (await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''))).json();
+        var data = (_raw.companies || _raw || []).map(function(c) { return { company_name: c.company_name, assets: { total: c.total_assets||0, bank_cash: c.cash||0, receivable: c.receivable||0, current_assets: c.current_assets||0, prepayments: c.prepayments||0, fixed_assets: c.fixed_assets||0, non_current_assets: c.non_current_assets||0, total_current: (c.cash||0)+(c.receivable||0)+(c.current_assets||0) }, liabilities: { total: c.total_liabilities||0, total_current: c.current_liabilities||0, payable: c.payable||0, current_liabilities: c.current_liabilities||0, non_current_liabilities: c.non_current_liabilities||0 }, equity: { total: c.total_equity||0, equity_unaffected: c.net_income||0, equity: c.equity||0 }, liabilities_plus_equity: (c.total_liabilities||0)+(c.total_equity||0) }; });
         if (!data.length) { el.innerHTML = '<div class="loading">No company data.</div>'; return; }
         data.sort(function(a, b) { return Math.abs(b.assets.total) - Math.abs(a.assets.total); });
 
