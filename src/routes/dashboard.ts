@@ -1209,7 +1209,9 @@ router.get('/executive-summary', (req, res) => {
       };
       let r = getRow(period);
       if (!r.na) {
-        const lp = (db.prepare(`SELECT period FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period <= ? ORDER BY period DESC LIMIT 1`).get(period) as any)?.period;
+        // Fallback: find latest period <= requested, or if none, latest period overall
+        const lp = (db.prepare(`SELECT period FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period <= ? ORDER BY period DESC LIMIT 1`).get(period) as any)?.period
+          || (db.prepare(`SELECT period FROM manual_bs_lines WHERE entity='Xterio Foundation' ORDER BY period DESC LIMIT 1`).get() as any)?.period;
         if (lp) r = getRow(lp);
       }
       return { net_assets: r.na || 0, cash_usd: r.ca || 0 };
