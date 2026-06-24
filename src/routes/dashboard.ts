@@ -982,7 +982,7 @@ router.get('/bank-accounts', (req, res) => {
       current_balance: a.balance,
       prior_balance: a.prior_balance,
       change: a.change,
-      asset_type: a.code.startsWith('10W') ? 'Crypto' : 'Cash',
+      asset_type: a.account_code?.startsWith('10W') ? 'Crypto' : 'Cash',
       currency: a.currency,
       company_name: a.company_name,
       company_id: a.company_id,
