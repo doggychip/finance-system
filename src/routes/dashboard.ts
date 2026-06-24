@@ -698,440 +698,155 @@ router.get('/balance-sheet-all', (req, res) => {
   // Consolidated balance sheet with entity groupings
 // ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ /consolidated-bs ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ
 router.get('/consolidated-bs', (req, res) => {
-  // Compute directly from journal entries (no account_balances dependency)
-  const snapshotDate = (req.query.as_of_date as string) ||
-    new Date().toISOString().slice(0, 10);
+  // Use tb_snapshots (admin TB kanban) as primary data source
+  try {
+    const snapshotDate = (req.query.as_of_date as string) ||
+      new Date().toISOString().slice(0, 10);
+    // Convert date to period (YYYY-MM)
+    const period = snapshotDate.slice(0, 7);
 
-  const asOfDate = snapshotDate || '2099-12-31';
-  const dateFilter = asOfDate ? `AND je.date <= '${asOfDate.replace(/'/g, '')}'` : '';
+    // Load all TB rows for this period
+    const tbRows = db.prepare(`
+      SELECT company_id, account_code, account_type, balance
+      FROM tb_snapshots
+      WHERE period = ?
+    `).all(period) as { company_id: number; account_code: string; account_type: string; balance: number }[];
 
-  const groupBalances: Record<string, Record<string, number>> = {};
-
-  for (const group of ENTITY_GROUPS) {
-    if (group.is_subtotal) continue;
-
-    if (group.is_manual) {
-      const latestPeriod = db.prepare(`
-        SELECT period, SUM(amount_usd) as total_usd
-        FROM manual_balances
-        WHERE entity = ? AND account_code NOT IN ('FOUNDATION_IC')
-        GROUP BY period
-        ORDER BY period DESC
-        LIMIT 1
-      `).get(group.name) as any;
-
-      const balances: Record<string, number> = {};
-      const totalUsd = latestPeriod?.total_usd || 0;
-      balances['BANK_CASH'] = totalUsd;
-      for (const line of BS_LINES) {
-        if (line.computed_from) continue;
-        if (!(line.code in balances)) balances[line.code] = 0;
+    // Index by company_id
+    const tbByCompany: Record<number, { byType: Record<string, number>; byCode: Record<string, number> }> = {};
+    for (const row of tbRows) {
+      if (!tbByCompany[row.company_id]) {
+        tbByCompany[row.company_id] = { byType: {}, byCode: {} };
       }
+      const c = tbByCompany[row.company_id];
+      c.byType[row.account_type] = (c.byType[row.account_type] || 0) + row.balance;
+      c.byCode[row.account_code] = (c.byCode[row.account_code] || 0) + row.balance;
+    }
 
-      for (let pass = 0; pass < 10; pass++) {
-        let resolved = 0;
-        for (const line of BS_LINES) {
-          if (!line.computed_from) continue;
-          if (line.code in balances) continue;
-          const allReady = line.computed_from.every((c: string) => c in balances);
-          if (!allReady) continue;
-          balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
-          resolved++;
+    // Helper: sum a BS line for a set of company_ids
+    function computeLineForGroup(companyIds: number[], line: BSLineItem): number {
+      let total = 0;
+      for (const cid of companyIds) {
+        const c = tbByCompany[cid];
+        if (!c) continue;
+        if (line.odoo_types && line.odoo_types.length > 0) {
+          for (const t of line.odoo_types) {
+            total += c.byType[t] || 0;
+          }
+        } else if (line.account_codes && line.account_codes.length > 0) {
+          for (const code of line.account_codes) {
+            total += c.byCode[code] || 0;
+          }
+        } else if (line.account_codes_prefix) {
+          for (const [code, val] of Object.entries(c.byCode)) {
+            if (code.startsWith(line.account_codes_prefix)) total += val as number;
+          }
         }
-        if (resolved === 0) break;
       }
-
-      groupBalances[group.name] = balances;
-      continue;
+      return total;
     }
 
-    if (group.company_ids.length === 0) continue;
-
-    const placeholders = group.company_ids.map(() => '?').join(',');
-    const currentYear = new Date().getFullYear().toString();
-
-    const allTimeBalances = db.prepare(`
-      SELECT a.odoo_type,
-             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type != ''
-      GROUP BY a.odoo_type
-    `).all(...group.company_ids) as any[];
-
-    const byTypeAll: Record<string, number> = {};
-    for (const row of allTimeBalances) byTypeAll[row.odoo_type] = row.balance;
-
-    const currentYearBalances = db.prepare(`
-      SELECT a.odoo_type,
-             COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-        AND je.status = 'posted' AND je.company_id IN (${placeholders})
-        AND je.date > ? ${dateFilter}
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.odoo_type != ''
-      GROUP BY a.odoo_type
-    `).all(...group.company_ids, currentYear + '-01-01') as any[];
-
-    const byTypeCY: Record<string, number> = {};
-    for (const row of currentYearBalances) byTypeCY[row.odoo_type] = row.balance;
-
-    const allAccountCodes = BS_LINES
-      .filter(l => l.account_codes && !l.computed_from)
-      .flatMap(l => l.account_codes!);
-    const uniqueCodes = [...new Set(allAccountCodes)];
-
-    const byCode: Record<string, number> = {};
-    if (uniqueCodes.length > 0) {
-      const codeRows = db.prepare(`
-        SELECT a.code,
-               COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-        FROM line_items li
-        INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-          AND je.status = 'posted' AND je.company_id IN (${placeholders}) ${dateFilter}
-        INNER JOIN accounts a ON a.id = li.account_id
-        WHERE a.code IN (${uniqueCodes.map(() => '?').join(',')})
-        GROUP BY a.code
-      `).all(...group.company_ids, ...uniqueCodes) as any[];
-      for (const r of codeRows) byCode[r.code] = r.balance;
-    }
-
-    const balances: Record<string, number> = {};
-    for (const line of BS_LINES) {
-      if (line.computed_from) continue;
-      if (line.account_codes) {
-        balances[line.code] = line.account_codes.reduce((s: number, c: string) => s + (byCode[c] || 0), 0);
-      } else if (line.odoo_types) {
-        if (line.date_filter === 'current_year') {
-          balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeCY[t] || 0), 0);
-        } else {
-          balances[line.code] = line.odoo_types.reduce((s: number, t: string) => s + (byTypeAll[t] || 0), 0);
-        }
-      } else {
-        balances[line.code] = 0;
-      }
-    }
-
-    for (let pass = 0; pass < 10; pass++) {
-      let resolved = 0;
-      for (const line of BS_LINES) {
-        if (!line.computed_from) continue;
-        if (line.code in balances) continue;
-        const allReady = line.computed_from.every((c: string) => c in balances);
-        if (!allReady) continue;
-        balances[line.code] = line.computed_from.reduce((s: number, c: string) => s + (balances[c] || 0), 0);
-        resolved++;
-      }
-      if (resolved === 0) break;
-    }
-
-    groupBalances[group.name] = balances;
-  }
-
-  // Step 2: Compute subtotals
-  for (const group of ENTITY_GROUPS) {
-    if (!group.is_subtotal || !group.subtotal_groups) continue;
-
-    const balances: Record<string, number> = {};
-    for (const line of BS_LINES) {
-      balances[line.code] = group.subtotal_groups.reduce((sum: number, gname: string) => {
-        return sum + (groupBalances[gname]?.[line.code] || 0);
-      }, 0);
-    }
-    groupBalances[group.name] = balances;
-  }
-
-  // Step 3: Compute IC elimination (JE-based, with date filter)
-  const allCompanyIds = ENTITY_GROUPS.filter(g => !g.is_subtotal && !g.is_manual).flatMap(
-    (g: any) => g.company_ids as number[]
-  );
-  const icByType: Record<string, number> = {};
-
-  const icPlaceholders = allCompanyIds.map(() => '?').join(',');
-  const icBalances = db.prepare(`
-    SELECT a.odoo_type,
-           COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-    FROM line_items li
-    INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-      AND je.status = 'posted' AND je.company_id IN (${icPlaceholders}) ${dateFilter}
-    INNER JOIN accounts a ON a.id = li.account_id
-    WHERE a.code LIKE '303%'
-    GROUP BY a.odoo_type
-  `).all(...allCompanyIds) as any[];
-  for (const row of icBalances) icByType[row.odoo_type] = row.balance;
-
-  const icElimination: Record<string, number> = {};
-  for (const line of BS_LINES) {
-    if (line.computed_from) continue;
-    if (line.odoo_types) {
-      icElimination[line.code] = -line.odoo_types.reduce((s: number, t: string) => s + (icByType[t] || 0), 0);
-    } else {
-      icElimination[line.code] = 0;
-    }
-  }
-
-  for (let pass = 0; pass < 10; pass++) {
-    let resolved = 0;
-    for (const line of BS_LINES) {
-      if (!line.computed_from) continue;
-      if (line.code in icElimination) continue;
-      const allReady = line.computed_from.every((c: string) => c in icElimination);
-      if (!allReady) continue;
-      icElimination[line.code] = line.computed_from.reduce((s: number, c: string) => s + (icElimination[c] || 0), 0);
-      resolved++;
-    }
-    if (resolved === 0) break;
-  }
-
-  // Step 4: Build response
-  const columns = [
-    ...ENTITY_GROUPS.map(g => ({
-      name: g.name,
-      is_subtotal: g.is_subtotal || false,
-      is_elimination: false,
-      is_consolidated: false,
-    })),
-    { name: 'IC Elimination', is_subtotal: false, is_elimination: true, is_consolidated: false },
-    { name: 'Consolidated', is_subtotal: false, is_elimination: false, is_consolidated: true },
-  ];
-
-  const totalIdx = ENTITY_GROUPS.findIndex(g => g.name === 'Total');
-
-  const rows = BS_LINES.map(line => {
-    const entityValues = ENTITY_GROUPS.map(g => groupBalances[g.name]?.[line.code] || 0);
-    const totalVal = totalIdx >= 0 ? entityValues[totalIdx] : 0;
-    const icVal = icElimination[line.code] || 0;
-    const consolidatedVal = totalVal + icVal;
-
-    return {
-      code: line.code,
-      label: line.label,
-      indent: line.indent,
-      is_total: line.is_total || false,
-      is_section: line.is_section || false,
-      values: [...entityValues, icVal, consolidatedVal],
-    };
-  });
-
-  rows.push({
-    code: 'CHECK',
-    label: 'Check (should be 0)',
-    indent: 0,
-    is_total: false,
-    is_section: false,
-    values: [
-      ...ENTITY_GROUPS.map(g => {
-        const b = groupBalances[g.name] || {};
-        return (b['ASSETS'] || 0) + (b['LIABILITIES'] || 0) + (b['EQUITY'] || 0);
-      }),
-      (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0),
-      (() => {
-        const totalBal = groupBalances['Total'] || {};
-        const t = (totalBal['ASSETS'] || 0) + (totalBal['LIABILITIES'] || 0) + (totalBal['EQUITY'] || 0);
-        return t + (icElimination['ASSETS'] || 0) + (icElimination['LIABILITIES'] || 0) + (icElimination['EQUITY'] || 0);
-      })(),
-    ],
-  });
-
-  res.json({ columns, rows });
-});
-  router.get('/ic-reconciliation', (_req, res) => {
-    // Get intercompany balances per company per account
-    const rows = db.prepare(`
-      SELECT
-        je.company_id, je.company_name,
-        a.code, a.name,
-        COALESCE(SUM(li.debit), 0) - COALESCE(SUM(li.credit), 0) as balance
-      FROM line_items li
-      INNER JOIN journal_entries je ON je.id = li.journal_entry_id AND je.status = 'posted'
-      INNER JOIN accounts a ON a.id = li.account_id
-      WHERE a.code LIKE '303%'
-      GROUP BY je.company_id, je.company_name, a.code, a.name
-      HAVING ABS(balance) > 0.01
-      ORDER BY a.code, je.company_name
-    `).all() as any[];
-
-    // Group by IC account
-    const byAccount: Record<string, { code: string; name: string; entries: any[]; total: number }> = {};
-    for (const row of rows) {
-      const key = row.code;
-      if (!byAccount[key]) byAccount[key] = { code: row.code, name: row.name, entries: [], total: 0 };
-      byAccount[key].entries.push({
-        company_id: row.company_id,
-        company_name: row.company_name,
-        balance: row.balance,
-      });
-      byAccount[key].total += row.balance;
-    }
-
-    // Summary
-    const accounts = Object.values(byAccount).sort((a: any, b: any) => a.code.localeCompare(b.code));
-    const grandTotal = accounts.reduce((s, a) => s + a.total, 0);
-    const unreconciled = accounts.filter(a => Math.abs(a.total) > 1);
-
-    res.json({
-      accounts,
-      summary: {
-        total_ic_accounts: accounts.length,
-        unreconciled_count: unreconciled.length,
-        net_unreconciled: grandTotal,
-      },
-    });
-  });
-
-
-  // ====== Cash Position Report ======
-  // Entity group cash composition over time (monthly snapshots)
-  router.get('/cash-position', (req, res) => {
-    const months = parseInt(req.query.months as string) || 12;
-
-    // Generate month labels
-    const now = new Date();
-    const monthLabels: string[] = [];
-    for (let i = 0; i < months; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      monthLabels.push(d.toISOString().slice(0, 7)); // YYYY-MM
-    }
-    monthLabels.reverse();
-
-    const categories = [
-      { key: 'cash', label: 'Cash', filter: "a.odoo_type = 'asset_cash'" },
-      { key: 'receivable', label: 'Receivables', filter: "a.odoo_type = 'asset_receivable'" },
-      { key: 'current_assets', label: 'Current Assets', filter: "a.odoo_type IN ('asset_current','asset_prepayments')" },
-      { key: 'non_current_assets', label: 'Non-current Assets', filter: "a.odoo_type IN ('asset_fixed','asset_non_current')" },
-      { key: 'payables', label: 'Payables', filter: "a.odoo_type = 'liability_payable'" },
-      { key: 'current_liabilities', label: 'Current Liabilities', filter: "a.odoo_type IN ('liability_current','liability_credit_card') AND a.code NOT LIKE '303%'" },
-      { key: 'non_current_liabilities', label: 'Non-current Liabilities', filter: "a.odoo_type = 'liability_non_current'" },
-      { key: 'ic_balances', label: 'IC Balances', filter: "a.code LIKE '303%'" },
-    ];
-
-    const result: any[] = [];
+    // Build balances per group per BS line
+    const groupBalances: Record<string, Record<string, number>> = {};
 
     for (const group of ENTITY_GROUPS) {
       if (group.is_subtotal) continue;
-      if (group.company_ids.length === 0) continue;
 
-      const placeholders = group.company_ids.map(() => '?').join(',');
+      if (group.is_manual) {
+        // Use manual_balances for Xterio Foundation, Keystone etc.
+        const manualRows = db.prepare(`
+          SELECT account_code, SUM(amount_usd) as total_usd
+          FROM manual_balances
+          WHERE entity = ? AND period = ? AND account_code NOT IN ('FOUNDATION_IC')
+          GROUP BY account_code
+        `).all(group.name, period) as { account_code: string; total_usd: number }[];
+        const manualTotal = manualRows.reduce((s: number, r: any) => s + (r.total_usd || 0), 0);
 
-      // ONE query: get monthly net changes per category
-      const monthlyData: Record<string, Record<string, number>> = {};
-
-      for (const cat of categories) {
-        const rows = db.prepare(`
-          SELECT strftime('%Y-%m', je.date) as month,
-            SUM(li.debit) - SUM(li.credit) as net
-          FROM line_items li
-          INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-            AND je.status = 'posted' AND je.company_id IN (${placeholders})
-          INNER JOIN accounts a ON a.id = li.account_id
-          WHERE ${cat.filter}
-          GROUP BY strftime('%Y-%m', je.date)
-        `).all(...group.company_ids) as any[];
-
-        for (const r of rows) {
-          if (!monthlyData[r.month]) monthlyData[r.month] = {};
-          monthlyData[r.month][cat.key] = r.net;
+        const bals: Record<string, number> = {};
+        for (const line of BS_LINES) {
+          if (line.computed_from) continue;
+          bals[line.code] = line.code === 'BANK_CASH' ? manualTotal : 0;
         }
+        for (const line of BS_LINES) {
+          if (!line.computed_from) continue;
+          if (line.code in bals) continue;
+          bals[line.code] = (line.computed_from as string[]).reduce((s: number, src: string) => s + (bals[src] || 0), 0);
+        }
+        groupBalances[group.name] = bals;
+        continue;
       }
 
-      // Build cumulative snapshots
-      const cumulative: Record<string, number> = {};
-      for (const cat of categories) cumulative[cat.key] = 0;
-
-      // Get all months sorted
-      const allMonths = Object.keys(monthlyData).sort();
-
-      // Accumulate up to our display window
-      for (const m of allMonths) {
-        for (const cat of categories) {
-          cumulative[cat.key] += monthlyData[m]?.[cat.key] || 0;
-        }
+      // TB-based group
+      const bals: Record<string, number> = {};
+      for (const line of BS_LINES) {
+        if (line.computed_from) continue;
+        bals[line.code] = computeLineForGroup(group.company_ids, line);
       }
-
-      // Now build snapshots for requested months
-      // First reset and re-accumulate
-      for (const cat of categories) cumulative[cat.key] = 0;
-      const snapshots: any[] = [];
-
-      for (const m of allMonths) {
-        for (const cat of categories) {
-          cumulative[cat.key] += monthlyData[m]?.[cat.key] || 0;
-        }
-        if (monthLabels.includes(m)) {
-          const snap: any = { date: m };
-          for (const cat of categories) snap[cat.key] = cumulative[cat.key];
-          snap.closing = categories.reduce((s, cat) => s + cumulative[cat.key], 0);
-          snapshots.push(snap);
-        }
+      for (const line of BS_LINES) {
+        if (!line.computed_from) continue;
+        if (line.code in bals) continue;
+        bals[line.code] = (line.computed_from as string[]).reduce((s: number, src: string) => s + (bals[src] || 0), 0);
       }
-
-      // Monthly burn
-      const last3 = snapshots.slice(-3);
-      let avgBurn = 0;
-      if (last3.length >= 2) {
-        const expRow = db.prepare(`
-          SELECT COALESCE(SUM(li.debit) - SUM(li.credit), 0) as total
-          FROM line_items li
-          INNER JOIN journal_entries je ON je.id = li.journal_entry_id
-            AND je.status = 'posted' AND je.company_id IN (${placeholders})
-            AND je.date >= ?
-          INNER JOIN accounts a ON a.id = li.account_id
-          WHERE a.odoo_type IN ('expense', 'expense_direct_cost')
-        `).get(...group.company_ids, last3[0].date + '-01') as any;
-        avgBurn = (expRow?.total || 0) / last3.length;
-      }
-
-      const lastClosing = snapshots.length > 0 ? snapshots[snapshots.length - 1].closing : 0;
-
-      result.push({
-        group: group.name,
-        company_ids: group.company_ids,
-        snapshots,
-        monthly_burn: avgBurn,
-        available_balance: lastClosing,
-        runway_months: avgBurn > 0 ? Math.round(lastClosing / avgBurn) : null,
-      });
+      groupBalances[group.name] = bals;
     }
 
-    // Add subtotals
+    // Step 2: Compute subtotals
     for (const group of ENTITY_GROUPS) {
-      if (!group.is_subtotal || !group.subtotal_groups) continue;
-      const children = result.filter(r => group.subtotal_groups!.includes(r.group));
-      if (children.length === 0) continue;
-
-      const snapshots = monthLabels.map((m) => {
-        const snap: any = { date: m };
-        for (const cat of categories) {
-          snap[cat.key] = children.reduce((s: number, c: any) => {
-            const cs = c.snapshots.find((x: any) => x.date === m);
-            return s + (cs?.[cat.key] || 0);
-          }, 0);
-        }
-        snap.closing = categories.reduce((s, cat) => s + (snap[cat.key] || 0), 0);
-        return snap;
-      }).filter((s: any) => Math.abs(s.closing) > 0.01 || categories.some(c => Math.abs(s[c.key]) > 0.01));
-
-      const totalBurn = children.reduce((s: number, c: any) => s + (c.monthly_burn || 0), 0);
-      const lastClosing = snapshots.length > 0 ? snapshots[snapshots.length - 1].closing : 0;
-
-      result.push({
-        group: group.name,
-        is_subtotal: true,
-        snapshots,
-        monthly_burn: totalBurn,
-        available_balance: lastClosing,
-        runway_months: totalBurn > 0 ? Math.round(lastClosing / totalBurn) : null,
-      });
+      if (!group.is_subtotal) continue;
+      const bals: Record<string, number> = {};
+      for (const line of BS_LINES) {
+        bals[line.code] = (group.subtotal_groups || []).reduce((s: number, sg: string) => {
+          return s + ((groupBalances[sg] || {})[line.code] || 0);
+        }, 0);
+      }
+      groupBalances[group.name] = bals;
     }
 
-    res.json({ months: monthLabels, categories, groups: result });
-  });
+    // Step 3: IC Elimination (zero in TB-based approach)
+    const icBals: Record<string, number> = {};
+    for (const line of BS_LINES) icBals[line.code] = 0;
 
-  // ====== Bank Account Detail ======
-// ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ /bank-accounts ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ
+    // Step 4: Consolidated = Total
+    const totalBals = groupBalances['Total'] || {};
+    const consolBals: Record<string, number> = {};
+    for (const line of BS_LINES) {
+      consolBals[line.code] = totalBals[line.code] || 0;
+    }
+
+    // Step 5: Build response
+    const columns = [
+      ...ENTITY_GROUPS.map(g => ({
+        name: g.name,
+        is_subtotal: g.is_subtotal || false,
+        is_elimination: false,
+        is_consolidated: false,
+      })),
+      { name: 'IC Elimination', is_subtotal: false, is_elimination: true, is_consolidated: false },
+      { name: 'Consolidated', is_subtotal: false, is_elimination: false, is_consolidated: true },
+    ];
+
+    const rows = BS_LINES.map(line => {
+      const values = [
+        ...ENTITY_GROUPS.map(g => (groupBalances[g.name] || {})[line.code] || 0),
+        icBals[line.code] || 0,
+        consolBals[line.code] || 0,
+      ];
+      return {
+        code: line.code,
+        label: line.label,
+        indent: line.indent,
+        is_total: line.is_total || false,
+        is_section: line.is_section || false,
+        values,
+      };
+    });
+
+    res.json({ columns, rows });
+  } catch (err: any) {
+    console.error('[consolidated-bs] tb error:', err);
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
 router.get('/bank-accounts', (req, res) => {
   const asOfDate = (req.query.as_of_date as string) || new Date().toISOString().slice(0, 10);
 
