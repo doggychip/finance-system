@@ -1269,7 +1269,7 @@ router.get('/executive-summary', (req, res) => {
       const ph = ids.map(() => '?').join(',');
       const cryptoCurrencies = new Set(['USDT','ETH','BTC','USDC','BNB','XTR','UST','WBN','USC','SHI','SPE']);
       const q = (w: string) => (db.prepare(`SELECT COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as t FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE ${w}`).get(asOfDate, ...ids) as any)?.t || 0;
-      const cashRows = db.prepare(`SELECT COALESCE(MAX(li.currency),'USD') as currency, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY a.id`).all(asOfDate, ...ids) as any[];
+      const cashRows = db.prepare(`SELECT a.code as code, COALESCE(MAX(li.currency),'USD') as currency, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY a.id`).all(asOfDate, ...ids) as any[];
       let cash_fiat = 0, cash_crypto = 0;
       for (const r of cashRows) { if (r.code && r.code.startsWith('10W')) cash_crypto += r.bal; else cash_fiat += r.bal; }
       return {
