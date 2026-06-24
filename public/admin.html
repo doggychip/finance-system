@@ -683,14 +683,14 @@
             '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:140px"></td>' +
             '<td>' + (r.currency || 'USD') + '</td>' +
             '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcKeystoneRow(this,' + r.id + ')" style="width:90px"></td>' +
-            '<td id="keystone_usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
+            '<td id="keystone_usd_' + r.id + '" style="color:var(--text-dim)">' + fmtBS(parseFloat(usd)) + '</td>' +
             '</tr>';
         });
       });
-      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="keystoneTotalCell">' + fmt(totalUSD) + '</td></tr>';
+      html += '<tr class="total-row"><td colspan="5">Total USD</td><td id="keystoneTotalCell">' + fmtBS(totalUSD) + '</td></tr>';
       html += '</tbody></table>';
       document.getElementById('keystoneTable').innerHTML = html;
-      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmt(totalUSD);
+      document.getElementById('keystoneTotal').textContent = 'Total: ' + fmtBS(totalUSD);
     }
 
     function recalcKeystoneRow(input, id) {
