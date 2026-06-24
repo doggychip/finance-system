@@ -1260,7 +1260,7 @@ router.get('/executive-summary', (req, res) => {
     const keystoneNAp = (keystonePriorRow?.total ?? 0) as number;
     const hNA = getNetAssets(HOLDINGS_IDS, asOfDate), hNAp = getNetAssets(HOLDINGS_IDS, priorDate);
     const xC = getCash(XTERIO_IDS, asOfDate), oC = getCash(OW_IDS, asOfDate);
-    const hC = getCash(HOLDINGS_IDS, asOfDate), aC = getCash(ALL_IDS, asOfDate);
+    const hC = getCash(HOLDINGS_IDS, asOfDate);
     const tbTotals = (db.prepare(`SELECT COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period=? AND account_type='asset_cash'`).get(ksPeriod) as any)||{fi:0,cr:0}; const total_cash_fiat = tbTotals.fi + fn.cash_usd, total_cash_crypto = tbTotals.cr;
     const total_cash_all = total_cash_fiat + total_cash_crypto;
     // Per-group waterfall: Net Assets breakdown into components
