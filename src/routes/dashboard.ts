@@ -1261,7 +1261,7 @@ router.get('/executive-summary', (req, res) => {
     const hNA = getNetAssets(HOLDINGS_IDS, asOfDate), hNAp = getNetAssets(HOLDINGS_IDS, priorDate);
     const xC = getCash(XTERIO_IDS, asOfDate), oC = getCash(OW_IDS, asOfDate);
     const hC = getCash(HOLDINGS_IDS, asOfDate), aC = getCash(ALL_IDS, asOfDate);
-    const total_cash_fiat = aC.fiat + fn.cash_usd, total_cash_crypto = aC.crypto;
+    const tbTotals = (db.prepare(`SELECT COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period=? AND account_type='asset_cash'`).get(ksPeriod) as any)||{fi:0,cr:0}; const total_cash_fiat = tbTotals.fi + fn.cash_usd, total_cash_crypto = tbTotals.cr;
     const total_cash_all = total_cash_fiat + total_cash_crypto;
     // Per-group waterfall: Net Assets breakdown into components
     function buildWFBreakdown(ids: number[]): any {
@@ -1323,7 +1323,7 @@ router.get('/executive-summary', (req, res) => {
     let entity_cash: any[] = [{ company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
     if (ALL_IDS.length > 0) {
       const ePh = ALL_IDS.map(() => '?').join(',');
-      const eRows = db.prepare(`SELECT je.company_id, je.company_name, COALESCE(SUM(CASE WHEN li.currency NOT IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN li.currency IN ('USDT','ETH','BTC','USDC') THEN li.debit-li.credit ELSE 0 END),0) as cr FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ePh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id, je.company_name ORDER BY je.company_name`).all(asOfDate, ...ALL_IDS) as any[];
+      const eRows = db.prepare(`SELECT company_id, company_name, COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period=? AND account_type='asset_cash' AND company_id IN (${ePh}) GROUP BY company_id, company_name ORDER BY company_name`).all(ksPeriod, ...ALL_IDS) as any[];
       entity_cash = [...eRows.map(r => ({ company_id: r.company_id, company_name: r.company_name, cash_fiat: r.fi, cash_crypto: r.cr })), { company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
     }
     let alerts: any[] = [], ic_imbalances: any[] = [];
