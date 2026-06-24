@@ -1201,11 +1201,17 @@ router.get('/executive-summary', (req, res) => {
     const foundationPeriod = (() => { const d = new Date(asOfDate + 'T00:00:00Z'); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
     const priorFoundPeriod = (() => { const d = new Date(priorDate + 'T00:00:00Z'); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
     function getFoundation(period: string) {
-      // Read from manual_bs_lines (ASSETS = net_assets, BANK_CASH = cash_usd)
+      // Read from manual_bs_lines: SUM all leaf values as net_assets, BANK_CASH as cash_usd
+      const LIABILITY_CODES = ['TRADE_PAY','ACCRUED_EXP','DEFERRED_REV','VAT_PAY','OTHER_CURR_LIAB','LONG_TERM_DEBT','DEFER_TAX_LIAB','OTHER_NON_CURR_LIAB','IC_PAY_CURR','IC_PAY_LONG'];
+      const EQUITY_CODES = ['SHARE_CAP','RETAINED','CURR_PROFIT','OTHER_EQUITY','NONCTRL_INT'];
       const getRow = (p: string) => {
-        const assets = (db.prepare(`SELECT amount_usd FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period=? AND line_code='ASSETS'`).get(p) as any)?.amount_usd || 0;
-        const bankCash = (db.prepare(`SELECT amount_usd FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period=? AND line_code='BANK_CASH'`).get(p) as any)?.amount_usd || 0;
-        return { na: assets, ca: bankCash };
+        const rows = db.prepare(`SELECT line_code, amount_usd FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period=?`).all(p) as any[];
+        let na = 0, ca = 0;
+        for (const row of rows) {
+          if ([...LIABILITY_CODES, ...EQUITY_CODES].indexOf(row.line_code) < 0) na += row.amount_usd || 0;
+          if (row.line_code === 'BANK_CASH') ca = row.amount_usd || 0;
+        }
+        return { na, ca };
       };
       let r = getRow(period);
       if (!r.na) {
