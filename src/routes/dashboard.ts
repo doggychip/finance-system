@@ -982,7 +982,7 @@ router.get('/bank-accounts', (req, res) => {
       current_balance: a.balance,
       prior_balance: a.prior_balance,
       change: a.change,
-      asset_type: ['BNB','ETH','XTR','UST','WBN','USC','SHI','SPE','USDT','USDC','BTC'].includes(a.currency) ? 'Crypto' : 'Cash',
+      asset_type: a.code.startsWith('10W') ? 'Crypto' : 'Cash',
       currency: a.currency,
       company_name: a.company_name,
       company_id: a.company_id,
@@ -1245,7 +1245,7 @@ router.get('/executive-summary', (req, res) => {
     function getCash(ids: number[], asOf: string): { fiat: number; crypto: number } {
       if (!ids.length) return { fiat: 0, crypto: 0 };
       const ph = ids.map(() => '?').join(',');
-      const rows = db.prepare(`SELECT COALESCE(MAX(li.currency),'USD') as currency, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY a.id`).all(asOf, ...ids) as any[];
+      const rows = db.prepare(`SELECT a.code as code, COALESCE(MAX(li.currency),'USD') as currency, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY a.id`).all(asOf, ...ids) as any[];
       const cr = new Set(['USDT','ETH','BTC','USDC']); let fiat = 0, crypto = 0;
       for (const r of rows) { if (cr.has(r.currency)) crypto += r.bal; else fiat += r.bal; }
       return { fiat, crypto };
@@ -1271,7 +1271,7 @@ router.get('/executive-summary', (req, res) => {
       const q = (w: string) => (db.prepare(`SELECT COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as t FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE ${w}`).get(asOfDate, ...ids) as any)?.t || 0;
       const cashRows = db.prepare(`SELECT COALESCE(MAX(li.currency),'USD') as currency, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as bal FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${ph}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY a.id`).all(asOfDate, ...ids) as any[];
       let cash_fiat = 0, cash_crypto = 0;
-      for (const r of cashRows) { if (cryptoCurrencies.has(r.currency)) cash_crypto += r.bal; else cash_fiat += r.bal; }
+      for (const r of cashRows) { if (r.code && r.code.startsWith('10W')) cash_crypto += r.bal; else cash_fiat += r.bal; }
       return {
         adj_300040: q(`a.code='300040'`),
         receivable: q(`a.odoo_type='asset_receivable'`),
@@ -1496,11 +1496,11 @@ router.get('/card-detail-csv', (req, res) => {
   }
   else if (card === 'cash_fiat') {
     companyIds = allIds; label = 'Cash-Fiat';
-          typeFilter = `AND ab.account_type = 'asset_cash' AND ab.currency NOT IN ('USDT','ETH','BTC','BNB','XTR','WBN','SPE','MNT','USC','WET','XTE')`;
+          typeFilter = `AND ab.account_type = 'asset_cash' AND ab.account_code NOT LIKE '10W%'`;
   }
   else if (card === 'cash_crypto') {
     companyIds = allIds; label = 'Cash-Crypto';
-          typeFilter = `AND ab.account_type = 'asset_cash' AND ab.currency IN ('USDT','ETH','BTC','BNB','XTR','WBN','SPE','MNT','USC','WET','XTE')`;
+          typeFilter = `AND ab.account_type = 'asset_cash' AND ab.account_code LIKE '10W%'`;
   }
   else return res.status(400).json({ error: 'Unknown card: ' + card });
 
