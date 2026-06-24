@@ -1232,7 +1232,7 @@ router.get('/executive-summary', (req, res) => {
       foundation: { net_assets: fn.net_assets, ...wfFoundation },
       xterio: { net_assets: xNA, ...wfXterio },
       holdings: { net_assets: hNA, ...wfHoldings },
-      ow: { net_assets: oNA, ...wfOW },
+      ow: { net_assets: oNA + keystoneNA, ...wfOW },
     };
     let monthly_burn = 0;
     if (ALL_IDS.length > 0) {
