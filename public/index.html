@@ -201,6 +201,14 @@
         <div class="sub">Cash + Crypto</div>
       </div>
     </div>
+    <!-- Level 2c: Total Group Cash + Crypto -->
+    <div class="hero-card main" style="text-align:center;margin-bottom:24px;padding:28px;position:relative">
+      <div class="card-actions"><button class="card-btn info-btn" title="構成逻辑" onclick="showCardInfo('cash_total_group')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('cash_total_group')">⊕</button></div>
+      <div class="label" style="font-size:14px">Total Group Cash + Crypto</div>
+      <div class="value" id="heroTotalCashCrypto" style="font-size:48px">--</div>
+      <div class="sub" id="heroTotalCashCryptoSub" style="font-size:12px">Loading...</div>
+    </div>
+
     <!-- Level 4: Cash Totals -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr">
       <div class="hero-card main" style="position:relative">
@@ -379,6 +387,12 @@
           var el = document.getElementById(c.id);
           if (el) el.textContent = fmt(val);
         });
+        // Level 2c: Total Group Cash + Crypto total
+        var totalCashCrypto = 0;
+        cashCards.forEach(function(c) { var w = wf[c.wfKey] || {}; totalCashCrypto += (w.cash_fiat || 0) + (w.cash_crypto || 0); });
+        document.getElementById('heroTotalCashCrypto').textContent = fmt(totalCashCrypto);
+        document.getElementById('heroTotalCashCryptoSub').textContent = 'As of ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
+
         // Level 4: Cash Fiat & Crypto totals
         document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
         document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | All entities incl. Foundation';
@@ -634,7 +648,8 @@
       cash_foundation: { title: 'Xterio Foundation — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','Xterio Foundation（company 22，手动录入）'],['Cash (Fiat)','manual_bs_lines BANK_CASH / CASH 科目折 USD'],['Crypto','manual_bs_lines 加密资产科目折 USD'],['数据源','executive-summary API: waterfall.foundation.cash_fiat + cash_crypto']] },
       cash_xterio: { title: 'Xterio ExclFoundation — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','LTECH / LTECH W3 / AOD / XLABS / XLAB W3 / PRIVILEGE HK'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.xterio.cash_fiat + cash_crypto']] },
       cash_holdings: { title: 'Lholding Total — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','CS / Palios / LHOLDINGS / PLAY ALGORITHM / QUANTUMMIND'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.holdings.cash_fiat + cash_crypto']] },
-      cash_ow: { title: 'OW & Reach — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','OW / Reach / Rough house / Keystone'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.ow.cash_fiat + cash_crypto']] }    };
+      cash_ow: { title: 'OW & Reach — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','OW / Reach / Rough house / Keystone'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.ow.cash_fiat + cash_crypto']] },
+cash_total_group: { title: 'Total Group Cash + Crypto — 构成逻辑', formula: '<strong>Foundation + Xterio + Holdings + OW & Reach</strong> Cash + Crypto 之和', rows: [['包含实体','Xterio Foundation / Xterio ExclFoundation / Lholding Total / OW & Reach'],['Cash (Fiat)','各实体 cash_fiat（银行账户 100xxx）之和'],['Crypto','各实体 cash_crypto（数字资产 10Wxxx）之和'],['CSV 对照','下载各实体 CSV 明细，对 Balance (USD) 列求和即得卡片数值'],['数据源','executive-summary API: waterfall.foundation/xterio/holdings/ow 各 (cash_fiat + cash_crypto) 之和']] }    };
     function showCardInfo(card) {
       var info = CARD_INFO[card]; if (!info) return;
       document.getElementById('cardModalTitle').textContent = info.title;
