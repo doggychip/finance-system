@@ -324,19 +324,7 @@
         fillWidget('heroHoldings', data.holdings_net_assets, data.holdings_net_assets_prior, 'CS+Palios+LHOLDINGS+PLAY ALGORITHM+QUANTUMMIND');
         fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'Excl. fixed assets');
 
-        // Level 2b: 4 Cash + Crypto cards (below breakdown table)
-        var cashCards = [
-          { id: 'cashFoundation', wfKey: 'foundation' },
-          { id: 'cashXterio',     wfKey: 'xterio' },
-          { id: 'cashHoldings',   wfKey: 'holdings' },
-          { id: 'cashOW',         wfKey: 'ow' }
-        ];
-        cashCards.forEach(function(c) {
-          var w = wf[c.wfKey] || {};
-          var val = (w.cash_fiat || 0) + (w.cash_crypto || 0);
-          var el = document.getElementById(c.id);
-          if (el) el.textContent = fmt(val);
-        });
+       
         // Level 3: Per-function waterfall table
         var wf = data.waterfall || {};
         var funcs = ['foundation', 'xterio', 'holdings', 'ow'];
@@ -378,6 +366,19 @@
         wfHtml += '</tbody></table>';
         document.getElementById('waterfallTable').innerHTML = wfHtml;
 
+        // Level 2b: 4 Cash + Crypto cards (below breakdown table)
+        var cashCards = [
+          { id: 'cashFoundation', wfKey: 'foundation' },
+          { id: 'cashXterio',     wfKey: 'xterio' },
+          { id: 'cashHoldings',   wfKey: 'holdings' },
+          { id: 'cashOW',         wfKey: 'ow' }
+        ];
+        cashCards.forEach(function(c) {
+          var w = wf[c.wfKey] || {};
+          var val = (w.cash_fiat || 0) + (w.cash_crypto || 0);
+          var el = document.getElementById(c.id);
+          if (el) el.textContent = fmt(val);
+        });
         // Level 4: Cash Fiat & Crypto totals
         document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
         document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | All entities incl. Foundation';
