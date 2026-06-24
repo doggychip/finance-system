@@ -1201,21 +1201,11 @@ router.get('/executive-summary', (req, res) => {
     const foundationPeriod = (() => { const d = new Date(asOfDate + 'T00:00:00Z'); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
     const priorFoundPeriod = (() => { const d = new Date(priorDate + 'T00:00:00Z'); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
     function getFoundation(period: string) {
-      // net_assets = Σ(asset_* codes) + Σ(liability_* codes) from manual_bs_lines
-      // Equity codes (A_RETAINED_EARNINGS, A_CAPITAL_IN_WALLET, CURRENT_YEAR_PL etc.) are excluded
-      // Matches ⓘ card formula: asset_* + liability_* only, excl. equity/expense/income
-      const ASSET_CODES = new Set([
-        'BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES',
-        'A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS',
-        'FIXED_ASSETS','NON_CURRENT_ASSETS','A_200000','A_202000'
-      ]);
-      const LIAB_CODES = new Set([
-        'A_303010','A_303011','A_303020','A_303021','A_303031',
-        'A_303040','A_303041','A_303050','A_303051','A_303060','A_303061',
-        'A_303070','A_303071','A_303080','A_303081','A_303090','A_303091',
-        'A_303100','A_303110','A_303120','A_303150','A_303160',
-        'A_303170','A_303171','A_303180','A_303181',
-        'A_301000','A_302010','A_300000','A_300030','A_300040','A_300050','A_303030'
+      // net_assets = sum of EQUITY codes from manual_bs_lines (matches admin ⓘ card formula)
+      // Equity = A_RETAINED_EARNINGS + A_SHARE_CAPITALS + A_CAPITAL_IN_WALLET + CURRENT_YEAR_PL + EQUITY_RETAINED
+      const EQUITY_CODES = new Set([
+        'A_RETAINED_EARNINGS','A_SHARE_CAPITALS','A_CAPITAL_IN_WALLET',
+        'CURRENT_YEAR_PL','EQUITY_RETAINED'
       ]);
       const CASH_CODES = new Set(['BANK_CASH','CASH']);
       const getRow = (p: string) => {
@@ -1223,7 +1213,7 @@ router.get('/executive-summary', (req, res) => {
         let na = 0, ca = 0;
         for (const row of rows) {
           const amt = row.amount_usd || 0;
-          if (ASSET_CODES.has(row.line_code) || LIAB_CODES.has(row.line_code)) na += amt;
+          if (EQUITY_CODES.has(row.line_code)) na += amt;
           if (CASH_CODES.has(row.line_code)) ca += amt;
         }
         return { na, ca };
