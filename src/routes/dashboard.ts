@@ -752,7 +752,7 @@ router.get('/consolidated-bs', (req, res) => {
     for (const group of ENTITY_GROUPS) {
       if (group.is_subtotal) continue;
 
-      if (group.is_manual) {
+            if (group.is_manual) {
         // Use manual_bs_lines for Xterio Foundation, Keystone etc. (per BS line)
         const bsLineRows = db.prepare(`
           SELECT line_code, amount_usd
@@ -763,13 +763,24 @@ router.get('/consolidated-bs', (req, res) => {
         for (const r of bsLineRows) bsLineMap[r.line_code] = r.amount_usd;
 
         const bals: Record<string, number> = {};
+        // Set leaf values from manual entries
         for (const line of BS_LINES) {
           if (line.computed_from) continue;
+          if (line.is_section || (line as any).is_total) continue; // skip aggregate rows
           bals[line.code] = bsLineMap[line.code] ?? 0;
         }
+        // Compute aggregate rows from leaves (odoo_types-based parents)
+        const assetLeafs = ['BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES','A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS','FIXED_ASSETS','NON_CURRENT_ASSETS','A_200000','A_202000'];
+        const curAssetLeafs = ['BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES','A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS'];
+        const liabLeafs = ['A_303010','A_303011','A_303020','A_303021','A_303031','A_303040','A_303041','A_303050','A_303051','A_303060','A_303061','A_303070','A_303071','A_303080','A_303081','A_303090','A_303091','A_303100','A_303110','A_303120','A_303150','A_303160','A_303170','A_303171','A_303180','A_303181','A_301000','A_302010','PAYABLES','A_300000','A_300030','NON_CURRENT_LIABILITIES','A_300040','A_300050','A_303030'];
+        const equityLeafs = ['EQUITY_RETAINED','A_RETAINED_EARNINGS','A_SHARE_CAPITALS','A_CAPITAL_IN_WALLET','CURRENT_YEAR_PL'];
+        bals['CURRENT_ASSETS'] = curAssetLeafs.reduce((s: number, c: string) => s + (bals[c] || 0), 0);
+        bals['ASSETS'] = assetLeafs.reduce((s: number, c: string) => s + (bals[c] || 0), 0);
+        bals['LIABILITIES'] = liabLeafs.reduce((s: number, c: string) => s + (bals[c] || 0), 0);
+        bals['EQUITY'] = equityLeafs.reduce((s: number, c: string) => s + (bals[c] || 0), 0);
+        // computed_from (LIAB_EQUITY)
         for (const line of BS_LINES) {
           if (!line.computed_from) continue;
-          if (line.code in bals) continue;
           bals[line.code] = (line.computed_from as string[]).reduce((s: number, src: string) => s + (bals[src] || 0), 0);
         }
         groupBalances[group.name] = bals;
