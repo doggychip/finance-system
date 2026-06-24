@@ -118,8 +118,8 @@ export const BS_LINES: BSLineItem[] = [
   { code: 'EQUITY', label: 'EQUITY', indent: 0, is_section: true, odoo_types: ['equity', 'equity_unaffected', 'income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation'] },
 
   { code: 'EQUITY_RETAINED', label: 'Retained Earnings', indent: 1, odoo_types: ['equity'] },
-  { code: 'A_RETAINED_EARNINGS', label: 'Retained Earnings', indent: 2, account_codes: ['500000'] },
-  { code: 'A_SHARE_CAPITALS', label: 'Share Capitals', indent: 2, account_codes: ['310000'] },
+  { code: 'A_RETAINED_EARNINGS', label: 'Retained Earnings', indent: 2, account_codes: ['310000'] },
+  { code: 'A_SHARE_CAPITALS', label: 'Share Capitals', indent: 2, account_codes: ['500000'] },
   { code: 'A_CAPITAL_IN_WALLET', label: 'Capital in Wallet', indent: 2, account_codes: ['201000'] },
   { code: 'CURRENT_YEAR_PL', label: 'Current Year Unallocated Earnings', indent: 1, odoo_types: ['equity_unaffected', 'income', 'income_other', 'expense', 'expense_direct_cost', 'expense_depreciation'] },
 
