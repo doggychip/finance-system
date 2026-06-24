@@ -129,23 +129,6 @@
         var snaps = data.snapshots;
         var summary = data.summary;
 
-        // Add Keystone Foundation (manual_balances) to latest snapshot cash + total
-        var ksOWTotal = 0;
-        try {
-          var latestSnap = snaps[snaps.length - 1];
-          var ksPeriodOW = latestSnap.date.slice(0, 7);
-          var ksRespOW = await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent('Keystone Foundation') + '&period=' + ksPeriodOW);
-          var ksDataOW = await ksRespOW.json();
-          (ksDataOW.rows || []).forEach(function(r) {
-            ksOWTotal += (r.amount_local || 0) * (r.exchange_rate || 1);
-          });
-          if (ksOWTotal) {
-            latestSnap.cash = (latestSnap.cash || 0) + ksOWTotal;
-            latestSnap.total = (latestSnap.total || 0) + ksOWTotal;
-            if (summary) summary.available_balance = (summary.available_balance || 0) + ksOWTotal;
-          }
-        } catch(e) {}
-
         document.getElementById('availBal').textContent = fmt(summary.available_balance);
         document.getElementById('availSub').textContent = 'As of ' + snaps[snaps.length - 1].date;
         document.getElementById('monthlyBurn').textContent = fmt(summary.monthly_burn);
