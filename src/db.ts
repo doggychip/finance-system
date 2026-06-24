@@ -120,6 +120,17 @@ export function initDb(filename: string = 'finance.db'): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_manual_entity_period ON manual_balances(entity, period);
 
+    CREATE TABLE IF NOT EXISTS manual_bs_lines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity TEXT NOT NULL,
+      period TEXT NOT NULL,
+      line_code TEXT NOT NULL,
+      amount_usd REAL DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(entity, period, line_code)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mbl_entity_period ON manual_bs_lines(entity, period);
+
     CREATE TABLE IF NOT EXISTS account_balances (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       company_id INTEGER NOT NULL,
