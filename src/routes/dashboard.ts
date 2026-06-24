@@ -1268,12 +1268,10 @@ router.get('/executive-summary', (req, res) => {
     const xC = getCash(XTERIO_IDS, asOfDate), oC = getCash(OW_IDS, asOfDate);
     const hC = getCash(HOLDINGS_IDS, asOfDate);
     const tbTotals = (db.prepare(`SELECT COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period=? AND account_type='asset_cash'`).get(ksPeriod) as any)||{fi:0,cr:0}; const fnPeriod = (db.prepare("SELECT period FROM manual_balances WHERE entity='Xterio Foundation' AND period<=? ORDER BY period DESC LIMIT 1").get(ksPeriod) as any)?.period; const fnCash = fnPeriod ? ((db.prepare("SELECT COALESCE(ROUND(SUM(amount_local*exchange_rate),2),0) as t FROM manual_balances WHERE entity='Xterio Foundation' AND period=? AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')").get(fnPeriod) as any)||{t:0}).t : 0; // Keystone Foundation cash from manual_balances (is_manual entity, no Odoo company_id)
-    const ksPeriodKs = (db.prepare("SELECT MAX(period) as p FROM manual_balances WHERE entity='Keystone Foundation' AND period<=?").get(ksPeriod) as any)?.p;
-    const ksManualRows = ksPeriodKs ? (db.prepare("SELECT currency, COALESCE(amount_local*exchange_rate,0) as usd FROM manual_balances WHERE entity='Keystone Foundation' AND period=?").all(ksPeriodKs) as any[]) : [];
-    const ksFiatCash = ksManualRows.filter((r:any) => r.currency === 'USD').reduce((s:number,r:any) => s + r.usd, 0);
-    const ksCryptoCash = ksManualRows.filter((r:any) => r.currency !== 'USD').reduce((s:number,r:any) => s + r.usd, 0);
-    const total_cash_fiat = tbTotals.fi + fnCash + ksFiatCash, total_cash_crypto = tbTotals.cr + ksCryptoCash;
-    const total_cash_all = total_cash_fiat + total_cash_crypto;
+    const ksFiatRow = (db.prepare("SELECT COALESCE(SUM(ROUND(amount_local*exchange_rate,2)),0) as t FROM manual_balances WHERE entity='Keystone Foundation' AND period=(SELECT MAX(period) FROM manual_balances WHERE entity='Keystone Foundation' AND period<=?) AND currency='USD'").get(ksPeriod) as any)||{t:0};
+    const ksCryptoRow = (db.prepare("SELECT COALESCE(SUM(ROUND(amount_local*exchange_rate,2)),0) as t FROM manual_balances WHERE entity='Keystone Foundation' AND period=(SELECT MAX(period) FROM manual_balances WHERE entity='Keystone Foundation' AND period<=?) AND currency!='USD'").get(ksPeriod) as any)||{t:0};
+    const ksFiatCash = ksFiatRow.t as number, ksCryptoCash = ksCryptoRow.t as number;
+    const total_cash_fiat = tbTotals.fi + fnCash + ksFiatCash, total_cash_crypto = tbTotals.cr + ksCryptoCash;    const total_cash_all = total_cash_fiat + total_cash_crypto;
     // Per-group waterfall: Net Assets breakdown into components
     function buildWFBreakdown(ids: number[]): any {
       if (!ids.length) return { adj_300040: 0, receivable: 0, payable: 0, intercompany: 0, deposit: 0, cash_fiat: 0, cash_crypto: 0 };
