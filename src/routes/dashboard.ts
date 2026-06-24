@@ -1201,13 +1201,18 @@ router.get('/executive-summary', (req, res) => {
     const foundationPeriod = (() => { const d = new Date(asOfDate + 'T00:00:00Z'); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
     const priorFoundPeriod = (() => { const d = new Date(priorDate + 'T00:00:00Z'); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
     function getFoundation(period: string) {
-      const q = `SELECT SUM(amount_usd) as na, SUM(CASE WHEN account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET') THEN amount_usd ELSE 0 END) as ca FROM manual_balances WHERE entity='Xterio Foundation' AND period=?`;
-      let r = db.prepare(q).get(period) as any;
-      if (!r?.na) {
-        const lp = (db.prepare(`SELECT period FROM manual_balances WHERE entity='Xterio Foundation' AND period <= ? GROUP BY period HAVING SUM(amount_usd) != 0 ORDER BY period DESC LIMIT 1`).get(period) as any)?.period;
-        if (lp) r = db.prepare(q).get(lp) as any;
+      // Read from manual_bs_lines (ASSETS = net_assets, BANK_CASH = cash_usd)
+      const getRow = (p: string) => {
+        const assets = (db.prepare(`SELECT amount_usd FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period=? AND line_code='ASSETS'`).get(p) as any)?.amount_usd || 0;
+        const bankCash = (db.prepare(`SELECT amount_usd FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period=? AND line_code='BANK_CASH'`).get(p) as any)?.amount_usd || 0;
+        return { na: assets, ca: bankCash };
+      };
+      let r = getRow(period);
+      if (!r.na) {
+        const lp = (db.prepare(`SELECT period FROM manual_bs_lines WHERE entity='Xterio Foundation' AND period <= ? ORDER BY period DESC LIMIT 1`).get(period) as any)?.period;
+        if (lp) r = getRow(lp);
       }
-      return { net_assets: r?.na || 0, cash_usd: r?.ca || 0 };
+      return { net_assets: r.na || 0, cash_usd: r.ca || 0 };
     }
     function getNetAssets(ids: number[], asOf: string, excludeFixedAssets = false): number {
       if (!ids.length) return 0;
