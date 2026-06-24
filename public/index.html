@@ -374,18 +374,22 @@
         wfHtml += '</tbody></table>';
         document.getElementById('waterfallTable').innerHTML = wfHtml;
 
-        // Level 2b: 4 Cash + Crypto cards (below breakdown table)
-        var cashCards = [
-          { id: 'cashFoundation', wfKey: 'foundation' },
-          { id: 'cashXterio',     wfKey: 'xterio' },
-          { id: 'cashHoldings',   wfKey: 'holdings' },
-          { id: 'cashOW',         wfKey: 'ow' }
-        ];
-        cashCards.forEach(function(c) {
-          var w = wf[c.wfKey] || {};
-          var val = (w.cash_fiat || 0) + (w.cash_crypto || 0);
-          var el = document.getElementById(c.id);
-          if (el) el.textContent = fmt(val);
+        // Level 2b: 4 Cash + Crypto cards — sum entity_cash by group company_ids
+        // (same source as Total Group card: total_cash_fiat + total_cash_crypto)
+        var ecMap = {};
+        (data.entity_cash || []).forEach(function(e) { ecMap[e.company_id] = e; });
+        var cashGroupIds = {
+          cashFoundation: [22],
+          cashXterio:     [1, 23, 5, 6, 7, 10, 17, 18, 21],
+          cashHoldings:   [2, 3, 4, 12, 13, 14, 11, 9, 19, 20, 28, 8],
+          cashOW:         [15, 16, 30, 31]
+        };
+        Object.keys(cashGroupIds).forEach(function(elId) {
+          var ids = cashGroupIds[elId];
+          var total = 0;
+          ids.forEach(function(id) { var e = ecMap[id]; if (e) total += (e.cash_fiat || 0) + (e.cash_crypto || 0); });
+          var el = document.getElementById(elId);
+          if (el) el.textContent = fmt(total);
         });
         // Level 2c: Total Group Cash + Crypto total (= total_cash_fiat + total_cash_crypto)
         var totalCashCrypto = (data.total_cash_fiat || 0) + (data.total_cash_crypto || 0);
