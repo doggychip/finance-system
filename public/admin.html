@@ -123,7 +123,7 @@
     </div>
     <!-- Foundation Manual Balances -->
     <div class="card">
-      <h2>Xterio Foundation — Manual Balances</h2>
+      <h2>Xterio Foundation — BS Line Items (Consolidated)</h2>
       <div id="foundationMsg" class="msg"></div>
       <div class="period-selector">
         <label style="font-size:12px;color:var(--text-dim)">Period:</label>
@@ -301,23 +301,81 @@
 
     init();
 
-    // ── Foundation Manual Balances ──
-    var foundationRows = [];
+    // ── Xterio Foundation — BS Lines ──
+    var FOUNDATION_BS_LINES = [
+      {code:'ASSETS',label:'ASSETS',indent:0,isSection:true},
+      {code:'CURRENT_ASSETS',label:'Current Assets',indent:1,isTotal:true,children:['BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES','A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS']},
+      {code:'BANK_CASH',label:'Bank and Cash Accounts',indent:1},
+      {code:'CASH',label:'Cash',indent:2},
+      {code:'DIGITAL_TOKEN',label:'Digital Token',indent:2},
+      {code:'RECEIVABLES',label:'Receivables',indent:1},
+      {code:'A_107010',label:'107010 GST Control',indent:2},
+      {code:'A_101000',label:'101000 Accounts Receivable',indent:2},
+      {code:'A_101010',label:'101010 Other Receivable',indent:2},
+      {code:'CURRENT_ASSETS_OTHER',label:'Current Assets (Other)',indent:1},
+      {code:'PREPAYMENTS',label:'Prepayments',indent:1},
+      {code:'FIXED_ASSETS',label:'Plus Fixed Assets',indent:1},
+      {code:'NON_CURRENT_ASSETS',label:'Plus Non-current Assets',indent:1},
+      {code:'A_200000',label:'200000 Investment',indent:2},
+      {code:'A_202000',label:'202000 Deposits',indent:2},
+      {code:'LIABILITIES',label:'LIABILITIES',indent:0,isSection:true},
+      {code:'CURRENT_LIABILITIES',label:'Current Liabilities',indent:1},
+      {code:'A_303010',label:'303010 Amount due to/from Holding',indent:2},
+      {code:'A_303011',label:'303011 Amount due to/from Holding W3',indent:2},
+      {code:'A_303020',label:'303020 Amount due to/from Libecciotech',indent:2},
+      {code:'A_303021',label:'303021 Amount due to/from Libecciotech W3',indent:2},
+      {code:'A_303031',label:'303031 Amount due to/from Xterio Fdn W3',indent:2},
+      {code:'A_303040',label:'303040 Amount due to/from Xterlabs',indent:2},
+      {code:'A_303041',label:'303041 Amount due to/from Xterlabs W3',indent:2},
+      {code:'A_303050',label:'303050 Amount due to/from Overworld',indent:2},
+      {code:'A_303051',label:'303051 Amount due to/from Overworld W3',indent:2},
+      {code:'A_303060',label:'303060 Amount due to/from Quantummind',indent:2},
+      {code:'A_303061',label:'303061 Amount due to/from PALIO W3',indent:2},
+      {code:'A_303070',label:'303070 Amount due to/from Shadowcay',indent:2},
+      {code:'A_303071',label:'303071 Amount due to/from Shadowcay W3',indent:2},
+      {code:'A_303080',label:'303080 Amount due to/from Gamephilos',indent:2},
+      {code:'A_303081',label:'303081 Amount due to/from Gamephilos W3',indent:2},
+      {code:'A_303090',label:'303090 Amount due to/from COS Games',indent:2},
+      {code:'A_303091',label:'303091 Amount due to/from COS Games W3',indent:2},
+      {code:'A_303100',label:'303100 Amount due to/from FunPlus',indent:2},
+      {code:'A_303110',label:'303110 Amount due to/from Privilege HK',indent:2},
+      {code:'A_303120',label:'303120 Amount due to/from collected on behalf of Other Entities',indent:2},
+      {code:'A_303150',label:'303150 Amount due to/from Libecciotech Station',indent:2},
+      {code:'A_303160',label:'303160 Amount due to/from Play Algorithm (BVI)',indent:2},
+      {code:'A_303170',label:'303170 Amount due to/from Rough House Games',indent:2},
+      {code:'A_303171',label:'303171 Amount due to/from Rough House Games W3',indent:2},
+      {code:'A_303180',label:'303180 Amount due to/from REACH LABS',indent:2},
+      {code:'A_303181',label:'303181 Amount due to/from REACH LABS W3',indent:2},
+      {code:'A_301000',label:'301000 Accrued Expenses',indent:2},
+      {code:'A_302010',label:'302010 Deferred Revenue',indent:2},
+      {code:'PAYABLES',label:'Payables',indent:1},
+      {code:'A_300000',label:'300000 Accounts Payable',indent:2},
+      {code:'A_300030',label:'300030 Trade Payables',indent:2},
+      {code:'NON_CURRENT_LIABILITIES',label:'Plus Non-current Liabilities',indent:1},
+      {code:'A_300040',label:'300040 Other Payables (non-trade)',indent:2},
+      {code:'A_300050',label:'300050 Other Payables - Fiat/Crypto',indent:2},
+      {code:'A_303030',label:'303030 Amount due to/from Xterio Fdn',indent:2},
+      {code:'EQUITY',label:'EQUITY',indent:0,isSection:true},
+      {code:'EQUITY_RETAINED',label:'Retained Earnings',indent:1},
+      {code:'A_RETAINED_EARNINGS',label:'Retained Earnings',indent:2},
+      {code:'A_SHARE_CAPITALS',label:'Share Capitals',indent:2},
+      {code:'A_CAPITAL_IN_WALLET',label:'Capital in Wallet',indent:2},
+      {code:'CURRENT_YEAR_PL',label:'Current Year Unallocated Earnings',indent:1},
+      {code:'LIAB_EQUITY',label:'LIABILITIES + EQUITY',indent:0,isSection:true}
+    ];
+
+    var foundationBSValues = {};
 
     async function loadFoundationPeriods() {
       try {
-        var data = await (await fetch('/api/dashboard/foundation-balances')).json();
+        var data = await (await fetch('/api/dashboard/manual-bs-lines?entity=Xterio%20Foundation')).json();
         var existingPeriods = (data.periods || []);
-        // Generate all months from earliest existing to current month
         var now = new Date();
         var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         var allPeriods = [];
-        // Find earliest: existingPeriods is desc, so last element is earliest
-        var earliest = existingPeriods.length ? existingPeriods[existingPeriods.length - 1] : currentPeriod;
-        var parts = earliest.split('-');
-        var cy = parseInt(parts[0]), cm = parseInt(parts[1]);
+        var startYear = 2025, startMonth = 5;
         var np = now.getFullYear() * 12 + now.getMonth() + 1;
-        var ep = cy * 12 + cm;
+        var ep = startYear * 12 + startMonth;
         for (var i = np; i >= ep; i--) {
           var y = Math.floor((i - 1) / 12);
           var m = ((i - 1) % 12) + 1;
@@ -328,11 +386,9 @@
           var hasData = existingPeriods.indexOf(p) >= 0;
           return '<option value="' + p + '" ' + (hasData ? '' : 'style="color:var(--text-dim)"') + '>' + p + (hasData ? '' : ' (no data)') + '</option>';
         }).join('');
-        // Default to current month
         sel.value = currentPeriod;
         loadFoundation();
       } catch(e) {
-        console.error(e);
         showMsg('foundationMsg', 'Failed to load periods: ' + e.message, 'error');
       }
     }
@@ -341,99 +397,132 @@
       var period = document.getElementById('foundationPeriod').value;
       if (!period) return;
       try {
-        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + period)).json();
-        foundationRows = data.rows;
-        if (!foundationRows.length) {
-          document.getElementById('foundationTable').innerHTML =
-            '<div style="padding:20px;color:var(--text-dim);text-align:center">' +
-            'No data for ' + period + '. ' +
-            '<button class="btn" onclick="copyFromPrevMonth(\'' + period + '\')" style="margin-left:8px">Copy from previous month</button>' +
-            '</div>';
-          document.getElementById('foundationTotal').textContent = '';
-        } else {
-          renderFoundationTable(foundationRows);
-        }
+        var data = await (await fetch('/api/dashboard/manual-bs-lines?entity=Xterio%20Foundation&period=' + period)).json();
+        foundationBSValues = data.lines || {};
+        renderFoundationTable(foundationBSValues);
       } catch(e) {
         showMsg('foundationMsg', 'Failed to load data', 'error');
       }
     }
 
-    function renderFoundationTable(rows) {
-      if (!rows.length) {
-        document.getElementById('foundationTable').innerHTML = '<p style="color:var(--text-dim)">No data for this period</p>';
-        return;
-      }
-      var cats = [...new Set(rows.map(function(r) { return r.category; }))];
-      var totalUSD = 0;
-      var html = '<table class="foundation-table"><thead><tr><th>Account Code</th><th>Account Name</th><th>CHF Amount</th><th>FX Rate (CHF/USD)</th><th>USD Amount</th></tr></thead><tbody>';
-      cats.forEach(function(cat) {
-        html += '<tr class="cat-header"><td colspan="5">' + cat + '</td></tr>';
-        rows.filter(function(r) { return r.category === cat; }).forEach(function(r) {
-          var usd = (r.amount_local * r.exchange_rate).toFixed(2);
-          totalUSD += r.amount_local * r.exchange_rate;
-          html += '<tr data-id="' + r.id + '">' +
-            '<td style="color:var(--text-dim)">' + r.account_code + '</td>' +
-            '<td>' + r.account_name + '</td>' +
-            '<td><input type="number" step="0.01" value="' + r.amount_local.toFixed(2) + '" onchange="recalcRow(this,' + r.id + ')" style="width:140px"></td>' +
-            '<td><input type="number" step="0.0001" value="' + r.exchange_rate.toFixed(4) + '" onchange="recalcRow(this,' + r.id + ')" style="width:90px"></td>' +
-            '<td id="usd_' + r.id + '" style="color:var(--text-dim)">' + fmt(parseFloat(usd)) + '</td>' +
-            '</tr>';
-        });
+    function renderFoundationTable(lineMap) {
+      var totalAssets = 0, totalLiab = 0, totalEquity = 0;
+      // Compute section totals from leaf values
+      FOUNDATION_BS_LINES.forEach(function(line) {
+        if (!line.isSection && !line.isTotal) {
+          var val = parseFloat(lineMap[line.code]) || 0;
+          if (['BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES','A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS','FIXED_ASSETS','NON_CURRENT_ASSETS','A_200000','A_202000'].indexOf(line.code) >= 0) totalAssets += val;
+          if (['A_303010','A_303011','A_303020','A_303021','A_303031','A_303040','A_303041','A_303050','A_303051','A_303060','A_303061','A_303070','A_303071','A_303080','A_303081','A_303090','A_303091','A_303100','A_303110','A_303120','A_303150','A_303160','A_303170','A_303171','A_303180','A_303181','A_301000','A_302010','PAYABLES','A_300000','A_300030','NON_CURRENT_LIABILITIES','A_300040','A_300050','A_303030'].indexOf(line.code) >= 0) totalLiab += val;
+          if (['EQUITY_RETAINED','A_RETAINED_EARNINGS','A_SHARE_CAPITALS','A_CAPITAL_IN_WALLET','CURRENT_YEAR_PL'].indexOf(line.code) >= 0) totalEquity += val;
+        }
       });
-      html += '<tr class="total-row"><td colspan="4">Total USD</td><td id="foundationTotalCell">' + fmt(totalUSD) + '</td></tr>';
+
+      var html = '<table class="foundation-table"><thead><tr><th style="width:220px">Line Item</th><th style="width:220px">USD Amount</th></tr></thead><tbody>';
+      FOUNDATION_BS_LINES.forEach(function(line) {
+        var val = parseFloat(lineMap[line.code]) || 0;
+        var indentPx = line.indent * 20;
+        var rowStyle = '';
+        var labelStyle = 'padding-left:' + indentPx + 'px';
+
+        if (line.isSection) {
+          // Major section header (ASSETS, LIABILITIES, EQUITY, LIAB+EQUITY)
+          var secVal = line.code === 'ASSETS' ? totalAssets : line.code === 'LIABILITIES' ? totalLiab : line.code === 'EQUITY' ? totalEquity : line.code === 'LIAB_EQUITY' ? totalLiab + totalEquity : 0;
+          rowStyle = 'background:var(--bg-secondary);font-weight:700;';
+          html += '<tr style="' + rowStyle + '">' +
+            '<td style="' + labelStyle + ';font-weight:700;letter-spacing:0.05em">' + line.label + '</td>' +
+            '<td style="color:var(--green);font-weight:700" id="sec_' + line.code + '">' + fmtBS(secVal) + '</td>' +
+            '</tr>';
+        } else if (line.isTotal) {
+          // Computed subtotal row
+          var computedVal = 0;
+          if (line.children) line.children.forEach(function(c) { computedVal += parseFloat(lineMap[c]) || 0; });
+          html += '<tr style="border-top:1px solid var(--border)">' +
+            '<td style="' + labelStyle + ';font-style:italic;color:var(--text-dim)">' + line.label + '</td>' +
+            '<td style="color:var(--text-dim)" id="tot_' + line.code + '">' + fmtBS(computedVal) + '</td>' +
+            '</tr>';
+        } else {
+          // Editable input row
+          html += '<tr>' +
+            '<td style="' + labelStyle + '">' + line.label + '</td>' +
+            '<td><input type="number" step="1" value="' + (val || '') + '" placeholder="0" data-code="' + line.code + '" oninput="recalcFoundationTotals()" style="width:180px;text-align:right"></td>' +
+            '</tr>';
+        }
+      });
       html += '</tbody></table>';
       document.getElementById('foundationTable').innerHTML = html;
-      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(totalUSD);
+      updateFoundationHeader();
     }
 
-    function fmt(n) {
+    function fmtBS(n) {
+      if (!n) return '-';
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
     }
 
-    function recalcRow(input, id) {
-      var row = foundationRows.find(function(r) { return r.id === id; });
-      if (!row) return;
-      var tr = input.closest('tr');
-      var chf = parseFloat(tr.querySelectorAll('input')[0].value) || 0;
-      var fx = parseFloat(tr.querySelectorAll('input')[1].value) || 1;
-      var usd = chf * fx;
-      document.getElementById('usd_' + id).textContent = fmt(usd);
-      // update total
+    function recalcFoundationTotals() {
+      var inputs = document.querySelectorAll('#foundationTable input[data-code]');
+      var vals = {};
+      inputs.forEach(function(inp) { vals[inp.dataset.code] = parseFloat(inp.value) || 0; });
+
+      // Recalculate section totals
+      var assetCodes = ['BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES','A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS','FIXED_ASSETS','NON_CURRENT_ASSETS','A_200000','A_202000'];
+      var liabCodes = ['A_303010','A_303011','A_303020','A_303021','A_303031','A_303040','A_303041','A_303050','A_303051','A_303060','A_303061','A_303070','A_303071','A_303080','A_303081','A_303090','A_303091','A_303100','A_303110','A_303120','A_303150','A_303160','A_303170','A_303171','A_303180','A_303181','A_301000','A_302010','A_300000','A_300030','A_300040','A_300050','A_303030'];
+      var equityCodes = ['A_RETAINED_EARNINGS','A_SHARE_CAPITALS','A_CAPITAL_IN_WALLET','CURRENT_YEAR_PL'];
+
+      var totalAssets = assetCodes.reduce(function(s,c) { return s + (vals[c] || 0); }, 0);
+      var totalLiab = liabCodes.reduce(function(s,c) { return s + (vals[c] || 0); }, 0);
+      var totalEquity = equityCodes.reduce(function(s,c) { return s + (vals[c] || 0); }, 0);
+
+      // Update section headers
+      var secAssets = document.getElementById('sec_ASSETS');
+      if (secAssets) secAssets.textContent = fmtBS(totalAssets);
+      var secLiab = document.getElementById('sec_LIABILITIES');
+      if (secLiab) secLiab.textContent = fmtBS(totalLiab);
+      var secEquity = document.getElementById('sec_EQUITY');
+      if (secEquity) secEquity.textContent = fmtBS(totalEquity);
+      var secLE = document.getElementById('sec_LIAB_EQUITY');
+      if (secLE) secLE.textContent = fmtBS(totalLiab + totalEquity);
+
+      // Update CURRENT_ASSETS total
+      var curAssetCodes = ['BANK_CASH','CASH','DIGITAL_TOKEN','RECEIVABLES','A_107010','A_101000','A_101010','CURRENT_ASSETS_OTHER','PREPAYMENTS'];
+      var curAssets = curAssetCodes.reduce(function(s,c) { return s + (vals[c] || 0); }, 0);
+      var totCA = document.getElementById('tot_CURRENT_ASSETS');
+      if (totCA) totCA.textContent = fmtBS(curAssets);
+
+      updateFoundationHeader();
+    }
+
+    function updateFoundationHeader() {
+      var inputs = document.querySelectorAll('#foundationTable input[data-code]');
       var total = 0;
-      foundationRows.forEach(function(r) {
-        var t = document.querySelector('tr[data-id="' + r.id + '"]');
-        if (!t) return;
-        var c = parseFloat(t.querySelectorAll('input')[0].value) || 0;
-        var f = parseFloat(t.querySelectorAll('input')[1].value) || 1;
-        total += c * f;
-      });
-      var tc = document.getElementById('foundationTotalCell');
-      if (tc) tc.textContent = fmt(total);
-      document.getElementById('foundationTotal').textContent = 'Total: ' + fmt(total);
+      inputs.forEach(function(inp) { total += parseFloat(inp.value) || 0; });
+      document.getElementById('foundationTotal').textContent = 'Total assets: ' + fmtBS(total);
     }
 
     async function saveFoundation() {
-      var saved = 0, failed = 0;
-      for (var r of foundationRows) {
-        var tr = document.querySelector('tr[data-id="' + r.id + '"]');
-        if (!tr) continue;
-        var chf = parseFloat(tr.querySelectorAll('input')[0].value);
-        var fx = parseFloat(tr.querySelectorAll('input')[1].value);
-        try {
-          var res = await fetch('/api/dashboard/foundation-balances/' + r.id, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount_local: chf, exchange_rate: fx })
-          });
-          if (res.ok) saved++; else failed++;
-        } catch(e) { failed++; }
+      var period = document.getElementById('foundationPeriod').value;
+      if (!period) return;
+      var inputs = document.querySelectorAll('#foundationTable input[data-code]');
+      var lines = {};
+      inputs.forEach(function(inp) {
+        var val = parseFloat(inp.value);
+        if (!isNaN(val)) lines[inp.dataset.code] = val;
+      });
+      try {
+        var res = await fetch('/api/dashboard/manual-bs-lines', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity: 'Xterio Foundation', period: period, lines: lines })
+        });
+        var json = await res.json();
+        if (res.ok) {
+          showMsg('foundationMsg', 'Saved ' + json.count + ' lines for ' + period, 'success');
+          loadFoundationPeriods();
+        } else {
+          showMsg('foundationMsg', 'Save failed: ' + (json.error || 'Unknown'), 'error');
+        }
+      } catch(e) {
+        showMsg('foundationMsg', 'Error: ' + e.message, 'error');
       }
-      if (failed === 0) {
-        showMsg('foundationMsg', saved + ' rows saved successfully', 'success');
-      } else {
-        showMsg('foundationMsg', saved + ' saved, ' + failed + ' failed', 'error');
-      }
-      loadFoundation();
     }
 
     function addNewPeriod() {
@@ -442,48 +531,6 @@
       var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
       sel.value = currentPeriod;
       loadFoundation();
-    }
-
-    async function copyFromPrevMonth(period) {
-      // Calculate previous month
-      var parts = period.split('-');
-      var y = parseInt(parts[0]), m = parseInt(parts[1]);
-      m--; if (m < 1) { m = 12; y--; }
-      var prevPeriod = y + '-' + String(m).padStart(2, '0');
-
-      try {
-        var data = await (await fetch('/api/dashboard/foundation-balances?period=' + prevPeriod)).json();
-        if (!data.rows.length) {
-          showMsg('foundationMsg', 'No data found for ' + prevPeriod + ' to copy from', 'error');
-          return;
-        }
-        // Post new rows for current period based on prev month
-        var newRows = data.rows.map(function(r) {
-          return {
-            account_code: r.account_code,
-            account_name: r.account_name,
-            category: r.category,
-            amount_local: r.amount_local,
-            currency: r.currency || 'CHF',
-            exchange_rate: r.exchange_rate
-          };
-        });
-        var res = await fetch('/api/dashboard/foundation-balances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ period: period, rows: newRows })
-        });
-        if (res.ok) {
-          showMsg('foundationMsg', 'Copied ' + newRows.length + ' rows from ' + prevPeriod + ' to ' + period, 'success');
-          await loadFoundationPeriods();
-          document.getElementById('foundationPeriod').value = period;
-          loadFoundation();
-        } else {
-          showMsg('foundationMsg', 'Failed to copy data', 'error');
-        }
-      } catch(e) {
-        showMsg('foundationMsg', 'Error: ' + e.message, 'error');
-      }
     }
 
     // ── Foundation IC Payable ──
