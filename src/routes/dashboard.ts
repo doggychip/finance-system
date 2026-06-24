@@ -1363,6 +1363,15 @@ router.get('/ow-closing', (req, res) => {
       else if (code === '301000' || code === '302010') { accrualExp += bal; }
       else if (code === '300040' || code === '300050') { thrackle += bal; }
     }
+    // Add Keystone Foundation cash from manual_balances (is_manual entity)
+    const ksRows = db.prepare(`
+      SELECT COALESCE(SUM(amount_local * exchange_rate), 0) as ks_cash
+      FROM manual_balances
+      WHERE entity = 'Keystone Foundation'
+        AND period = ?
+        AND (account_code = 'KEYSTONE_FIAT' OR account_code = 'KEYSTONE_USDC')
+    `).get(month) as any;
+    cash += (ksRows?.ks_cash || 0);
     const total = cash + orFromXterio + ar + noteReceivable + payables + accrualExp + thrackle;
     return { date: lastDay, cash, or_from_xterio: orFromXterio, ar, note_receivable: noteReceivable, payables, accrual_exp: accrualExp, thrackle_loan: thrackle, total };
   });
