@@ -753,19 +753,19 @@ router.get('/consolidated-bs', (req, res) => {
       if (group.is_subtotal) continue;
 
       if (group.is_manual) {
-        // Use manual_balances for Xterio Foundation, Keystone etc.
-        const manualRows = db.prepare(`
-          SELECT account_code, SUM(amount_usd) as total_usd
-          FROM manual_balances
-          WHERE entity = ? AND period = ? AND account_code NOT IN ('FOUNDATION_IC')
-          GROUP BY account_code
-        `).all(group.name, period) as { account_code: string; total_usd: number }[];
-        const manualTotal = manualRows.reduce((s: number, r: any) => s + (r.total_usd || 0), 0);
+        // Use manual_bs_lines for Xterio Foundation, Keystone etc. (per BS line)
+        const bsLineRows = db.prepare(`
+          SELECT line_code, amount_usd
+          FROM manual_bs_lines
+          WHERE entity = ? AND period = ?
+        `).all(group.name, period) as { line_code: string; amount_usd: number }[];
+        const bsLineMap: Record<string, number> = {};
+        for (const r of bsLineRows) bsLineMap[r.line_code] = r.amount_usd;
 
         const bals: Record<string, number> = {};
         for (const line of BS_LINES) {
           if (line.computed_from) continue;
-          bals[line.code] = line.code === 'BANK_CASH' ? manualTotal : 0;
+          bals[line.code] = bsLineMap[line.code] ?? 0;
         }
         for (const line of BS_LINES) {
           if (!line.computed_from) continue;
@@ -1118,6 +1118,42 @@ router.get('/bank-accounts', (req, res) => {
       res.json({ ok: true, entity, period, count: rows.length });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+
+  // ─── /manual-bs-lines GET ─────────────────────────────────────────────────
+  router.get('/manual-bs-lines', (req, res) => {
+    try {
+      const entity = (req.query.entity as string) || '';
+      const period = (req.query.period as string) || '';
+      if (!entity) return res.status(400).json({ error: 'entity required' }) as any;
+      let rows: any[];
+      if (period) {
+        rows = db.prepare('SELECT line_code, amount_usd FROM manual_bs_lines WHERE entity = ? AND period = ?').all(entity, period) as any[];
+      } else {
+        rows = db.prepare('SELECT line_code, amount_usd, period FROM manual_bs_lines WHERE entity = ? ORDER BY period DESC').all(entity) as any[];
+      }
+      const periods = [...new Set((db.prepare('SELECT DISTINCT period FROM manual_bs_lines WHERE entity = ? ORDER BY period DESC').all(entity) as any[]).map((r: any) => r.period))];
+      const lineMap: Record<string, number> = {};
+      for (const r of rows as any[]) lineMap[r.line_code] = r.amount_usd;
+      res.json({ lines: lineMap, periods });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ─── /manual-bs-lines POST (upsert) ───────────────────────────────────────
+  router.post('/manual-bs-lines', (req, res) => {
+    try {
+      const { entity, period, lines } = req.body as { entity: string; period: string; lines: Record<string, number> };
+      if (!entity || !period || !lines) return res.status(400).json({ error: 'entity, period and lines required' }) as any;
+      const upsert = db.prepare('INSERT INTO manual_bs_lines (entity, period, line_code, amount_usd, updated_at) VALUES (?, ?, ?, ?, datetime(\'now\')) ON CONFLICT(entity, period, line_code) DO UPDATE SET amount_usd = excluded.amount_usd, updated_at = excluded.updated_at');
+      const tx = db.transaction(() => {
+        for (const [code, amount] of Object.entries(lines)) {
+          upsert.run(entity, period, code, Number(amount) || 0);
+        }
+      });
+      tx();
+      res.json({ ok: true, entity, period, count: Object.keys(lines).length });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
 
   // List available balance snapshots
 // ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ /snapshots ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ
