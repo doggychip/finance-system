@@ -174,6 +174,33 @@
       <div id="waterfallTable" style="overflow-x:auto"><div class="loading">Loading...</div></div>
     </div>
 
+    <!-- Level 2b: Cash + Crypto per entity (below breakdown table) -->
+    <div class="hero-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;margin-bottom:24px">
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_foundation')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('foundation')">&#x2295;</button></div>
+        <div class="label">Xterio Foundation <span style="cursor:help;color:var(--text-dim)">&#x24D8;</span></div>
+        <div class="value" id="cashFoundation" style="font-size:24px;color:var(--green)">--</div>
+        <div class="sub">Cash + Crypto</div>
+      </div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_xterio')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('xterio')">&#x2295;</button></div>
+        <div class="label">Xterio ExclFoundation <span style="cursor:help;color:var(--text-dim)">&#x24D8;</span></div>
+        <div class="value" id="cashXterio" style="font-size:24px;color:var(--green)">--</div>
+        <div class="sub">Cash + Crypto</div>
+      </div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_holdings')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('holdings')">&#x2295;</button></div>
+        <div class="label">Lholding Total <span style="cursor:help;color:var(--text-dim)">&#x24D8;</span></div>
+        <div class="value" id="cashHoldings" style="font-size:24px;color:var(--green)">--</div>
+        <div class="sub">Cash + Crypto</div>
+      </div>
+      <div class="hero-card" style="position:relative">
+        <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_ow')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('ow')">&#x2295;</button></div>
+        <div class="label">OW &amp; Reach <span style="cursor:help;color:var(--text-dim)">&#x24D8;</span></div>
+        <div class="value" id="cashOW" style="font-size:24px;color:var(--green)">--</div>
+        <div class="sub">Cash + Crypto</div>
+      </div>
+    </div>
     <!-- Level 4: Cash Totals -->
     <div class="hero-grid" style="grid-template-columns:1fr 1fr">
       <div class="hero-card main" style="position:relative">
@@ -297,6 +324,19 @@
         fillWidget('heroHoldings', data.holdings_net_assets, data.holdings_net_assets_prior, 'CS+Palios+LHOLDINGS+PLAY ALGORITHM+QUANTUMMIND');
         fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'Excl. fixed assets');
 
+        // Level 2b: 4 Cash + Crypto cards (below breakdown table)
+        var cashCards = [
+          { id: 'cashFoundation', wfKey: 'foundation' },
+          { id: 'cashXterio',     wfKey: 'xterio' },
+          { id: 'cashHoldings',   wfKey: 'holdings' },
+          { id: 'cashOW',         wfKey: 'ow' }
+        ];
+        cashCards.forEach(function(c) {
+          var w = wf[c.wfKey] || {};
+          var val = (w.cash_fiat || 0) + (w.cash_crypto || 0);
+          var el = document.getElementById(c.id);
+          if (el) el.textContent = fmt(val);
+        });
         // Level 3: Per-function waterfall table
         var wf = data.waterfall || {};
         var funcs = ['foundation', 'xterio', 'holdings', 'ow'];
@@ -589,7 +629,11 @@
       ow: { title: 'OW (Overworld) Net Assets — 构成逻辑', formula: '<strong>OW + Reach + Rough house + Keystone</strong> 净资产，排除固定及长期资产', rows: [['包含实体','OVERWORLD, OVERWORLD W3（OW）；REACH LABS（Reach）；ROUGH HOUSE（Rough house）；Keystone Foundation（Keystone）'],['科目范围','仅含 asset_* 和 liability_* 科目；已排除 asset_fixed（固定资产）及科目代码 300040'],['公式','Σ(asset_cash + asset_receivable + asset_current + asset_prepayments) + Σ(liability_*)'],['CSV对照','下载明细直接对 Balance (USD) 列求和即得卡片数值']] },
       cash_fiat: { title: 'Total Cash (Fiat) — 构成逻辑', formula: '所有实体 <strong>asset_cash、非加密</strong>账户余额之和', rows: [['账户类型','account_type = asset_cash， asset_type != Crypto'],['科目代码','100xxx 银行账户'],['数据来源','Admin Export TB + Foundation manual_balances']] },
       cash_crypto: { title: 'Total Crypto — 构成逻辑', formula: '所有实体 <strong>asset_type = Crypto</strong> 账户余额之和', rows: [['账户类型','asset_type = Crypto，链上钉包/交易所'],['科目代码','10Wxxx 数字资产账户'],['负余额说明','锁定/抖押仓位，按 Odoo 同步时汇率折 USD']] }
-    };
+,
+      cash_foundation: { title: 'Xterio Foundation — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','Xterio Foundation（company 22，手动录入）'],['Cash (Fiat)','manual_bs_lines BANK_CASH / CASH 科目折 USD'],['Crypto','manual_bs_lines 加密资产科目折 USD'],['数据源','executive-summary API: waterfall.foundation.cash_fiat + cash_crypto']] },
+      cash_xterio: { title: 'Xterio ExclFoundation — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','LTECH / LTECH W3 / AOD / XLABS / XLAB W3 / PRIVILEGE HK'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.xterio.cash_fiat + cash_crypto']] },
+      cash_holdings: { title: 'Lholding Total — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','CS / Palios / LHOLDINGS / PLAY ALGORITHM / QUANTUMMIND'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.holdings.cash_fiat + cash_crypto']] },
+      cash_ow: { title: 'OW & Reach — Cash + Crypto', formula: '<strong>Cash + Crypto = cash_fiat + cash_crypto</strong>（来自 executive-summary waterfall）', rows: [['实体','OW / Reach / Rough house / Keystone'],['Cash (Fiat)','asset_cash 科目（100xxx）非加密币，折 USD'],['Crypto','asset_cash 科目（10Wxxx）加密资产，折 USD'],['数据源','executive-summary API: waterfall.ow.cash_fiat + cash_crypto']] }    };
     function showCardInfo(card) {
       var info = CARD_INFO[card]; if (!info) return;
       document.getElementById('cardModalTitle').textContent = info.title;
