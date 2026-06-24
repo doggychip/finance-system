@@ -387,9 +387,8 @@
           var el = document.getElementById(c.id);
           if (el) el.textContent = fmt(val);
         });
-        // Level 2c: Total Group Cash + Crypto total
-        var totalCashCrypto = 0;
-        cashCards.forEach(function(c) { var w = wf[c.wfKey] || {}; totalCashCrypto += (w.cash_fiat || 0) + (w.cash_crypto || 0); });
+        // Level 2c: Total Group Cash + Crypto total (= total_cash_fiat + total_cash_crypto)
+        var totalCashCrypto = (data.total_cash_fiat || 0) + (data.total_cash_crypto || 0);
         document.getElementById('heroTotalCashCrypto').textContent = fmt(totalCashCrypto);
         document.getElementById('heroTotalCashCryptoSub').textContent = 'As of ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
 
