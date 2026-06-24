@@ -307,6 +307,14 @@
       if (!document.getElementById('asOfDate').value) document.getElementById('asOfDate').value = lastDayOfPrevMonth();
       try {
         var data = await (await fetch('/api/dashboard/executive-summary' + getAsOfParam())).json();
+        // Fetch Keystone Foundation manual balances (is_manual entity, belongs to OW & Reach)
+        var ksAsOf = document.getElementById('asOfDate').value || lastDayOfPrevMonth();
+        var ksPeriod = ksAsOf.slice(0, 7);
+        var ksData = await (await fetch('/api/dashboard/manual-balances?entity=Keystone%20Foundation&period=' + ksPeriod)).json();
+        var ksRows = ksData.rows || [];
+        var ksCashCrypto = ksRows.filter(function(r){ return r.currency !== 'USD'; }).reduce(function(s,r){ return s + (r.amount_usd || 0); }, 0);
+        var ksCashFiat = ksRows.filter(function(r){ return r.currency === 'USD'; }).reduce(function(s,r){ return s + (r.amount_usd || 0); }, 0);
+
         if (!data.snapshot_date) return;
 
         // Helper to populate a Net Assets widget
@@ -389,21 +397,16 @@
           var total = 0;
           ids.forEach(function(id) { var e = ecMap[id]; if (e) total += (e.cash_fiat || 0) + (e.cash_crypto || 0); });
           var el = document.getElementById(elId);
-          if (el) el.textContent = fmt(total);
+          if (el) { var ksAdd = (elId === 'cashOW') ? (ksCashFiat + ksCashCrypto) : 0; el.textContent = fmt(total + ksAdd); }
         });
         // Level 2c: Total Group Cash + Crypto total (= total_cash_fiat + total_cash_crypto)
         var totalCashCrypto = (data.total_cash_fiat || 0) + (data.total_cash_crypto || 0);
-        document.getElementById('heroTotalCashCrypto').textContent = fmt(totalCashCrypto);
-        document.getElementById('heroTotalCashCryptoSub').textContent = 'As of ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
+        document.getElementById('heroTotalCashCrypto').textContent = fmt(totalCashCryptdocument.getElementById('heroTotalCashCrypto').textContent = fmt((data.total_cash_fiat || 0) + (data.total_cash_crypto || 0) + ksCashFiat + ksCashCrypto); ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
 
         // Level 4: Cash Fiat & Crypto totals
         document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
-        document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | All entities incl. Foundation';
-        document.getElementById('heroCashCrypto').textContent = fmt(data.total_cash_crypto);
-        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snapshot_date + ' | All entities';
-
-        // Cash trend chart
-        if (data.cash_trend && data.cash_trend.length > 0) {
+        document.getElementById('heroCashFiatSub').textContent = 'As odocument.getElementById('heroCashFiat').textContent = fmt((data.total_cash_fiat || 0) + ksCashFiat);getElementById('heroCashCrypto').textContent = fmt(data.total_cash_crypto);
+        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snadocument.getElementById('heroCashCrypto').textContent = fmt((data.total_cash_crypto || 0) + ksCashCrypto);rend && data.cash_trend.length > 0) {
           var ctx = document.getElementById('trendChart').getContext('2d');
           if (charts.trend) charts.trend.destroy();
           charts.trend = new Chart(ctx, {
