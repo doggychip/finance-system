@@ -311,6 +311,20 @@
       var totalFiat = execData.total_cash_fiat || 0;
       var totalCrypto = execData.total_cash_crypto || 0;
       var grandTotal = totalFiat + totalCrypto;
+      // Add Keystone Foundation from manual_balances (not in executive-summary)
+      var ksFiatCash = 0, ksCryptoCash = 0;
+      try {
+        var ksPeriodCash = (execData.snapshot_date || getCashAsOfParam().slice(1)).slice(0, 7);
+        var ksRespCash = await fetch('/api/dashboard/manual-balances?entity=' + encodeURIComponent('Keystone Foundation') + '&period=' + ksPeriodCash);
+        var ksDataCash = await ksRespCash.json();
+        (ksDataCash.rows || []).forEach(function(r) {
+          var amt = (r.amount_local || 0) * (r.exchange_rate || 1);
+          if (r.account_code === 'KEYSTONE_FIAT') ksFiatCash += amt;
+          else if (r.account_code === 'KEYSTONE_USDC') ksCryptoCash += amt;
+          else ksCryptoCash += amt;
+        });
+      } catch(e) {}
+      grandTotal += ksFiatCash + ksCryptoCash;
 
       // Foundation total for the detail table rows (store globally)
       var wfFoundation = (execData.waterfall || {}).foundation || {};
@@ -333,7 +347,7 @@
       var breakdownParts =
         'Xterio: ' + fmtShort((wf.xterio?.cash_fiat||0)+(wf.xterio?.cash_crypto||0)) +
         ' | Holdings: ' + fmtShort((wf.holdings?.cash_fiat||0)+(wf.holdings?.cash_crypto||0)) +
-        ' | OW: ' + fmtShort((wf.ow?.cash_fiat||0)+(wf.ow?.cash_crypto||0)) +
+        ' | OW: ' + fmtShort((wf.ow?.cash_fiat||0)+(wf.ow?.cash_crypto||0)+ksFiatCash+ksCryptoCash) +
         ' | Foundation: ' + fmtShort(foundationTotal);
       breakdownParts += ' | ' + (data.snapshot_date || '');
       document.getElementById('heroSub').textContent = breakdownParts;
