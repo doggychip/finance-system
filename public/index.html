@@ -411,12 +411,18 @@
         });
         // Level 2c: Total Group Cash + Crypto total (= total_cash_fiat + total_cash_crypto)
         var totalCashCrypto = (data.total_cash_fiat || 0) + (data.total_cash_crypto || 0);
-        document.getElementById('heroTotalCashCrypto').textContent = fmt(totalCashCryptdocument.getElementById('heroTotalCashCrypto').textContent = fmt((data.total_cash_fiat || 0) + (data.total_cash_crypto || 0) + ksCashFiat + ksCashCrypto); ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
+        document.getElementById('heroTotalCashCrypto').textContent = fmt((data.total_cash_fiat || 0) + (data.total_cash_crypto || 0) + ksCashFiat + ksCashCrypto);
+        document.getElementById('heroTotalCashCryptoSub').textContent = 'As of ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
 
         // Level 4: Cash Fiat & Crypto totals
         document.getElementById('heroCashFiat').textContent = fmt(data.total_cash_fiat);
-        document.getElementById('heroCashFiatSub').textContent = 'As odocument.getElementById('heroCashFiat').textContent = fmt((data.total_cash_fiat || 0) + ksCashFiat);getElementById('heroCashCrypto').textContent = fmt(data.total_cash_crypto);
-        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snadocument.getElementById('heroCashCrypto').textContent = fmt((data.total_cash_crypto || 0) + ksCashCrypto);rend && data.cash_trend.length > 0) {
+        document.getElementById('heroCashFiat').textContent = fmt((data.total_cash_fiat || 0) + ksCashFiat);
+        document.getElementById('heroCashFiatSub').textContent = 'As of ' + data.snapshot_date + ' | All entities incl. Foundation';
+        document.getElementById('heroCashCrypto').textContent = fmt((data.total_cash_crypto || 0) + ksCashCrypto);
+        document.getElementById('heroCashCryptoSub').textContent = 'As of ' + data.snapshot_date + ' | All entities';
+
+        // Cash trend chart
+        if (data.cash_trend && data.cash_trend.length > 0) {
           var ctx = document.getElementById('trendChart').getContext('2d');
           if (charts.trend) charts.trend.destroy();
           charts.trend = new Chart(ctx, {
