@@ -1268,22 +1268,48 @@ router.get('/executive-summary', (req, res) => {
     const xC = getCash(XTERIO_IDS, asOfDate), oC = getCash(OW_IDS, asOfDate);
     const hC = getCash(HOLDINGS_IDS, asOfDate);
     const tbTotals = (db.prepare(`SELECT COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period=? AND account_type='asset_cash'`).get(ksPeriod) as any)||{fi:0,cr:0}; const fnPeriod = (db.prepare("SELECT period FROM manual_balances WHERE entity='Xterio Foundation' AND period<=? ORDER BY period DESC LIMIT 1").get(ksPeriod) as any)?.period; const fnCash = fnPeriod ? ((db.prepare("SELECT COALESCE(ROUND(SUM(amount_local*exchange_rate),2),0) as t FROM manual_balances WHERE entity='Xterio Foundation' AND period=? AND account_code NOT IN ('FOUNDATION_IC','FOUNDATION_NET')").get(fnPeriod) as any)||{t:0}).t : 0; const total_cash_fiat = tbTotals.fi + fnCash, total_cash_crypto = tbTotals.cr;
-    // Safe defaults — real implementations were lost in commit 6de85ae9 and need to be re-added.
+    // ── TB-based aggregates (getCash/getNetAssets above already use TB/manual data) ──
     const total_cash_all = total_cash_fiat + total_cash_crypto;
-    const waterfall: any = { foundation: {}, xterio: {}, holdings: {}, ow: {} };
-    const monthly_burn = 0;
-    const runway_months: number | null = null;
-    const entity_cash: any[] = [];
-    const cash_trend: any[] = [];
+    // waterfall: group-level cash+net_assets matching ⓘ card logic
+    const waterfall = [
+      { label: 'Foundation', key: 'foundation', bold: false, cash_fiat: fn.cash_usd, cash_crypto: 0, net_assets: fn.net_assets },
+      { label: 'Xterio', key: 'xterio', bold: false, cash_fiat: xC.fiat, cash_crypto: xC.crypto, net_assets: xNA },
+      { label: 'Holdings', key: 'holdings', bold: false, cash_fiat: hC.fiat, cash_crypto: hC.crypto, net_assets: hNA },
+      { label: 'OW', key: 'ow', bold: false, cash_fiat: oC.fiat, cash_crypto: oC.crypto, net_assets: oNA + keystoneNA },
+      { label: 'Total', key: 'total', bold: true, cash_fiat: total_cash_fiat, cash_crypto: total_cash_crypto, net_assets: xNA + fn.net_assets + hNA + oNA + keystoneNA },
+    ];
+    let monthly_burn = 0;
+    const runway_months = monthly_burn > 0 ? total_cash_all / monthly_burn : null;
+    let cash_trend: any[] = [];
+    // entity_cash: per-company TB cash from tb_snapshots (100%=fiat, 10W%=crypto)
+    const tbPeriod = asOfDate.slice(0, 7);
+    let entity_cash: any[] = [{ company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
+    if (ALL_IDS.length > 0) {
+      const ePh = ALL_IDS.map(() => '?').join(',');
+      const eRows = db.prepare(`SELECT company_id, company_name, COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period = ? AND company_id IN (${ePh}) GROUP BY company_id, company_name ORDER BY company_name`).all(tbPeriod, ...ALL_IDS) as any[];
+      entity_cash = [...eRows.map((r: any) => ({ company_id: r.company_id, company_name: r.company_name, cash_fiat: r.fi, cash_crypto: r.cr })), { company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
+    }
     let alerts: any[] = [], ic_imbalances: any[] = [];
     if (ALL_IDS.length > 0) {
       const aPh = ALL_IDS.map(() => '?').join(',');
       const aRows = db.prepare(`SELECT je.company_name, a.code, a.name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${aPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id, a.code HAVING balance<-0.01 ORDER BY balance`).all(asOfDate, ...ALL_IDS) as any[];
-      alerts = aRows.map(r => ({ company_name: r.company_name, account_code: r.code, account_name: r.name, balance: r.balance }));
-
+      alerts = aRows.map((r: any) => ({ company_name: r.company_name, account_code: r.code, account_name: r.name, balance: r.balance }));
       const icPh = ALL_IDS.map(() => '?').join(',');
       const icRows = db.prepare(`SELECT je.company_name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as ic_balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${icPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.code LIKE '303%' GROUP BY je.company_id, je.company_name HAVING ABS(ic_balance)>100 ORDER BY ABS(ic_balance) DESC`).all(asOfDate, ...ALL_IDS) as any[];
-      ic_imbalances = icRows.map(r => ({ company_name: r.company_name, ic_balance: r.ic_balance }));
+      ic_imbalances = icRows.map((r: any) => ({ company_name: r.company_name, ic_balance: r.ic_balance }));
+    }
+      const ePh = ALL_IDS.map(() => '?').join(',');
+      const eRows = db.prepare(`SELECT company_id, company_name, COALESCE(SUM(CASE WHEN account_code LIKE '100%' THEN balance ELSE 0 END),0) as fi, COALESCE(SUM(CASE WHEN account_code LIKE '10W%' THEN balance ELSE 0 END),0) as cr FROM tb_snapshots WHERE period = ? AND company_id IN (${ePh}) GROUP BY company_id, company_name ORDER BY company_name`).all(tbPeriod, ...ALL_IDS) as any[];
+      entity_cash = [...eRows.map((r: any) => ({ company_id: r.company_id, company_name: r.company_name, cash_fiat: r.fi, cash_crypto: r.cr })), { company_id: 22, company_name: 'Xterio Foundation', cash_fiat: fn.cash_usd, cash_crypto: 0 }];
+    }
+    let alerts: any[] = [], ic_imbalances: any[] = [];
+    if (ALL_IDS.length > 0) {
+      const aPh = ALL_IDS.map(() => '?').join(',');
+      const aRows = db.prepare(`SELECT je.company_name, a.code, a.name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${aPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.odoo_type='asset_cash' GROUP BY je.company_id, a.code HAVING balance<-0.01 ORDER BY balance`).all(asOfDate, ...ALL_IDS) as any[];
+      alerts = aRows.map((r: any) => ({ company_name: r.company_name, account_code: r.code, account_name: r.name, balance: r.balance }));
+      const icPh = ALL_IDS.map(() => '?').join(',');
+      const icRows = db.prepare(`SELECT je.company_name, COALESCE(SUM(li.debit),0)-COALESCE(SUM(li.credit),0) as ic_balance FROM line_items li INNER JOIN journal_entries je ON je.id=li.journal_entry_id AND je.status='posted' AND je.date<=? AND je.company_id IN (${icPh}) INNER JOIN accounts a ON a.id=li.account_id WHERE a.code LIKE '303%' GROUP BY je.company_id, je.company_name HAVING ABS(ic_balance)>100 ORDER BY ABS(ic_balance) DESC`).all(asOfDate, ...ALL_IDS) as any[];
+      ic_imbalances = icRows.map((r: any) => ({ company_name: r.company_name, ic_balance: r.ic_balance }));
     }
     res.json({ snapshot_date: asOfDate, _v: 2, prior_date: priorDate, xterio_net_assets: xNA, xterio_net_assets_prior: xNAp, foundation_net_assets: fn.net_assets, foundation_net_assets_prior: fp.net_assets, holdings_net_assets: hNA, holdings_net_assets_prior: hNAp, ow_net_assets: oNA + keystoneNA, ow_net_assets_prior: oNAp + keystoneNAp, total_group_net_assets: xNA + fn.net_assets + hNA + oNA + keystoneNA, waterfall, total_cash_fiat, total_cash_crypto, total_cash_all, non_ow_cash: xC.fiat + xC.crypto + hC.fiat + hC.crypto + fn.cash_usd, ow_cash: oC.fiat + oC.crypto, monthly_burn, runway_months, entity_cash, cash_trend, alerts, ic_imbalances });
   } catch (err: any) {
