@@ -650,6 +650,11 @@
         // Level 2c: Total Group Cash + Crypto total (= total_cash_fiat + total_cash_crypto)
         var totalCashCrypto = (data.total_cash_fiat || 0) + (data.total_cash_crypto || 0);
         document.getElementById('heroTotalCashCrypto').textContent = fmt((data.total_cash_fiat || 0) + (data.total_cash_crypto || 0) + ksCashFiat + ksCashCrypto);
+        // Apply XTR subtraction to heroTotalCashCrypto if XTER block already resolved
+        if (window._xterWfPending && window._xterWfPending.tot > 0) {
+          var _ccEl = document.getElementById('heroTotalCashCrypto');
+          if (_ccEl) { var _ccV = parseFloat(_ccEl.textContent.replace(/[$,]/g,'')) || 0; _ccEl.textContent = fmt(_ccV - window._xterWfPending.tot); }
+        }
         document.getElementById('heroTotalCashCryptoSub').textContent = 'As of ' + _displayDate + ' | Xterio Foundation + Xterio ExclFoundation + Lholding Total + OW & Reach';
 
         // Level 4: Cash Fiat & Crypto totals
