@@ -156,6 +156,7 @@
       <div class="label">Total Cash&Crypto (All Entities)</div>
       <div class="total" id="heroTotal">--</div>
       <div class="sub" id="heroSub">Loading...</div>
+      <div class="sub" id="heroXtrSub" style="font-size:11px;color:var(--text-dim);margin-top:2px"></div>
     </div>
 
     <!-- Stats -->
@@ -351,6 +352,55 @@
         ' | Foundation: ' + fmtShort(foundationTotal);
       breakdownParts += ' | ' + (data.snapshot_date || '');
       document.getElementById('heroSub').textContent = breakdownParts;
+      // XTER exclusion: subtract XTER from hero total and show annotation
+      (function() {
+        var asOf = execData.snapshot_date || '';
+        var asOfMonth = asOf.slice(0, 7);
+        Promise.all([
+          fetch('/api/dashboard/card-detail-csv?card=xterio&as_of_date=' + encodeURIComponent(asOf)).then(function(r){ return r.text(); }),
+          fetch('/api/dashboard/card-detail-csv?card=holdings&as_of_date=' + encodeURIComponent(asOf)).then(function(r){ return r.text(); })
+        ]).then(function(csvs) {
+          function parseXterCash(csvText) {
+            var lines = csvText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+            if (!lines.length) return 0;
+            var hdr = lines[0].split(',').map(function(h){ return h.replace(/"/g,'').trim(); });
+            var codeIdx = hdr.indexOf('Account Code');
+            var currIdx = hdr.indexOf('Currency');
+            var balIdx  = hdr.indexOf('Balance USD');
+            var snapIdx = hdr.indexOf('Snapshot Date');
+            var total = 0;
+            lines.slice(1).filter(function(l){ return l.trim(); }).forEach(function(l) {
+              var v = l.match(/(".*?"|[^,]+)/g) || [];
+              var code = (v[codeIdx]||'').replace(/"/g,'').trim();
+              var curr = (v[currIdx]||'').replace(/"/g,'').trim().toUpperCase();
+              var bal  = parseFloat((v[balIdx]||'0').replace(/"/g,''));
+              var snap = (v[snapIdx]||'').replace(/"/g,'').trim();
+              if (code.indexOf('10W') === 0 && curr === 'XTR' && snap === asOf) { total += bal; }
+            });
+            return total;
+          }
+          var xeUsd = parseXterCash(csvs[0]);
+          var lhUsd = parseXterCash(csvs[1]);
+          var totalXter = xeUsd + lhUsd;
+          if (totalXter <= 0) return;
+          var heroEl2 = document.getElementById('heroTotal');
+          if (heroEl2) {
+            var cur = parseFloat(heroEl2.textContent.replace(/[$,]/g,'')) || 0;
+            heroEl2.textContent = '$' + (cur - totalXter).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+          }
+          fetch('/api/export/journal?month=' + encodeURIComponent(asOfMonth)).then(function(r){ return r.text(); }).then(function(csv) {
+            var xtrRate = 0;
+            var jLines = csv.split('\n');
+            for (var j = 0; j < jLines.length; j++) {
+              var m = jLines[j].match(/1 USD = ([\d.]+) XTR/);
+              if (m) { xtrRate = parseFloat(m[1]); break; }
+            }
+            function xtrTok(usd) { return xtrRate ? Math.round(usd * xtrRate).toLocaleString() : Math.round(usd).toLocaleString(); }
+            var subEl = document.getElementById('heroXtrSub');
+            if (subEl) subEl.textContent = 'excl. XTR: ' + xtrTok(totalXter) + ' tokens / $' + Math.round(totalXter).toLocaleString();
+          });
+        });
+      })();
 
       var totalAccountCount = allAccs.length;
       var positiveCount = allAccs.filter(function(a) { return a.balance > 0; }).length;
