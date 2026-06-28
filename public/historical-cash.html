@@ -241,7 +241,7 @@
             DATA.kpis.current_date = latestRow.snapshot_date;
             const prevRow = DATA.weekly[DATA.weekly.length-2];
             DATA.kpis.wow_change = prevRow ? latestRow.grand_total - prevRow.grand_total : DATA.kpis.wow_change;
-            DATA.kpis.from_peak = latestRow.grand_total - DATA.kpis.peak_total;
+            DATA.kpis.from_peak = latestRow.grand_total - DATA.kpis.peak_total; DATA.monthly_bs=DATA.weekly.map(r=>({month_end:r.snapshot_date,total_closing:r.grand_total,platform_cash:r.platform_total,lholding_cash:r.lholding_total,overworld_cash:r.overworld_total})); DATA.pl.monthly=DATA.weekly.map((r,i,a)=>({month_start:r.snapshot_date.substring(0,7)+'-01',net_profit:i>0?r.grand_total-a[i-1].grand_total:0}));
           }
         } catch(eAug) { console.warn('Failed to load TB snapshot data:', eAug); }
         renderKPIs();
