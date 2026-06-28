@@ -134,6 +134,7 @@
       <div class="label" style="font-size:14px">Total Group Net Assets</div>
       <div class="value" id="heroTotalNA" style="font-size:48px">--</div>
       <div class="sub" id="heroTotalNASub" style="font-size:12px">Loading...</div>
+      <div class="sub" id="heroTotalNAXtrSub" style="font-size:10px;color:var(--text-dim)"></div>
     </div>
 
     <!-- Level 2: 4 Function Net Assets -->
@@ -144,6 +145,7 @@
         <div class="value" id="heroFoundation" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroFoundationChange"></div>
         <div class="sub" id="heroFoundationSub"></div>
+        <div class="sub" id="heroFoundationXtrSub" style="font-size:10px;color:var(--text-dim)"></div>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('xterio')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('xterio')">⊕</button></div>
@@ -151,6 +153,7 @@
         <div class="value" id="heroXterio" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroXterioChange"></div>
         <div class="sub" id="heroXterioSub"></div>
+        <div class="sub" id="heroXterioXtrSub" style="font-size:10px;color:var(--text-dim)"></div>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('holdings')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('holdings')">⊕</button></div>
@@ -158,6 +161,7 @@
         <div class="value" id="heroHoldings" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroHoldingsChange"></div>
         <div class="sub" id="heroHoldingsSub"></div>
+        <div class="sub" id="heroHoldingsXtrSub" style="font-size:10px;color:var(--text-dim)"></div>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="构成逻辑" onclick="showCardInfo('ow')">ⓘ</button><button class="card-btn dl-btn" title="下载CSV明细" onclick="downloadCardDetail('ow')">⊕</button></div>
@@ -165,6 +169,7 @@
         <div class="value" id="heroOWClosing" style="font-size:24px;color:var(--green)">--</div>
         <div class="change" id="heroOWClosingChange"></div>
         <div class="sub" id="heroOWClosingSub"></div>
+        <div class="sub" id="heroOWClosingXtrSub" style="font-size:10px;color:var(--text-dim)"></div>
       </div>
     </div>
 
@@ -418,6 +423,19 @@
             var subHL = document.getElementById('cashHoldingsSub');
             if (subHL && lhXter.usd > 0) {
               subHL.textContent = 'Cash + Crypto (excl. XTER ' + fmtN(lhXter.qty) + ' tokens / $' + fmtN(lhXter.usd) + ')';
+            }
+            // Update Net Assets XtrSub annotations
+            var subTotNA = document.getElementById('heroTotalNAXtrSub');
+            if (subTotNA && totalXter > 0) {
+              subTotNA.textContent = 'excl. XTR: ' + fmtN(totalXter) + ' tokens / $' + fmtN(totalXter);
+            }
+            var subXtNA = document.getElementById('heroXterioXtrSub');
+            if (subXtNA && xeXter.usd > 0) {
+              subXtNA.textContent = 'excl. XTR: ' + fmtN(xeXter.qty) + ' tokens / $' + fmtN(xeXter.usd);
+            }
+            var subHlNA = document.getElementById('heroHoldingsXtrSub');
+            if (subHlNA && lhXter.usd > 0) {
+              subHlNA.textContent = 'excl. XTR: ' + fmtN(lhXter.qty) + ' tokens / $' + fmtN(lhXter.usd);
             }
           // Update waterfall table cells for Net Assets, Cash+Crypto, Crypto rows
             function wfUpdCell(rowKey, colIdx, delta) {
