@@ -492,15 +492,23 @@
             cash_crypto: getV('DIGITAL_TOKEN', COL.holdings)
           };
           wfData.ow = {
-            net_assets: data.ow_net_assets || 0,
+            net_assets: (data.ow_net_assets || 0) + getV('A_202000', COL.ow),
             adj_300040: getV('A_300040', COL.ow),
             receivable: getV('RECEIVABLES', COL.ow),
             payable: getV('PAYABLES', COL.ow),
             intercompany: ic.ow,
-            deposit: getV('A_202000', COL.ow),
+            deposit: -getV('A_202000', COL.ow),
             cash_fiat: getV('CASH', COL.ow),
             cash_crypto: getV('DIGITAL_TOKEN', COL.ow)
           };
+          // Add OW Deposits (202000) back to hero cards (backend excludes asset_non_current from ow_net_assets)
+          var owDepAmt = getV('A_202000', COL.ow);
+          if (owDepAmt) {
+            var owHeroEl = document.getElementById('heroOWClosing');
+            if (owHeroEl) owHeroEl.textContent = fmt((data.ow_net_assets || 0) + owDepAmt);
+            var totNAEl = document.getElementById('heroTotalNA');
+            if (totNAEl) { var c = parseFloat(totNAEl.textContent.replace(/[$,]/g,'')||0); totNAEl.textContent = fmt(c + owDepAmt); }
+          }
         }
 
         // Build TB cash map (from entity_cash) to override cash rows
