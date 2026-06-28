@@ -202,15 +202,15 @@
 
     async function loadData() {
       try {
-        const res = await fetch('/api/historical-cash/summary');
-        DATA = await res.json();
-        // Augment weekly data with newer monthly snapshots
+        const tbSnapsResp = await fetch('/api/dashboard/snapshots');
+        const tbSnaps = await tbSnapsResp.json();
+        tbSnaps.sort(function(a,b){return a.snapshot_date<b.snapshot_date?-1:1;}); DATA={weekly:[],monthly_bs:[],pl:{monthly:[]},deposits:{},kpis:{current_total:0,current_date:null,peak_total:0,wow_change:0,from_peak:0,fiat_total:0,crypto_total:0}};
         try {
-          const lastDate = DATA.weekly.length ? DATA.weekly[DATA.weekly.length-1].snapshot_date : '0000-00-00';
-          const snapsResp = await fetch('/api/dashboard/snapshots');
-          const snaps = await snapsResp.json();
-          const newSnaps = Array.from(snaps).filter(function(s) { return s.snapshot_date > lastDate; });
-          newSnaps.sort(function(a,b) { return a.snapshot_date < b.snapshot_date ? -1 : 1; });
+          // All TB snapshots loaded above
+          const snaps = tbSnaps; // use all TB snapshots
+          // snaps already set above
+          const newSnaps = snaps; // use all TB snapshots
+          // already sorted by tbSnaps.sort above
           for (const snap of newSnaps) {
             const esResp = await fetch('/api/dashboard/executive-summary?as_of_date=' + snap.snapshot_date);
             const es = await esResp.json();
@@ -243,7 +243,7 @@
             DATA.kpis.wow_change = prevRow ? latestRow.grand_total - prevRow.grand_total : DATA.kpis.wow_change;
             DATA.kpis.from_peak = latestRow.grand_total - DATA.kpis.peak_total;
           }
-        } catch(eAug) { console.warn('Failed to augment historical data:', eAug); }
+        } catch(eAug) { console.warn('Failed to load TB snapshot data:', eAug); }
         renderKPIs();
         renderTimeline();
         renderBS();
