@@ -186,13 +186,13 @@
         <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_xterio')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('xterio')">&#x2295;</button></div>
         <div class="label">Xterio ExclFoundation <span style="cursor:help;color:var(--text-dim)">&#x24D8;</span></div>
         <div class="value" id="cashXterio" style="font-size:24px;color:var(--green)">--</div>
-        <div class="sub">Cash + Crypto</div>
+        <div class="sub" id="cashXterioSub">Cash + Crypto</div>>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_holdings')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('holdings')">&#x2295;</button></div>
         <div class="label">Lholding Total <span style="cursor:help;color:var(--text-dim)">&#x24D8;</span></div>
         <div class="value" id="cashHoldings" style="font-size:24px;color:var(--green)">--</div>
-        <div class="sub">Cash + Crypto</div>
+        <div class="sub" id="cashHoldingsSub">Cash + Crypto</div>>
       </div>
       <div class="hero-card" style="position:relative">
         <div class="card-actions"><button class="card-btn info-btn" title="Cash+Crypto 构成" onclick="showCardInfo('cash_ow')">&#x24D8;</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('ow')">&#x2295;</button></div>
@@ -338,7 +338,90 @@
         fillWidget('heroFoundation', data.foundation_net_assets, data.foundation_net_assets_prior, 'Manual entry');
         fillWidget('heroXterio', data.xterio_net_assets, data.xterio_net_assets_prior, 'LTECH+LTECH W3+AOD+XLABS+XLAB W3+PRIVILEGE HK');
         fillWidget('heroHoldings', data.holdings_net_assets, data.holdings_net_assets_prior, 'CS+Palios+LHOLDINGS+PLAY ALGORITHM+QUANTUMMIND');
-        fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'Excl. fixed assets');
+        fillWidget('heroOWClosing', data.ow_net_assets, data.ow_net_assets_prior, 'Excl. fixed assets'
+        // === XTER Token Exclusion Block ===
+        // Remove XTER token (account code starts with '10W', currency='XTR')
+        // from 8 card values and add annotation to Cash+Crypto subtitles.
+        (function() {
+          function parseXterUSD(csvText, asOf) {
+            var lines = csvText.split('\n');
+            var hdr = lines[0].split(',').map(function(h){ return h.replace(/"/g,'').trim(); });
+            var codeIdx = hdr.indexOf('Account Code');
+            var currIdx = hdr.indexOf('Currency');
+            var balIdx  = hdr.indexOf('Balance USD');
+            var snapIdx = hdr.indexOf('Snapshot Date');
+            var total = 0, qty = 0;
+            lines.slice(1).filter(function(l){ return l.trim(); }).forEach(function(l) {
+              var v = l.match(/(".*?"|[^,]+)/g) || [];
+              var code = (v[codeIdx]||'').replace(/"/g,'').trim();
+              var curr = (v[currIdx]||'').replace(/"/g,'').trim().toUpperCase();
+              var bal  = parseFloat((v[balIdx]||'0').replace(/"/g,''));
+              var snap = (v[snapIdx]||'').replace(/"/g,'').trim();
+              if (code.indexOf('10W') === 0 && curr === 'XTR' && snap === asOf) {
+                total += bal; qty += bal;
+              }
+            });
+            return { usd: total, qty: qty };
+          }
+          var asOf = (document.getElementById('asOfDate') || {}).value || lastDayOfPrevMonth();
+          Promise.all([
+            fetch('/api/dashboard/card-detail-csv?card=xterio&as_of_date=' + encodeURIComponent(asOf)).then(function(r){ return r.text(); }),
+            fetch('/api/dashboard/card-detail-csv?card=holdings&as_of_date=' + encodeURIComponent(asOf)).then(function(r){ return r.text(); })
+          ]).then(function(csvs) {
+            var xeXter = parseXterUSD(csvs[0], asOf);
+            var lhXter = parseXterUSD(csvs[1], asOf);
+            var totalXter = xeXter.usd + lhXter.usd;
+            function fmtN(n){ return Math.round(n).toLocaleString(); }
+            // Update heroXterio (Net Assets card - XterioExcl)
+            var heroXtEl = document.getElementById('heroXterio');
+            if (heroXtEl && xeXter.usd > 0) {
+              var c = parseFloat(heroXtEl.textContent.replace(/[$,]/g,'')) || 0;
+              heroXtEl.textContent = fmt(c - xeXter.usd);
+            }
+            // Update heroHoldings (Net Assets card - Lholding)
+            var heroHlEl = document.getElementById('heroHoldings');
+            if (heroHlEl && lhXter.usd > 0) {
+              var c = parseFloat(heroHlEl.textContent.replace(/[$,]/g,'')) || 0;
+              heroHlEl.textContent = fmt(c - lhXter.usd);
+            }
+            // Update heroTotalNA (Total Net Assets)
+            var heroTotEl = document.getElementById('heroTotalNA');
+            if (heroTotEl && totalXter > 0) {
+              var c = parseFloat(heroTotEl.textContent.replace(/[$,]/g,'')) || 0;
+              heroTotEl.textContent = fmt(c - totalXter);
+            }
+            // Update cashXterio (Cash+Crypto card - XterioExcl)
+            var cashXEl = document.getElementById('cashXterio');
+            if (cashXEl && xeXter.usd > 0) {
+              var c = parseFloat(cashXEl.textContent.replace(/[$,]/g,'')) || 0;
+              cashXEl.textContent = fmt(c - xeXter.usd);
+            }
+            // Update cashHoldings (Cash+Crypto card - Lholding)
+            var cashHEl = document.getElementById('cashHoldings');
+            if (cashHEl && lhXter.usd > 0) {
+              var c = parseFloat(cashHEl.textContent.replace(/[$,]/g,'')) || 0;
+              cashHEl.textContent = fmt(c - lhXter.usd);
+            }
+            // Update heroTotalCashCrypto (Total Cash+Crypto)
+            var heroTotCCEl = document.getElementById('heroTotalCashCrypto');
+            if (heroTotCCEl && totalXter > 0) {
+              var c = parseFloat(heroTotCCEl.textContent.replace(/[$,]/g,'')) || 0;
+              heroTotCCEl.textContent = fmt(c - totalXter);
+            }
+            // Update subtitle annotations for XterioExcl cash card
+            var subXE = document.getElementById('cashXterioSub');
+            if (subXE && xeXter.usd > 0) {
+              subXE.textContent = 'Cash + Crypto (excl. XTER ' + fmtN(xeXter.qty) + ' tokens / $' + fmtN(xeXter.usd) + ')';
+            }
+            // Update subtitle annotations for Lholding cash card
+            var subHL = document.getElementById('cashHoldingsSub');
+            if (subHL && lhXter.usd > 0) {
+              subHL.textContent = 'Cash + Crypto (excl. XTER ' + fmtN(lhXter.qty) + ' tokens / $' + fmtN(lhXter.usd) + ')';
+            }
+          });
+        })();
+        // === End XTER Token Exclusion Block ===
+);
 
        
         // Level 3: Per-function waterfall table — TB data from consolidated-bs + executive-summary
