@@ -415,34 +415,6 @@
               var c = parseFloat(heroTotCCEl.textContent.replace(/[$,]/g,'')) || 0;
               heroTotCCEl.textContent = fmt(c - totalXter);
             }
-            // Update Total Cash+Crypto XtrSub annotation
-            var subTotCC = document.getElementById('heroTotalCashCryptoXtrSub');
-            if (subTotCC && totalXter > 0) {
-              subTotCC.textContent = 'excl. XTR: ' + fmtN(totalXter) + ' tokens / $' + fmtN(totalXter);
-            }
-            // Update subtitle annotations for XterioExcl cash card
-            var subXE = document.getElementById('cashXterioSub');
-            if (subXE && xeXter.usd > 0) {
-              subXE.textContent = 'Cash + Crypto (excl. XTER ' + fmtN(xeXter.qty) + ' tokens / $' + fmtN(xeXter.usd) + ')';
-            }
-            // Update subtitle annotations for Lholding cash card
-            var subHL = document.getElementById('cashHoldingsSub');
-            if (subHL && lhXter.usd > 0) {
-              subHL.textContent = 'Cash + Crypto (excl. XTER ' + fmtN(lhXter.qty) + ' tokens / $' + fmtN(lhXter.usd) + ')';
-            }
-            // Update Net Assets XtrSub annotations
-            var subTotNA = document.getElementById('heroTotalNAXtrSub');
-            if (subTotNA && totalXter > 0) {
-              subTotNA.textContent = 'excl. XTR: ' + fmtN(totalXter) + ' tokens / $' + fmtN(totalXter);
-            }
-            var subXtNA = document.getElementById('heroXterioXtrSub');
-            if (subXtNA && xeXter.usd > 0) {
-              subXtNA.textContent = 'excl. XTR: ' + fmtN(xeXter.qty) + ' tokens / $' + fmtN(xeXter.usd);
-            }
-            var subHlNA = document.getElementById('heroHoldingsXtrSub');
-            if (subHlNA && lhXter.usd > 0) {
-              subHlNA.textContent = 'excl. XTR: ' + fmtN(lhXter.qty) + ' tokens / $' + fmtN(lhXter.usd);
-            }
           // Update waterfall table cells for Net Assets, Cash+Crypto, Crypto rows
             function wfUpdCell(rowKey, colIdx, delta) {
               var tr = document.getElementById('wfRow-' + rowKey);
@@ -478,10 +450,42 @@
                 var m2 = jDesc2.match(/1 USD = ([\d.]+) XTR/);
                 if (m2) { xtrRate = parseFloat(m2[1]); break; }
               }
+              // Helper: compute XTR token count from USD amount and rate
+              function xtrTok(usd) { return xtrRate ? Math.round(usd * xtrRate).toLocaleString() : fmtN(usd); }
+              // Total Crypto card annotation
               var xtrSubEl = document.getElementById('heroCashCryptoXtrSub');
               if (xtrSubEl && totalXter > 0) {
-                var xtrTokens = xtrRate ? Math.round(totalXter * xtrRate).toLocaleString() : 'N/A';
-                xtrSubEl.textContent = 'excl. XTR: ' + xtrTokens + ' tokens / ' + fmtN(totalXter) + ' USD';
+                xtrSubEl.textContent = 'excl. XTR: ' + xtrTok(totalXter) + ' tokens / ' + fmtN(totalXter) + ' USD';
+              }
+              // Total Group Cash+Crypto card annotation
+              var subTotCC2 = document.getElementById('heroTotalCashCryptoXtrSub');
+              if (subTotCC2 && totalXter > 0) {
+                subTotCC2.textContent = 'excl. XTR: ' + xtrTok(totalXter) + ' tokens / $' + fmtN(totalXter);
+              }
+              // Total Group Net Assets card annotation
+              var subTotNA2 = document.getElementById('heroTotalNAXtrSub');
+              if (subTotNA2 && totalXter > 0) {
+                subTotNA2.textContent = 'excl. XTR: ' + xtrTok(totalXter) + ' tokens / $' + fmtN(totalXter);
+              }
+              // XterioExcl Net Assets card annotation
+              var subXtNA2 = document.getElementById('heroXterioXtrSub');
+              if (subXtNA2 && xeXter.usd > 0) {
+                subXtNA2.textContent = 'excl. XTR: ' + xtrTok(xeXter.usd) + ' tokens / $' + fmtN(xeXter.usd);
+              }
+              // Lholding Net Assets card annotation
+              var subHlNA2 = document.getElementById('heroHoldingsXtrSub');
+              if (subHlNA2 && lhXter.usd > 0) {
+                subHlNA2.textContent = 'excl. XTR: ' + xtrTok(lhXter.usd) + ' tokens / $' + fmtN(lhXter.usd);
+              }
+              // XterioExcl Cash+Crypto card subtitle
+              var subXE2 = document.getElementById('cashXterioSub');
+              if (subXE2 && xeXter.usd > 0) {
+                subXE2.textContent = 'Cash + Crypto (excl. XTER ' + xtrTok(xeXter.usd) + ' tokens / $' + fmtN(xeXter.usd) + ')';
+              }
+              // Lholding Cash+Crypto card subtitle
+              var subHL2 = document.getElementById('cashHoldingsSub');
+              if (subHL2 && lhXter.usd > 0) {
+                subHL2.textContent = 'Cash + Crypto (excl. XTER ' + xtrTok(lhXter.usd) + ' tokens / $' + fmtN(lhXter.usd) + ')';
               }
             });
           });
