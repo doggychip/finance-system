@@ -8,7 +8,7 @@
   <style>
     :root {
       --bg: #0f1117;
-      --surface: #1a1d27;
+      --surface: #1a1d27;h
       --surface2: #232734;
       --border: #2e3344;
       --text: #e4e6ef;
@@ -307,7 +307,7 @@
         data: {
           labels,
           datasets: [
-            { label: 'Overworld', data: w.map(r => r.overworld_total), borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
+            { label: 'OW & Reach', data: w.map(r => r.overworld_total), borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
             { label: 'Lholding', data: w.map(r => r.lholding_total), borderColor: '#22c55e', tension: 0.3, pointRadius: 2 },
             { label: 'Platform', data: w.map(r => r.platform_total), borderColor: '#eab308', tension: 0.3, pointRadius: 2 },
             { label: 'AOD', data: w.map(r => r.aod_total), borderColor: '#ef4444', tension: 0.3, pointRadius: 2 },
@@ -358,7 +358,7 @@
           datasets: [
             { label: 'Platform', data: bs.map(r => r.platform_cash), borderColor: '#eab308', tension: 0.3, pointRadius: 2 },
             { label: 'Lholding', data: bs.map(r => r.lholding_cash), borderColor: '#22c55e', tension: 0.3, pointRadius: 2 },
-            { label: 'Overworld', data: bs.map(r => r.overworld_cash), borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
+            { label: 'OW & Reach', data: bs.map(r => r.overworld_cash), borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
           ]
         },
         options: {
@@ -446,7 +446,7 @@
       // Project allocation cards
       if (latest) {
         const projects = [
-          { name: 'Overworld', val: latest.overworld_total, color: '#3b82f6' },
+          { name: 'OW & Reach', val: latest.overworld_total, color: '#3b82f6' },
           { name: 'Lholding', val: latest.lholding_total, color: '#22c55e' },
           { name: 'Platform', val: latest.platform_total, color: '#eab308' },
           { name: 'AOD', val: latest.aod_total, color: '#ef4444' },
