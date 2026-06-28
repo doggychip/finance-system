@@ -222,6 +222,7 @@
         <div class="label">Total Crypto <span style="cursor:help;color:var(--text-dim)" title="Digital token accounts (10Wxxx) across all entities.">ⓘ</span></div>
         <div class="value" id="heroCashCrypto" style="font-size:28px;color:var(--cyan)">--</div>
         <div class="sub" id="heroCashCryptoSub"></div>
+      <div class="sub" id="heroCashCryptoXtrSub" style="font-size:11px;color:var(--text-dim);margin-top:2px"></div>
       </div>
     </div>
 
@@ -418,6 +419,29 @@
             if (subHL && lhXter.usd > 0) {
               subHL.textContent = 'Cash + Crypto (excl. XTER ' + fmtN(lhXter.qty) + ' tokens / $' + fmtN(lhXter.usd) + ')';
             }
+          // Update Total Crypto card - subtract XTR and add annotation from journal rate
+            var cryptoEl = document.getElementById('heroCashCrypto');
+            if (cryptoEl && totalXter > 0) {
+              var cc = parseFloat(cryptoEl.textContent.replace(/[$,]/g,'')) || 0;
+              cryptoEl.textContent = fmt(cc - totalXter);
+            }
+            var asOfMonth = asOf.slice(0, 7);
+            fetch('/api/export/journal?month=' + encodeURIComponent(asOfMonth)).then(function(r){ return r.text(); }).then(function(csv) {
+              var jLines2 = csv.split('\r\n');
+              var jHdr2 = jLines2[0].split(',').map(function(h){ return h.replace(/"/g,'').trim(); });
+              var jDescIdx2 = jHdr2.indexOf('Line Description');
+              var xtrRate = null;
+              for (var ji = 1; ji < jLines2.length; ji++) {
+                var jDesc2 = (jLines2[ji].split(',')[jDescIdx2]||'').replace(/"/g,'').trim();
+                var m2 = jDesc2.match(/1 USD = ([\d.]+) XTR/);
+                if (m2) { xtrRate = parseFloat(m2[1]); break; }
+              }
+              var xtrSubEl = document.getElementById('heroCashCryptoXtrSub');
+              if (xtrSubEl && totalXter > 0) {
+                var xtrTokens = xtrRate ? Math.round(totalXter * xtrRate).toLocaleString() : 'N/A';
+                xtrSubEl.textContent = 'excl. XTR: ' + xtrTokens + ' tokens / ' + fmtN(totalXter) + ' USD';
+              }
+            });
           });
         })();
         // === End XTER Token Exclusion Block ===
