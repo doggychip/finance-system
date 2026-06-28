@@ -212,6 +212,7 @@
       <div class="label" style="font-size:14px">Total Group Cash + Crypto</div>
       <div class="value" id="heroTotalCashCrypto" style="font-size:48px">--</div>
       <div class="sub" id="heroTotalCashCryptoSub" style="font-size:12px">Loading...</div>
+      <div class="sub" id="heroTotalCashCryptoXtrSub" style="font-size:10px;color:var(--text-dim)"></div>
     </div>
 
     <!-- Level 4: Cash Totals -->
@@ -413,6 +414,11 @@
             if (heroTotCCEl && totalXter > 0) {
               var c = parseFloat(heroTotCCEl.textContent.replace(/[$,]/g,'')) || 0;
               heroTotCCEl.textContent = fmt(c - totalXter);
+            }
+            // Update Total Cash+Crypto XtrSub annotation
+            var subTotCC = document.getElementById('heroTotalCashCryptoXtrSub');
+            if (subTotCC && totalXter > 0) {
+              subTotCC.textContent = 'excl. XTR: ' + fmtN(totalXter) + ' tokens / $' + fmtN(totalXter);
             }
             // Update subtitle annotations for XterioExcl cash card
             var subXE = document.getElementById('cashXterioSub');
