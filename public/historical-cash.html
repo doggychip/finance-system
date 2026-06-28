@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historical Cash â Finance Dashboard</title>
+  <title>Historical Cash — Finance Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -111,11 +111,11 @@
   <div class="container">
     <!-- KPI Row -->
     <div class="kpi-row" id="kpiRow">
-      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_current')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_current')">⊕</button></div><div class="label">Current Total</div><div class="value" id="kpiCurrent">â</div></div>
-      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_fiat')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_fiat')">⊕</button></div><div class="label">Fiat Deposits</div><div class="value" id="kpiFiat">â</div></div>
-      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_crypto')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_crypto')">⊕</button></div><div class="label">Fixed Crypto</div><div class="value" id="kpiCrypto">â</div></div>
-      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_wow')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_wow')">⊕</button></div><div class="label">WoW Change</div><div class="value" id="kpiWow">â</div></div>
-      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_peak')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_peak')">⊕</button></div><div class="label">From Peak</div><div class="value" id="kpiPeak">â</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_current')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_current')">⊕</button></div><div class="label">Current Total</div><div class="value" id="kpiCurrent">—</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_fiat')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_fiat')">⊕</button></div><div class="label">Fiat Deposits</div><div class="value" id="kpiFiat">—</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_crypto')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_crypto')">⊕</button></div><div class="label">Fixed Crypto</div><div class="value" id="kpiCrypto">—</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_wow')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_wow')">⊕</button></div><div class="label">WoW Change</div><div class="value" id="kpiWow">—</div></div>
+      <div class="kpi"><div class="card-actions"><button class="card-btn info-btn" title="Card Info" onclick="showCardInfo('hist_peak')">ⓘ</button><button class="card-btn dl-btn" title="Download CSV" onclick="downloadCardDetail('hist_peak')">⊕</button></div><div class="label">From Peak</div><div class="value" id="kpiPeak">—</div></div>
     </div>
 
     <!-- Tabs -->
@@ -129,11 +129,11 @@
     <!-- Cash Timeline Tab -->
     <div class="tab-content active" id="tab-timeline">
       <div class="chart-card">
-        <h3>Weekly Cash â Grand Total</h3>
+        <h3>Weekly Cash&Crypto — Grand Total</h3>
         <div class="chart-wrap"><canvas id="chartTotal"></canvas></div>
       </div>
       <div class="chart-card">
-        <h3>Weekly Cash â By Project</h3>
+        <h3>Weekly Cash&Crypto — By Project</h3>
         <div class="chart-wrap"><canvas id="chartProjects"></canvas></div>
       </div>
     </div>
@@ -181,7 +181,7 @@
     let DATA = null;
 
     function fmt(n) {
-      if (n == null) return 'â';
+      if (n == null) return '—';
       const abs = Math.abs(n);
       if (abs >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
       if (abs >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
@@ -189,7 +189,7 @@
     }
 
     function fmtFull(n) {
-      if (n == null) return 'â';
+      if (n == null) return '—';
       return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
 
@@ -204,6 +204,46 @@
       try {
         const res = await fetch('/api/historical-cash/summary');
         DATA = await res.json();
+        // Augment weekly data with newer monthly snapshots
+        try {
+          const lastDate = DATA.weekly.length ? DATA.weekly[DATA.weekly.length-1].snapshot_date : '0000-00-00';
+          const snapsResp = await fetch('/api/dashboard/snapshots');
+          const snaps = await snapsResp.json();
+          const newSnaps = Array.from(snaps).filter(function(s) { return s.snapshot_date > lastDate; });
+          newSnaps.sort(function(a,b) { return a.snapshot_date < b.snapshot_date ? -1 : 1; });
+          for (const snap of newSnaps) {
+            const esResp = await fetch('/api/dashboard/executive-summary?as_of_date=' + snap.snapshot_date);
+            const es = await esResp.json();
+            const ec = es.entity_cash || [];
+            let lhT=0, owT=0, xlabsT=0, palioT=0, foundT=0, aodT=0, platT=0;
+            ec.forEach(function(e) {
+              const tot = (e.cash_fiat||0) + (e.cash_crypto||0);
+              const n = e.company_name.toUpperCase();
+              if (n.includes('LHOLD')) lhT += tot;
+              else if (n.includes('OVERWORLD') || n.includes('REACH')) owT += tot;
+              else if (n.includes('XLABS')) xlabsT += tot;
+              else if (n.includes('PALIO')) palioT += tot;
+              else if (n.includes('FOUNDATION')) foundT += tot;
+              else if (n.includes('AOD')) aodT += tot;
+              else platT += tot;
+            });
+            DATA.weekly.push({
+              snapshot_date: snap.snapshot_date,
+              grand_total: (es.total_cash_fiat||0) + (es.total_cash_crypto||0),
+              platform_total: platT, aod_total: aodT, xlabs_total: xlabsT,
+              lholding_total: lhT, overworld_total: owT, reach_total: 0,
+              foundation_total: foundT, cs_total: 0, palio_total: palioT
+            });
+          }
+          if (newSnaps.length > 0) {
+            const latestRow = DATA.weekly[DATA.weekly.length-1];
+            DATA.kpis.current_total = latestRow.grand_total;
+            DATA.kpis.current_date = latestRow.snapshot_date;
+            const prevRow = DATA.weekly[DATA.weekly.length-2];
+            DATA.kpis.wow_change = prevRow ? latestRow.grand_total - prevRow.grand_total : DATA.kpis.wow_change;
+            DATA.kpis.from_peak = latestRow.grand_total - DATA.kpis.peak_total;
+          }
+        } catch(eAug) { console.warn('Failed to augment historical data:', eAug); }
         renderKPIs();
         renderTimeline();
         renderBS();
