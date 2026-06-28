@@ -449,6 +449,9 @@
               tds[colIdx].style.color = nv < -0.5 ? 'var(--red)' : nv > 0.5 ? 'var(--green)' : '';
             }
             // Cols: 0=label,1=Foundation,2=XterioExcl,3=Lholding,4=OW,5=Total
+            // Store XTR values globally so waterfall can apply them after render
+            window._xterWfPending = { xe: xeXter.usd, lh: lhXter.usd, tot: totalXter };
+            // Also call wfUpdCell now in case waterfall already rendered
             if (xeXter.usd > 0) { wfUpdCell('net_assets',2,-xeXter.usd); wfUpdCell('_cash_total',2,-xeXter.usd); wfUpdCell('cash_crypto',2,-xeXter.usd); }
             if (lhXter.usd > 0) { wfUpdCell('net_assets',3,-lhXter.usd); wfUpdCell('_cash_total',3,-lhXter.usd); wfUpdCell('cash_crypto',3,-lhXter.usd); }
             if (totalXter > 0) { wfUpdCell('net_assets',5,-totalXter); wfUpdCell('_cash_total',5,-totalXter); wfUpdCell('cash_crypto',5,-totalXter); }
@@ -604,6 +607,23 @@
         });
         wfHtml += '</tbody></table>';
         document.getElementById('waterfallTable').innerHTML = wfHtml;
+        // Apply XTR waterfall corrections if XTER block already resolved
+        if (window._xterWfPending) {
+          var _p = window._xterWfPending;
+          function _applyWfCell(rowKey, colIdx, delta) {
+            var tr = document.getElementById('wfRow-' + rowKey);
+            if (!tr) return;
+            var tds = tr.querySelectorAll('td');
+            if (!tds[colIdx]) return;
+            var v = parseFloat(tds[colIdx].textContent.replace(/[$,]/g,'')) || 0;
+            var nv = v + delta;
+            tds[colIdx].textContent = fmt(nv);
+            tds[colIdx].style.color = nv < -0.5 ? 'var(--red)' : nv > 0.5 ? 'var(--green)' : '';
+          }
+          if (_p.xe > 0) { _applyWfCell('net_assets',2,-_p.xe); _applyWfCell('_cash_total',2,-_p.xe); _applyWfCell('cash_crypto',2,-_p.xe); }
+          if (_p.lh > 0) { _applyWfCell('net_assets',3,-_p.lh); _applyWfCell('_cash_total',3,-_p.lh); _applyWfCell('cash_crypto',3,-_p.lh); }
+          if (_p.tot > 0) { _applyWfCell('net_assets',5,-_p.tot); _applyWfCell('_cash_total',5,-_p.tot); _applyWfCell('cash_crypto',5,-_p.tot); }
+        }
         // Level 2b: 4 Cash + Crypto cards — sum entity_cash by group company_ids
         // (same source as Total Group card: total_cash_fiat + total_cash_crypto)
         var ecMap = {};
