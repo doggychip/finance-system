@@ -522,95 +522,164 @@
     }
 
     // ── Cash Flow Statement ──
-    async function loadCashFlowStatement() {
-      var el = document.getElementById('cfContent');
-      try {
-        var data = await (await fetch('/api/dashboard/cash-flow-statement')).json();
-        data.sort(function(a, b) { return a.company_name.localeCompare(b.company_name); });
-        if (!data.length) { el.innerHTML = '<div class="loading">No data.</div>'; return; }
-
-        // Build export data
-        var exportRows = [];
-        var allCashAccs = {};
-        data.forEach(function(c) { c.cash_accounts.forEach(function(a) { allCashAccs[a.code + ' ' + a.name] = a; }); });
-
-        var allCodes = {};
-        data.forEach(function(c) { c.movements.forEach(function(m) { allCodes[m.code] = m.name; }); });
-        var sortedCodes = Object.entries(allCodes).sort(function(a,b) { return a[0].localeCompare(b[0]); });
-        var cashInCodes = sortedCodes.filter(function(e) { return e[0].startsWith('8'); });
-        var cashOutCodes = sortedCodes.filter(function(e) { return !e[0].startsWith('8'); });
-
-        function getMovement(company, code) { var m = company.movements.find(function(x) { return x.code === code; }); return m ? m.net : 0; }
-
-        var cols = data.length;
-        var html = '<table class="cf-table"><tr class="company-header"><th class="row-label" style="background:#1e3a5f;color:white">Account</th>';
-        data.forEach(function(c) { html += '<th>' + c.company_name + '</th>'; });
-        html += '</tr>';
-
-        html += '<tr class="section-header"><td class="row-label">Bank & Cash Accounts</td>';
-        for (var i=0;i<cols;i++) html += '<td></td>';
-        html += '</tr>';
-
-        Object.values(allCashAccs).sort(function(a,b){return a.code.localeCompare(b.code);}).forEach(function(acc) {
-          html += '<tr class="cash-account"><td class="row-label">' + acc.code + ' ' + acc.name + '</td>';
-          data.forEach(function(c) {
-            var ca = c.cash_accounts.find(function(x) { return x.code === acc.code && x.name === acc.name; });
-            var val = ca ? ca.balance : 0;
-            html += '<td class="' + valCls(val) + '">' + fmt(val) + '</td>';
-          });
-          html += '</tr>';
-        });
-
-        html += '<tr class="total-row"><td class="row-label">Cash and cash equivalents</td>';
-        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_balance) + '">' + fmt(c.cash_balance) + '</td>'; });
-        html += '</tr>';
-
-        html += '<tr><td class="row-label" style="border:none"></td>';
-        for (i=0;i<cols;i++) html += '<td style="border:none"></td>';
-        html += '</tr>';
-
-        html += '<tr class="sub-header"><td class="row-label">Cash in</td>';
-        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_in) + '">' + fmt(c.cash_in) + '</td>'; });
-        html += '</tr>';
-        cashInCodes.forEach(function(entry) {
-          var vals = data.map(function(c) { return getMovement(c, entry[0]); });
-          if (!vals.some(function(v) { return Math.abs(v) > 0.01; })) return;
-          html += '<tr class="movement-row"><td class="row-label">' + entry[0] + ' ' + entry[1] + '</td>';
-          vals.forEach(function(v) { html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>'; });
-          html += '</tr>';
-        });
-
-        html += '<tr class="sub-header"><td class="row-label">Cash out</td>';
-        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_out) + '">' + fmt(c.cash_out) + '</td>'; });
-        html += '</tr>';
-        cashOutCodes.forEach(function(entry) {
-          var vals = data.map(function(c) { return getMovement(c, entry[0]); });
-          if (!vals.some(function(v) { return Math.abs(v) > 0.01; })) return;
-          html += '<tr class="movement-row"><td class="row-label">' + entry[0] + ' ' + entry[1] + '</td>';
-          vals.forEach(function(v) { html += '<td class="' + valCls(v) + '">' + fmt(v) + '</td>'; });
-          html += '</tr>';
-        });
-
-        html += '<tr><td class="row-label" style="border:none"></td>';
-        for (i=0;i<cols;i++) html += '<td style="border:none"></td>';
-        html += '</tr>';
-        html += '<tr class="total-row"><td class="row-label">Cash and cash equivalents, closing</td>';
-        data.forEach(function(c) { html += '<td class="' + valCls(c.cash_balance) + '">' + fmt(c.cash_balance) + '</td>'; });
-        html += '</tr></table>';
-        el.innerHTML = html;
-
-        // Build export data from the table
-        lastExportData = [];
-        var allMovCodes = cashInCodes.concat(cashOutCodes);
-        allMovCodes.forEach(function(entry) {
-          var row = { Account: entry[0] + ' ' + entry[1] };
-          data.forEach(function(c) { row[c.company_name] = getMovement(c, entry[0]); });
-          lastExportData.push(row);
-        });
-      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; }
+    var _cfTBCache = {};
+    async function _getCFTB(period) {
+      if (_cfTBCache[period]) return _cfTBCache[period];
+      var r = await (await fetch('/api/admin/tb?period=' + period)).json();
+      _cfTBCache[period] = r.rows || [];
+      return _cfTBCache[period];
     }
 
-    // ── IC Recon ──
+    async function loadCashFlowStatement() {
+      var el = document.getElementById('cfContent');
+      el.innerHTML = '<div class="loading">Loading cash flow data...</div>';
+      try {
+        var asOf = getAsOf();
+        var endP = asOf ? asOf.slice(0, 7) : (new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
+        var tbMeta = await (await fetch('/api/admin/tb?period=' + endP)).json();
+        var allPeriods = (tbMeta.periods || [endP]).sort();
+        var endIdx = allPeriods.indexOf(endP);
+        var defaultStart = endIdx > 0 ? allPeriods[endIdx - 1] : endP;
+        var cfFromSel = document.getElementById('cfFromPeriod');
+        if (!cfFromSel) {
+          var ctrlHtml = '<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">' +
+            '<label style="font-size:12px;color:var(--text-dim)">From:</label>' +
+            '<select id="cfFromPeriod" onchange="loadCashFlowStatement()" style="padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">' +
+            allPeriods.map(function(p){ return '<option value="' + p + '"' + (p === defaultStart ? ' selected' : '') + '>' + p + '</option>'; }).join('') +
+            '</select>' +
+            '<label style="font-size:12px;color:var(--text-dim)">To (As Of):</label>' +
+            '<strong style="font-size:13px">' + endP + '</strong>' +
+            '</div><div id="cfTableWrap"><div class="loading">Computing...</div></div>';
+          el.innerHTML = ctrlHtml;
+        } else {
+          if (!cfFromSel.querySelector('[value="' + endP + '"]')) {
+            cfFromSel.innerHTML = allPeriods.map(function(p){ return '<option value="' + p + '"' + (p === defaultStart ? ' selected' : '') + '>' + p + '</option>'; }).join('');
+          }
+          document.querySelector('#cfContent strong').textContent = endP;
+        }
+        var startP = document.getElementById('cfFromPeriod') ? document.getElementById('cfFromPeriod').value : defaultStart;
+        var tableEl = document.getElementById('cfTableWrap') || el;
+        tableEl.innerHTML = '<div class="loading">Computing ' + startP + ' → ' + endP + '...</div>';
+
+        var rowsOpen = await _getCFTB(startP);
+        var rowsClose = await _getCFTB(endP);
+
+        function byType(rows) {
+          var m = {};
+          rows.forEach(function(r) { m[r.account_type] = (m[r.account_type] || 0) + r.balance; });
+          return m;
+        }
+        var tO = byType(rowsOpen), tC = byType(rowsClose);
+        function delta(tp) { return (tC[tp] || 0) - (tO[tp] || 0); }
+
+        var dIncome  = delta('income') + delta('income_other');
+        var dExpense = delta('expense') + delta('expense_direct_cost') + delta('expense_depreciation');
+        var netProfit = -dIncome - dExpense;
+        var dReceivable = delta('asset_receivable') + delta('asset_current');
+        var dPayable    = delta('liability_payable') + delta('liability_current');
+        var wcAdj       = -dReceivable + dPayable;
+        var operTotal   = netProfit + wcAdj;
+        var investTotal = -delta('asset_fixed') - delta('asset_non_current');
+        var finTotal    = -delta('equity') - delta('liability_non_current');
+        var dCash       = delta('asset_cash');
+        var openCash    = tO['asset_cash'] || 0;
+        var closeCash   = tC['asset_cash'] || 0;
+
+        function detailLines(types) {
+          var byKey = {};
+          rowsOpen.forEach(function(r) {
+            if (types.indexOf(r.account_type) < 0) return;
+            var k = r.account_code + '||' + r.company_id;
+            if (!byKey[k]) byKey[k] = {code: r.account_code, name: r.account_name, company: r.company_name, type: r.account_type, open: 0, close: 0};
+            byKey[k].open += r.balance;
+          });
+          rowsClose.forEach(function(r) {
+            if (types.indexOf(r.account_type) < 0) return;
+            var k = r.account_code + '||' + r.company_id;
+            if (!byKey[k]) byKey[k] = {code: r.account_code, name: r.account_name, company: r.company_name, type: r.account_type, open: 0, close: 0};
+            byKey[k].close += r.balance;
+          });
+          return Object.values(byKey)
+            .map(function(d) { return {code: d.code, name: d.name, company: d.company, type: d.type, delta: d.close - d.open}; })
+            .filter(function(d) { return Math.abs(d.delta) >= 0.5; })
+            .sort(function(a, b) { return Math.abs(b.delta) - Math.abs(a.delta); });
+        }
+
+        var detIncome  = detailLines(['income', 'income_other']);
+        var detExpense = detailLines(['expense', 'expense_direct_cost', 'expense_depreciation']);
+        var detRecv    = detailLines(['asset_receivable', 'asset_current']);
+        var detPayable = detailLines(['liability_payable', 'liability_current']);
+        var detFixed   = detailLines(['asset_fixed', 'asset_non_current']);
+        var detEquity  = detailLines(['equity', 'liability_non_current']);
+        var detCash    = detailLines(['asset_cash']);
+
+        lastExportData = [];
+        function storeSection(label, items) {
+          items.forEach(function(d) {
+            lastExportData.push({Section: label, Code: d.code, Account: d.name, Company: d.company, Type: d.type, 'Change USD': Math.round(d.delta)});
+          });
+        }
+        storeSection('A1 Revenue', detIncome);
+        storeSection('A2 Expense', detExpense);
+        storeSection('A3 Receivables+CurrAssets', detRecv);
+        storeSection('A4 Payables+CurrLiab', detPayable);
+        storeSection('B Fixed+NonCurrAssets', detFixed);
+        storeSection('C Equity+LTLiab', detEquity);
+        storeSection('Cash Accounts', detCash);
+
+        function fmtV(n) {
+          var v = Math.round(n);
+          if (Math.abs(v) < 1) return '<span style="color:var(--text-dim)">-</span>';
+          var s = Math.abs(v).toLocaleString('en-US');
+          return v < 0 ? '<span style="color:var(--red)">(' + s + ')</span>' : '<span style="color:var(--green)">' + s + '</span>';
+        }
+
+        function subRows(items, flipSign) {
+          return items.map(function(d) {
+            var val = flipSign ? -d.delta : d.delta;
+            return '<tr class="cash-account"><td class="row-label">' + d.code + '  ' + d.name + '</td>' +
+              '<td style="text-align:right;color:var(--text-dim);font-size:11px;padding:3px 10px">' + d.company + '</td>' +
+              '<td style="text-align:right;padding:3px 10px">' + fmtV(val) + '</td></tr>';
+          }).join('');
+        }
+
+        var tbl = '<div style="overflow-x:auto"><table class="cf-table">' +
+          '<colgroup><col style="min-width:300px"><col style="width:140px"><col style="width:130px"></colgroup>' +
+          '<thead><tr class="company-header"><th class="row-label">Item</th><th style="text-align:right">Detail</th><th style="text-align:right">' + startP + ' → ' + endP + '</th></tr></thead><tbody>' +
+
+          '<tr class="section-header"><td class="row-label" colspan="2">A. OPERATING ACTIVITIES</td><td></td></tr>' +
+          '<tr class="movement-row"><td class="row-label">Net Profit / (Loss)</td><td></td><td style="text-align:right;font-weight:700">' + fmtV(netProfit) + '</td></tr>' +
+          '<tr class="sub-header"><td class="row-label">&nbsp;&nbsp;Revenue changes (income ↑ = inflow)</td><td style="text-align:right">' + fmtV(-dIncome) + '</td><td></td></tr>' +
+          subRows(detIncome, true) +
+          '<tr class="sub-header"><td class="row-label">&nbsp;&nbsp;Expense changes (expense ↑ = outflow)</td><td style="text-align:right">' + fmtV(-dExpense) + '</td><td></td></tr>' +
+          subRows(detExpense, true) +
+          '<tr class="sub-header"><td class="row-label">&nbsp;&nbsp;Receivables &amp; current assets (asset ↑ = use of cash)</td><td style="text-align:right">' + fmtV(-dReceivable) + '</td><td></td></tr>' +
+          subRows(detRecv, true) +
+          '<tr class="sub-header"><td class="row-label">&nbsp;&nbsp;Payables &amp; current liabilities (liability ↑ = source of cash)</td><td style="text-align:right">' + fmtV(dPayable) + '</td><td></td></tr>' +
+          subRows(detPayable, false) +
+          '<tr class="total-row"><td class="row-label"><strong>Net Cash from Operating Activities (A)</strong></td><td></td><td style="text-align:right;font-weight:800;font-size:13px">' + fmtV(operTotal) + '</td></tr>' +
+
+          '<tr class="section-header"><td class="row-label" colspan="2">B. INVESTING ACTIVITIES</td><td></td></tr>' +
+          '<tr class="sub-header"><td class="row-label">&nbsp;&nbsp;Fixed &amp; non-current assets (asset ↑ = outflow)</td><td style="text-align:right">' + fmtV(investTotal) + '</td><td></td></tr>' +
+          subRows(detFixed, true) +
+          '<tr class="total-row"><td class="row-label"><strong>Net Cash from Investing Activities (B)</strong></td><td></td><td style="text-align:right;font-weight:800;font-size:13px">' + fmtV(investTotal) + '</td></tr>' +
+
+          '<tr class="section-header"><td class="row-label" colspan="2">C. FINANCING ACTIVITIES</td><td></td></tr>' +
+          '<tr class="sub-header"><td class="row-label">&nbsp;&nbsp;Equity &amp; long-term liabilities (equity ↑ = inflow)</td><td style="text-align:right">' + fmtV(finTotal) + '</td><td></td></tr>' +
+          subRows(detEquity, false) +
+          '<tr class="total-row"><td class="row-label"><strong>Net Cash from Financing Activities (C)</strong></td><td></td><td style="text-align:right;font-weight:800;font-size:13px">' + fmtV(finTotal) + '</td></tr>' +
+
+          '<tr class="section-header" style="background:rgba(234,179,8,0.12)"><td class="row-label" colspan="2"><strong>NET CHANGE IN CASH (A+B+C)</strong></td><td style="text-align:right;font-weight:800;font-size:14px">' + fmtV(operTotal + investTotal + finTotal) + '</td></tr>' +
+          '<tr class="movement-row"><td class="row-label">Opening Cash Balance (' + startP + ')</td><td></td><td style="text-align:right">' + fmtV(openCash) + '</td></tr>' +
+          '<tr class="total-row"><td class="row-label">Closing Cash Balance (' + endP + ')</td><td></td><td style="text-align:right">' + fmtV(closeCash) + '</td></tr>' +
+          '<tr class="section-header" style="background:rgba(99,102,241,0.1)"><td class="row-label" colspan="2">Actual Change in Cash (from TB balance)</td><td style="text-align:right;font-weight:700">' + fmtV(dCash) + '</td></tr>' +
+          '</tbody></table></div>';
+
+        tableEl.innerHTML = tbl;
+      } catch (err) { el.innerHTML = '<div class="loading">Error: ' + err.message + '</div>'; console.error(err); }
+    }
+
+        // ── IC Recon ──
     async function loadIcRecon() {
       try {
         var data = await (await fetch('/api/dashboard/ic-reconciliation')).json();
