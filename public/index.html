@@ -852,23 +852,33 @@
     // Level 5: Account detail tables (Fiat + Crypto)
     async function loadAccountDetail() {
       try {
-        var asOf = getAsOfParam();
-        var data = await (await fetch('/api/dashboard/bank-accounts' + asOf)).json();
-        var groups = data.groups || [];
+
+        var asOfParam = getAsOfParam();
+        var tbMonth = (function() {
+          var d = new Date();
+          if (asOfParam) {
+            d = new Date(asOfParam.replace('?as_of_date=','').replace('&as_of_date=','') + 'T00:00:00Z');
+          }
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        })();
+        var tbData = await (await fetch('/api/admin/tb?period=' + tbMonth)).json();
+        var rows = tbData.rows || [];
 
         var fiatAccounts = [];
         var cryptoAccounts = [];
+        var fiatCurrencies = ['USD','CNY','SGD','EUR','GBP','HKD','AUD','MNT'];
 
-        groups.forEach(function(g) {
-          (g.accounts || []).forEach(function(a) {
-            var item = { entity: g.name, code: a.code, name: a.name, balance: a.current_balance, company: a.company_name };
-            if (!(/^100/.test(a.code || '') || /^10[Ww]/i.test(a.code || ''))) return;
-            if (a.asset_type === 'Crypto') {
-              cryptoAccounts.push(item);
-            } else {
-              fiatAccounts.push(item);
-            }
-          });
+        rows.forEach(function(r) {
+          if (r.account_type !== 'asset_cash') return;
+          if (!(/^100/.test(r.account_code || '') || /^10[Ww]/i.test(r.account_code || ''))) return;
+          var n = (r.company_name || '').toUpperCase();
+          var entity = n.includes('OVERWORLD') || n.includes('REACH') ? 'OW' : 'Xterio';
+          var item = { entity: entity, code: r.account_code, name: r.account_name, balance: r.balance, company: r.company_name };
+          if (fiatCurrencies.includes(r.currency)) {
+            fiatAccounts.push(item);
+          } else {
+            cryptoAccounts.push(item);
+          }
         });
 
         fiatAccounts.sort(function(a, b) { return Math.abs(b.balance) - Math.abs(a.balance); });
