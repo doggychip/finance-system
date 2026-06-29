@@ -871,8 +871,7 @@
         rows.forEach(function(r) {
           if (r.account_type !== 'asset_cash') return;
           if (!(/^100/.test(r.account_code || '') || /^10[Ww]/i.test(r.account_code || ''))) return;
-          var n = (r.company_name || '').toUpperCase();
-          var entity = n.includes('OVERWORLD') || n.includes('REACH') ? 'OW' : 'Xterio';
+          var entity = r.company_name;
           var item = { entity: entity, code: r.account_code, name: r.account_name, balance: r.balance, company: r.company_name };
           if (fiatCurrencies.includes(r.currency)) {
             fiatAccounts.push(item);
