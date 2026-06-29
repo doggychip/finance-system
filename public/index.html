@@ -878,11 +878,13 @@
           if (!accounts.length) { el.innerHTML = '<div class="loading">No accounts</div>'; return; }
           var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
           html += '<thead><tr><th style="text-align:left;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Entity</th>';
+          html += '<th style="text-align:left;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Code</th>';
           html += '<th style="text-align:left;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Account</th>';
           html += '<th style="text-align:right;padding:6px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Balance</th></tr></thead><tbody>';
           accounts.forEach(function(a) {
             var color = a.balance < 0 ? 'color:var(--red)' : 'color:var(--green)';
             html += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 8px;color:var(--text-dim);white-space:nowrap">' + a.entity + '</td>';
+            html += '<td style="padding:5px 8px;color:var(--text-dim);font-size:11px;white-space:nowrap">' + (a.code || '') + '</td>';
             html += '<td style="padding:5px 8px;font-size:11px" title="' + a.code + ' — ' + a.company + '">' + a.name + '</td>';
             html += '<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;' + color + '">' + fmt(a.balance) + '</td></tr>';
           });
