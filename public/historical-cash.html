@@ -217,7 +217,8 @@
       try {
         const tbSnapsResp = await fetch('/api/dashboard/snapshots');
         const tbSnaps = await tbSnapsResp.json();
-        tbSnaps.sort(function(a,b){return a.snapshot_date<b.snapshot_date?-1:1;}); DATA={weekly:[],monthly_bs:[],pl:{monthly:[]},deposits:{},kpis:{current_total:0,current_date:null,peak_total:0,wow_change:0,from_peak:0,fiat_total:0,crypto_total:0}};
+        tbSnaps.sort(function(a,b){return a.snapshot_date<b.snapshot_date?-1:1;});
+        DATA={weekly:[],monthly_bs:[],pl:{monthly:[]},deposits:{},kpis:{current_total:0,current_date:null,peak_total:0,wow_change:0,from_peak:0,fiat_total:0,crypto_total:0}};
         try {
           // All TB snapshots loaded above
           const snaps = tbSnaps; // use all TB snapshots
@@ -254,11 +255,17 @@
             DATA.kpis.current_date = latestRow.snapshot_date;
             const prevRow = DATA.weekly[DATA.weekly.length-2];
             DATA.kpis.wow_change = prevRow ? latestRow.grand_total - prevRow.grand_total : DATA.kpis.wow_change;
-            DATw.grand_total - prevRow.grand_total : DATA.kpis.wow_change;
-            DATA.kpis.from_peak = latestRow.grand_total - DATA.kpis.peak_total; DATA.monthly_bs=DATA.weekly.map(r=>({month_end:r.snapshot_date,total_closing:r.grand_total,platform_cash:r.platform_total,lholding_cash:r.lholding_total,overworld_cash:r.overworld_total})); DATA.pl.monthly=DATA.weekly.map((r,i,a)=>({month_start:r.snapshot_date.substring(0,7)+'-01',net_profit:i>0?r.grand_total-a[i-1].grand_total:0}));
+            DATA.kpis.from_peak = latestRow.grand_total - DATA.kpis.peak_total;
           }
         } catch(eAug) { console.warn('Failed to load TB snapshot data:', eAug); }
-        try { const [bsR,plR]=await Promise.all([fetch('/api/historical-cash/monthly-bs'),fetch('/api/historical-cash/pl')]); if(bsR.ok) DATA.monthly_bs=await bsR.json(); if(plR.ok){const pd=await plR.json();DATA.pl=pd;} } catch(eBsPl){console.warn('BS/PL load failed:',eBsPl);}
+        try {
+          const [bsR,plR] = await Promise.all([
+            fetch('/api/historical-cash/monthly-bs'),
+            fetch('/api/historical-cash/pl')
+          ]);
+          if(bsR.ok) DATA.monthly_bs = await bsR.json();
+          if(plR.ok){ const pd = await plR.json(); DATA.pl = pd; }
+        } catch(eBsPl){ console.warn('BS/PL load failed:', eBsPl); }
         renderKPIs();
         renderTimeline();
         renderBS();
@@ -268,7 +275,6 @@
         console.error('Failed to load historical cash data:', e);
       }
     }
-
     function renderKPIs() {
       const k = DATA.kpis;
       document.getElementById('kpiCurrent').textContent = fmt(k.current_total);
