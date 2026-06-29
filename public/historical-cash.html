@@ -212,32 +212,37 @@
           const newSnaps = snaps; // use all TB snapshots
           // already sorted by tbSnaps.sort above
           for (const snap of newSnaps) {
-            const esResp = await fetch('/api/dashboard/executive-summary?as_of_date=' + snap.snapshot_date);
-            const es = await esResp.json();
-            const ec = es.entity_cash || [];
-            let lhT=0, owT=0, xlabsT=0, palioT=0, foundT=0, aodT=0, platT=0;
-            ec.forEach(function(e) {
-              const tot = (e.cash_fiat||0) + (e.cash_crypto||0);
-              const n = e.company_name.toUpperCase();
-              if (n.includes('LHOLD')) lhT += tot;
-              else if (n.includes('OVERWORLD') || n.includes('REACH')) owT += tot;
-              else if (n.includes('XLABS')) xlabsT += tot;
-              else if (n.includes('PALIO')) palioT += tot;
-              else if (n.includes('FOUNDATION')) foundT += tot;
-              else if (n.includes('AOD')) aodT += tot;
-              else platT += tot;
+            const tbResp = await fetch('/api/admin/tb?period=' + snap.month);
+            const tbData = await tbResp.json();
+            const cashRows = (tbData.rows || []).filter(function(r){ return r.account_type === 'asset_cash'; });
+            let lhT=0, owT=0, xlabsT=0, palioT=0, foundT=0, aodT=0, platT=0, totalFiat=0, totalCrypto=0;
+            const fiatCurrencies = ['USD','CNY','SGD','EUR','GBP','HKD','AUD','MNT'];
+            cashRows.forEach(function(r) {
+              const bal = r.balance || 0;
+              if (fiatCurrencies.includes(r.currency)) { totalFiat += bal; } else { totalCrypto += bal; }
+              const n = (r.company_name || '').toUpperCase();
+              if (n.includes('LHOLD')) lhT += bal;
+              else if (n.includes('OVERWORLD') || n.includes('REACH')) owT += bal;
+              else if (n.includes('XLABS')) xlabsT += bal;
+              else if (n.includes('PALIO')) palioT += bal;
+              else if (n.includes('FOUND')) foundT += bal;
+              else if (n.includes('AOD')) aodT += bal;
+              else platT += bal;
             });
             DATA.weekly.push({
               snapshot_date: snap.snapshot_date,
-              grand_total: (es.total_cash_fiat||0) + (es.total_cash_crypto||0),
+              grand_total: totalFiat + totalCrypto,
               platform_total: platT, aod_total: aodT, xlabs_total: xlabsT,
               lholding_total: lhT, overworld_total: owT, reach_total: 0,
-              foundation_total: foundT, cs_total: 0, palio_total: palioT
+              foundation_total: foundT, cs_total: 0, palio_total: palioT,
+              fiat_total: totalFiat, crypto_total: totalCrypto
             });
-          }
+          } }
           if (newSnaps.length > 0) {
             const latestRow = DATA.weekly[DATA.weekly.length-1];
             DATA.kpis.current_total = latestRow.grand_total;
+            DATA.kpis.fiat_total = latestRow.fiat_total || 0;
+            DATA.kpis.crypto_total = latestRow.crypto_total || 0;
             DATA.kpis.current_date = latestRow.snapshot_date;
             const prevRow = DATA.weekly[DATA.weekly.length-2];
             DATA.kpis.wow_change = prevRow ? latestRow.grand_total - prevRow.grand_total : DATA.kpis.wow_change;
