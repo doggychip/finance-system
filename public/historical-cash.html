@@ -227,8 +227,6 @@
           for (const snap of newSnaps) {
             const esResp = await fetch('/api/dashboard/executive-summary?as_of_date=' + snap.snapshot_date);
             const es = await esResp.json();
-            const ec = _date);
-            const es = await esResp.json();
             const ec = es.entity_cash || [];
             let lhT=0, owT=0, xlabsT=0, palioT=0, foundT=0, aodT=0, platT=0;
             ec.forEach(function(e) {
