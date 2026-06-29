@@ -432,7 +432,8 @@
             '<div class="bs-section">'+
               '<div class="bs-row header"><span class="label">ASSETS</span><span class="value '+valClass(a)+'">'+fmtBs(a)+'</span></div>'+
               '<div class="bs-row sub-header"><span class="label">Current Assets</span><span class="value">'+fmtBs(at)+'</span></div>'+
-              '<div class="bs-row"><span class="label">Bank and Cash</span><span class="value '+valClass(ac)+'">'+fmtBs(ac)+'</span></div>'              '<div class="bs-row sub-row" style="padding-left:20px;font-size:11px;opacity:0.85"><span class="label">— Fiat</span><span class="value '+valClass(d.cash_fiat||0)+'">'+fmtBs(d.cash_fiat||0)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Bank and Cash</span><span class="value '+valClass(ac)+'">'+fmtBs(ac)+'</span></div>'+
+              '<div class="bs-row sub-row" style="padding-left:20px;font-size:11px;opacity:0.85"><span class="label">— Fiat</span><span class="value '+valClass(d.cash_fiat||0)+'">'+fmtBs(d.cash_fiat||0)+'</span></div>'+
               '<div class="bs-row sub-row" style="padding-left:20px;font-size:11px;opacity:0.85"><span class="label">— StableCoin</span><span class="value '+valClass(d.cash_stable||0)+'">'+fmtBs(d.cash_stable||0)+'</span></div>'+
               '<div class="bs-row sub-row" style="padding-left:20px;font-size:11px;opacity:0.85"><span class="label">— XTR</span><span class="value '+valClass(d.cash_xtr||0)+'">'+fmtBs(d.cash_xtr||0)+'</span></div>'+
               '<div class="bs-row sub-row" style="padding-left:20px;font-size:11px;opacity:0.85"><span class="label">— Other Crypto</span><span class="value '+valClass(d.cash_other||0)+'">'+fmtBs(d.cash_other||0)+'</span></div>'+
