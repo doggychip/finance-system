@@ -368,33 +368,37 @@
 
     // ── Balance Sheet ──
     async function loadBalanceSheet() {
-      var el = document.getElementById('bsContent');
-      var asOf = getAsOf();
-      try {
-        var _raw = await (await fetch('/api/dashboard/balance-sheet-all' + (asOf ? '?as_of_date=' + asOf : ''))).json();
-        var companies = (_raw.companies || _raw || []);
-        if (!companies.length) { el.innerHTML = '<div class="loading">No company data.</div>'; return; }
-        var byId = {};
-        companies.forEach(function(c) { byId[c.company_id] = c; });
-        // Fetch admin TB for cash breakdowns
-        var tbPeriod = asOf ? asOf.slice(0,7) : (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
-        var tbRaw = await (await fetch('/api/admin/tb?period='+tbPeriod)).json();
-        var fiatCurr = ['USD','CNY','SGD','EUR','GBP','HKD','AUD','MNT'];
-        var stableCurr = ['USC','UST'];
-        var xtrCurr = ['XTR'];
-        (tbRaw.rows||[]).forEach(function(r){
-          if(r.account_type!=='asset_cash') return;
-          var c=byId[r.company_id]; if(!c) return;
-          if(!c.cash_fiat) c.cash_fiat=0;
-          if(!c.cash_stable) c.cash_stable=0;
-          if(!c.cash_xtr) c.cash_xtr=0;
-          if(!c.cash_other) c.cash_other=0;
-          var bal=r.balance||0;
-          if(fiatCurr.includes(r.currency)) c.cash_fiat+=bal;
-          else if(stableCurr.includes(r.currency)) c.cash_stable+=bal;
-          else if(xtrCurr.includes(r.currency)) c.cash_xtr+=bal;
-          else c.cash_other+=bal;
-        });
+     var asOf = getAsOf();
+     var el = document.getElementById('bsContainer');
+     try {
+       var tbPeriod = asOf ? asOf.slice(0,7) : (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
+       var tbRaw = await (await fetch('/api/admin/tb?period='+tbPeriod)).json();
+       var companies = [];
+       var byId = {};
+       var FIAT_CCY = ['USD','CNY','SGD','EUR','GBP','HKD','AUD','MNT'];
+       var STABLE_CCY = ['USC','UST'];
+       (tbRaw.rows||[]).forEach(function(r){
+         if (!byId[r.company_id]) {
+           byId[r.company_id] = {company_id:r.company_id,company_name:r.company_name,total_assets:0,cash:0,receivable:0,current_assets:0,prepayments:0,fixed_assets:0,non_current_assets:0,total_liabilities:0,payable:0,current_liabilities:0,non_current_liabilities:0,total_equity:0,equity:0,net_income:0,retained_earnings:0,cash_fiat:0,cash_stable:0,cash_xtr:0,cash_other:0};
+         }
+         var d=byId[r.company_id]; var b=r.balance||0; var at=r.account_type||'';
+         if(at==='asset_cash'){d.cash+=b;d.total_assets+=b;if(r.account_code&&r.account_code.startsWith('100')){d.cash_fiat+=b;}else if(r.account_code&&r.account_code.startsWith('10')){var c=r.currency||'';if(c==='XTR'){d.cash_xtr+=b;}else if(STABLE_CCY.indexOf(c)>=0){d.cash_stable+=b;}else{d.cash_other+=b;}}}
+         else if(at==='asset_receivable'){d.receivable+=b;d.total_assets+=b;}
+         else if(at==='asset_current'){d.current_assets+=b;d.total_assets+=b;}
+         else if(at==='asset_fixed'){d.fixed_assets+=b;d.total_assets+=b;}
+         else if(at==='asset_non_current'){d.non_current_assets+=b;d.total_assets+=b;}
+         else if(at==='liability_payable'){d.payable+=b;d.total_liabilities+=b;}
+         else if(at==='liability_current'){d.current_liabilities+=b;d.total_liabilities+=b;}
+         else if(at==='liability_non_current'){d.non_current_liabilities+=b;d.total_liabilities+=b;}
+         else if(at==='equity'){d.equity+=b;}
+         else if(at==='income'||at==='income_other'||at.startsWith('expense')){d.net_income+=b;}
+       });
+       Object.values(byId).forEach(function(d){
+         d.retained_earnings=-(d.total_assets+d.total_liabilities+d.equity+d.net_income);
+         d.total_equity=d.equity+d.net_income+d.retained_earnings;
+         companies.push(d);
+       });
+       if(!companies.length){el.innerHTML='<div class="loading">No company data.</div>';return;}
         var EG = [
           { name: 'Xterio', color: '#6366f1', subs: [
             { name: 'LTECH, LTECH W3', ids: [1, 23] },
@@ -417,14 +421,14 @@
           ]}
         ];
         function sumIds(ids) {
-          var r={total_assets:0,cash:0,receivable:0,current_assets:0,prepayments:0,fixed_assets:0,non_current_assets:0,total_liabilities:0,payable:0,current_liabilities:0,non_current_liabilities:0,total_equity:0,equity:0,net_income:0,cash_fiat:0,cash_stable:0,cash_xtr:0,cash_other:0};
+          var r={total_assets:0,cash:0,receivable:0,current_assets:0,prepayments:0,fixed_assets:0,non_current_assets:0,total_liabilities:0,payable:0,current_liabilities:0,non_current_liabilities:0,total_equity:0,equity:0,net_income:0,retained_earnings:0,cash_fiat:0,cash_stable:0,cash_xtr:0,cash_other:0};
           ids.forEach(function(id){var c=byId[id];if(!c)return;Object.keys(r).forEach(function(k){r[k]+=(c[k]||0);});});
           return r;
         }
         function bsCol(label, d, isTot, isGrand, color) {
           var a=d.total_assets||0,ac=d.cash||0,ar=d.receivable||0,aca=d.current_assets||0,ap=d.prepayments||0,af=d.fixed_assets||0,an=d.non_current_assets||0,at=ac+ar+aca;
           var l=d.total_liabilities||0,lc=d.current_liabilities||0,lp=d.payable||0,ln=d.non_current_liabilities||0;
-          var e=d.total_equity||0,er=d.equity||0,en=d.net_income||0,le=l+e;
+          var e=d.total_equity||0,er=d.equity||0,en=d.net_income||0,er2=d.retained_earnings||0,le=l+e;
           var cls=isGrand?' super-total-col':isTot?' group-total-col':'';
           var bs='border-top:3px solid '+color+';';
           return '<div class="bs-column'+cls+'" style="'+bs+'">'+
@@ -452,8 +456,9 @@
             '</div>'+
             '<div class="bs-section">'+
               '<div class="bs-row header"><span class="label">EQUITY</span><span class="value '+valClass(e)+'">'+fmtBs(e)+'</span></div>'+
-              '<div class="bs-row"><span class="label">Unallocated Earnings</span><span class="value '+valClass(en)+'">'+fmtBs(en)+'</span></div>'+
-              '<div class="bs-row"><span class="label">Retained Earnings</span><span class="value '+valClass(er)+'">'+fmtBs(er)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Equity Accounts</span><span class="value '+valClass(er)+'">'+fmtBs(er)+'</span></div>'+
+              '<div class="bs-row"><span class="label">P&L (Current Year)</span><span class="value '+valClass(en)+'">'+fmtBs(en)+'</span></div>'+
+              '<div class="bs-row"><span class="label">Retained Earnings</span><span class="value '+valClass(er2)+'">'+fmtBs(er2)+'</span></div>'+
             '</div>'+
             '<div class="bs-section"><div class="bs-row grand-total"><span class="label">L + E</span><span class="value '+valClass(le)+'">'+fmtBs(le)+'</span></div></div>'+
             '</div>';
