@@ -369,7 +369,7 @@
     // ── Balance Sheet ──
     async function loadBalanceSheet() {
      var asOf = getAsOf();
-     var el = document.getElementById('bsContainer');
+     var el = document.getElementById('bsContent');
      try {
        var tbPeriod = asOf ? asOf.slice(0,7) : (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
        var tbRaw = await (await fetch('/api/admin/tb?period='+tbPeriod)).json();
