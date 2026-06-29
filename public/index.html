@@ -862,6 +862,7 @@
         groups.forEach(function(g) {
           (g.accounts || []).forEach(function(a) {
             var item = { entity: g.name, code: a.code, name: a.name, balance: a.current_balance, company: a.company_name };
+            if (!(/^100/.test(a.code || '') || /^10[Ww]/i.test(a.code || ''))) return;
             if (a.asset_type === 'Crypto') {
               cryptoAccounts.push(item);
             } else {
