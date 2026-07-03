@@ -32,10 +32,10 @@ beforeEach(() => {
 describe('syncAccounts', () => {
   it('should sync accounts from Odoo', async () => {
     (odoo.searchRead as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      { id: 1, name: 'Cash', code: '1000', account_type: 'asset_cash', deprecated: false },
-      { id: 2, name: 'Accounts Receivable', code: '1200', account_type: 'asset_receivable', deprecated: false },
-      { id: 3, name: 'Sales Revenue', code: '4000', account_type: 'income', deprecated: false },
-      { id: 4, name: 'Accounts Payable', code: '2000', account_type: 'liability_payable', deprecated: false },
+      { id: 1, name: 'Cash', code: '1000', account_type: 'asset_cash', active: true },
+      { id: 2, name: 'Accounts Receivable', code: '1200', account_type: 'asset_receivable', active: true },
+      { id: 3, name: 'Sales Revenue', code: '4000', account_type: 'income', active: true },
+      { id: 4, name: 'Accounts Payable', code: '2000', account_type: 'liability_payable', active: true },
     ]);
 
     const result = await syncAccounts(odoo, db);
@@ -57,7 +57,7 @@ describe('syncAccounts', () => {
 
   it('should update existing accounts on re-sync', async () => {
     const mockData = [
-      { id: 1, name: 'Cash', code: '1000', account_type: 'asset_cash', deprecated: false },
+      { id: 1, name: 'Cash', code: '1000', account_type: 'asset_cash', active: true },
     ];
     (odoo.searchRead as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
@@ -77,11 +77,11 @@ describe('syncAccounts', () => {
 
   it('should map all Odoo account types correctly', async () => {
     (odoo.searchRead as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      { id: 1, name: 'A', code: '1000', account_type: 'asset_cash', deprecated: false },
-      { id: 2, name: 'B', code: '2000', account_type: 'liability_current', deprecated: false },
-      { id: 3, name: 'C', code: '3000', account_type: 'equity', deprecated: false },
-      { id: 4, name: 'D', code: '4000', account_type: 'income', deprecated: false },
-      { id: 5, name: 'E', code: '5000', account_type: 'expense', deprecated: false },
+      { id: 1, name: 'A', code: '1000', account_type: 'asset_cash', active: true },
+      { id: 2, name: 'B', code: '2000', account_type: 'liability_current', active: true },
+      { id: 3, name: 'C', code: '3000', account_type: 'equity', active: true },
+      { id: 4, name: 'D', code: '4000', account_type: 'income', active: true },
+      { id: 5, name: 'E', code: '5000', account_type: 'expense', active: true },
     ]);
 
     await syncAccounts(odoo, db);
@@ -94,9 +94,9 @@ describe('syncAccounts', () => {
     expect(accounts[4].type).toBe('expense');
   });
 
-  it('should mark deprecated accounts as inactive', async () => {
+  it('should mark archived (active=false) accounts as inactive', async () => {
     (odoo.searchRead as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      { id: 1, name: 'Old Account', code: '9999', account_type: 'asset_cash', deprecated: true },
+      { id: 1, name: 'Old Account', code: '9999', account_type: 'asset_cash', active: false },
     ]);
 
     await syncAccounts(odoo, db);
@@ -110,8 +110,8 @@ describe('syncJournalEntries', () => {
   beforeEach(async () => {
     // Pre-seed accounts for journal entry mapping
     (odoo.searchRead as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      { id: 10, name: 'Cash', code: '1000', account_type: 'asset_cash', deprecated: false },
-      { id: 20, name: 'Revenue', code: '4000', account_type: 'income', deprecated: false },
+      { id: 10, name: 'Cash', code: '1000', account_type: 'asset_cash', active: true },
+      { id: 20, name: 'Revenue', code: '4000', account_type: 'income', active: true },
     ]);
     await syncAccounts(odoo, db);
   });
