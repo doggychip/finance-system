@@ -8,6 +8,7 @@ import {
   getJournalEntry,
   listPayments,
 } from './db';
+import { computeFreshness, freshnessStamp } from './freshness';
 
 import path from 'path';
 
@@ -53,11 +54,25 @@ const READ_ONLY = {
   openWorldHint: false,
 } as const;
 
-/** Wrap a structured result into the SDK's dual text+structured response. */
-const ok = (data: unknown) => ({
-  content: [{ type: 'text' as const, text: JSON.stringify(data) }],
-  structuredContent: data as Record<string, unknown>,
-});
+/**
+ * Wrap a structured result into the SDK's dual text+structured response.
+ *
+ * Every object result is stamped with data_age_hours / stale / data_as_of from
+ * the single freshness source, so callers can judge trustworthiness inline
+ * without a separate get_sync_status round-trip. This is the one place every
+ * tool's result funnels through — the finance-system equivalent of stamping in
+ * a central dispatch. Non-object results (none today) pass through unstamped.
+ */
+const ok = (data: unknown) => {
+  const stamped =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? { ...(data as Record<string, unknown>), ...freshnessStamp() }
+      : data;
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(stamped) }],
+    structuredContent: stamped as Record<string, unknown>,
+  };
+};
 
 export function buildServer(): McpServerInstance {
   const server = new McpServerClass({ name: 'xter-finance-mcp-server', version: '1.0.0' });
@@ -245,6 +260,18 @@ export function buildServer(): McpServerInstance {
           offset: a.offset,
         })
       )
+  );
+
+  server.registerTool(
+    'get_sync_status',
+    {
+      title: 'Get sync status',
+      description:
+        "Report finance.db freshness so an agent can decide whether the data is trustworthy before answering. Returns: the canonical last_data_timestamp (newest successful data write), data_age_hours and stale (threshold 26h), the latest snapshot date per snapshot table, the max write timestamp per data table, the last successful sync, the SQLite file mtime (diagnostic only — NOT used for staleness, since failed syncs bump it), per-table row counts, and future_dated: journal entries dated after today (usually intentional pre-posted entries, but they corrupt any 'latest entry' view — flagged, not hidden). Call this first when the user asks 'is this data current/up to date' or before presenting figures the user will rely on.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => ok(computeFreshness())
   );
 
   return server;
