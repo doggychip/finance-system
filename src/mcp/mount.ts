@@ -3,6 +3,14 @@ import { timingSafeEqual } from 'node:crypto';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { buildServer } from './tools';
 import { healthProbe, dbPath, setDbPath } from './db';
+import { computeFreshness } from './freshness';
+
+/** Short git SHA of the running build (Zeabur injects it), for /healthz. Best-effort. */
+const GIT_SHA: string | null =
+  (process.env.ZEABUR_GIT_COMMIT_SHA ?? process.env.GIT_SHA ?? process.env.SOURCE_COMMIT)?.slice(
+    0,
+    12
+  ) ?? null;
 
 /*
  * Same reason as tools.ts: load via require() to avoid TypeScript's
@@ -146,6 +154,33 @@ export function mountMcp(app: Express, opts: MountOptions = {}): void {
       res.json({ status: 'ok', db: dbPath(), latest_snapshot: h.latest_snapshot });
     } catch (err) {
       res.status(503).json({ status: 'error', error: (err as Error).message });
+    }
+  });
+
+  // Richer, unauthenticated freshness probe. Reports build identity and data
+  // freshness so a monitor can alert on a stalled upstream Odoo sync (stale=true)
+  // without a bearer token. Unlike /mcp/health (which reports the latest snapshot
+  // date), this uses the canonical last successful data write — a failed sync
+  // bumps the file mtime but must NOT clear staleness. Never throws.
+  // (index.ts exempts /healthz from the dashboard Basic-auth gate.)
+  app.get('/healthz', (_req: Request, res: Response) => {
+    try {
+      const f = computeFreshness();
+      res.json({
+        status: f.error ? 'degraded' : f.stale ? 'stale' : 'ok',
+        git_sha: GIT_SHA,
+        last_data_timestamp: f.last_data_timestamp,
+        data_age_hours: f.data_age_hours,
+        stale: f.stale,
+        stale_threshold_hours: f.stale_threshold_hours,
+      });
+    } catch (err) {
+      res.status(200).json({
+        status: 'error',
+        git_sha: GIT_SHA,
+        last_data_timestamp: null,
+        error: (err as Error).message,
+      });
     }
   });
   // (The OAuth discovery endpoints /.well-known/oauth-* + /register are now

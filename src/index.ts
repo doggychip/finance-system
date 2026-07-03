@@ -69,6 +69,7 @@ if (authUser && authPass) {
     // (not the Basic-auth HTML), avoiding a misleading client-side OAuth error.
     if (
       req.path === '/health' ||
+      req.path === '/healthz' ||
       req.path === '/mcp' ||
       req.path.startsWith('/mcp/') ||
       req.path.startsWith('/.well-known/') ||
