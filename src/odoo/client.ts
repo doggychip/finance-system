@@ -97,7 +97,7 @@ export class OdooClient {
     model: string,
     domain: unknown[][],
     fields: string[],
-    options: { limit?: number; offset?: number; order?: string } = {}
+    options: { limit?: number; offset?: number; order?: string; context?: Record<string, unknown> } = {}
   ): Promise<Record<string, unknown>[]> {
     return await this.execute(model, 'search_read', [domain], {
       fields,

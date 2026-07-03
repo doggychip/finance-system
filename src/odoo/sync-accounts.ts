@@ -41,12 +41,15 @@ export interface AccountSyncResult {
 export async function syncAccounts(odoo: OdooClient, db: Database.Database): Promise<AccountSyncResult> {
   const result: AccountSyncResult = { created: 0, updated: 0, total: 0, errors: [] };
 
-  // Fetch all accounts from Odoo
+  // Fetch all accounts from Odoo.
+  // Odoo 18+ removed account.account.deprecated in favor of the standard
+  // active flag; active_test:false keeps archived accounts in the result
+  // (matching the old behavior where deprecated accounts synced as inactive).
   const odooAccounts = await odoo.searchRead(
     'account.account',
     [],
     ['id', 'name', 'code', 'account_type', 'active'],
-    { order: 'code asc' }
+    { order: 'code asc', context: { active_test: false } }
   );
 
   result.total = odooAccounts.length;
